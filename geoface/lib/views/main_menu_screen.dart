@@ -1,20 +1,26 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:lottie/lottie.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
+// La clase TimeService se mantiene como la definiste originalmente.
 class TimeService {
   static final TimeService _instance = TimeService._internal();
   factory TimeService() => _instance;
   TimeService._internal();
 
-  // APIs más confiables con diferentes enfoques
   static const List<Map<String, String>> _timeApis = [
+    {
+      'url': 'https://www.google.com',
+      'name': 'Google HTTP Header',
+      'type': 'google-header'
+    },
     {
       'url': 'https://timeapi.io/api/Time/current/zone?timeZone=America/Lima',
       'name': 'TimeAPI.io',
@@ -28,96 +34,54 @@ class TimeService {
   ];
 
   DateTime? _baseApiTime;
-  DateTime? _baseLocalTime;
+  final Stopwatch _syncStopwatch = Stopwatch();
+  
   String _currentTimeSource = 'Inicializando...';
   bool _isOnline = false;
-  bool _hasInternetConnection = true;
-  Timer? _connectionCheckTimer;
+  Timer? _syncTimer;
 
   String get timeSource => _currentTimeSource;
   bool get isOnline => _isOnline;
 
-  // Método principal para obtener tiempo con mejor lógica
   Future<DateTime> getCurrentTime() async {
-    // Si tenemos tiempo base de API, calcularlo dinámicamente
-    if (_baseApiTime != null && _baseLocalTime != null) {
-      final elapsed = DateTime.now().difference(_baseLocalTime!);
-      final calculatedTime = _baseApiTime!.add(elapsed);
-      
-      // Verificar que el tiempo calculado sea razonable (no más de 1 hora de diferencia)
-      final timeDiff = calculatedTime.difference(DateTime.now()).abs();
-      if (timeDiff.inHours < 1) {
-        return calculatedTime;
-      }
+    if (_baseApiTime != null && _syncStopwatch.isRunning) {
+      return _baseApiTime!.add(_syncStopwatch.elapsed);
     }
-
-    // Intentar sincronizar si no tenemos tiempo base o si es muy antiguo
+    
     await _attemptTimeSync();
 
-    // Si logramos sincronizar, usar tiempo calculado
-    if (_baseApiTime != null && _baseLocalTime != null) {
-      final elapsed = DateTime.now().difference(_baseLocalTime!);
-      return _baseApiTime!.add(elapsed);
+    if (_baseApiTime != null && _syncStopwatch.isRunning) {
+      return _baseApiTime!.add(_syncStopwatch.elapsed);
     }
 
-    // Fallback: usar tiempo local con ajuste manual para Lima
-    return _getLocalTimeLima();
-  }
-
-  // Obtener tiempo local ajustado manualmente para Lima (UTC-5)
-  DateTime _getLocalTimeLima() {
+    _currentTimeSource = 'Sin Conexión - Tiempo Local';
     _isOnline = false;
-    _currentTimeSource = 'Tiempo Local (UTC-5)';
-    
-    // Obtener UTC y restar 5 horas para Lima
-    final utcNow = DateTime.now().toUtc();
-    return utcNow.subtract(const Duration(hours: 5));
+    return DateTime.now().toUtc().subtract(const Duration(hours: 5));
   }
-
-  // Verificar conexión de manera más eficiente
-  Future<bool> _checkConnection() async {
-    try {
-      final response = await http.head(
-        Uri.parse('https://www.google.com'),
-      ).timeout(const Duration(seconds: 3));
-      
-      _hasInternetConnection = response.statusCode == 200;
-      return _hasInternetConnection;
-    } catch (e) {
-      _hasInternetConnection = false;
-      return false;
-    }
-  }
-
-  // Intento de sincronización con múltiples APIs
+  
   Future<void> _attemptTimeSync() async {
-    if (!await _checkConnection()) {
-      _currentTimeSource = 'Sin Conexión - Tiempo Local';
-      _isOnline = false;
-      return;
-    }
-
     for (final api in _timeApis) {
       try {
-        final response = await http.get(
-          Uri.parse(api['url']!),
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'GeoFace-TimeSync/1.0'
-          },
-        ).timeout(const Duration(seconds: 8));
+        final uri = Uri.parse(api['url']!);
+        final response = api['type'] == 'google-header'
+            ? await http.head(uri).timeout(const Duration(seconds: 5))
+            : await http.get(uri, headers: {'Accept': 'application/json'})
+                .timeout(const Duration(seconds: 8));
 
-        if (response.statusCode == 200) {
-          final apiTime = _parseTimeResponse(api, response.body);
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          final apiTime = _parseTimeResponse(api, response);
+          
           if (apiTime != null && _isTimeReasonable(apiTime)) {
             _baseApiTime = apiTime;
-            _baseLocalTime = DateTime.now();
+            _syncStopwatch.reset();
+            _syncStopwatch.start();
+            
             _isOnline = true;
-            _currentTimeSource = '${api['name']} (Lima)';
+            _currentTimeSource = '${api['name']} (Sincronizado)';
             
             print('✓ Sincronizado con: ${api['name']}');
-            print('✓ Hora API: ${apiTime.toString()}');
-            print('✓ Diferencia con local: ${apiTime.difference(DateTime.now()).inSeconds}s');
+            print('✓ Hora Base API (Lima): ${_baseApiTime.toString()}');
+            
             return;
           }
         }
@@ -127,29 +91,26 @@ class TimeService {
       }
     }
 
-    // Si todas las APIs fallan
-    _currentTimeSource = 'APIs no disponibles - Tiempo Local';
+    print('✗ Todas las APIs fallaron. Usando tiempo local.');
     _isOnline = false;
+    _currentTimeSource = 'APIs no disponibles - Tiempo Local';
+    _syncStopwatch.stop();
+    _baseApiTime = null;
   }
-
-  // Parser mejorado para diferentes APIs
-  DateTime? _parseTimeResponse(Map<String, String> api, String responseBody) {
+  
+  DateTime? _parseTimeResponse(Map<String, String> api, http.Response response) {
     try {
-      final data = json.decode(responseBody);
-      
       switch (api['type']) {
-                  
+        case 'google-header':
+          final dateHeader = response.headers['date'];
+          if (dateHeader == null) return null;
+          return parseHttpDate(dateHeader).subtract(const Duration(hours: 5));
         case 'timeapi':
-          // TimeAPI.io - formato diferente
-          final dateTimeString = data['dateTime'] as String;
-          return DateTime.parse(dateTimeString);
-          
+          final data = json.decode(response.body);
+          return DateTime.parse(data['dateTime'] as String);
         case 'worldclock':
-          // WorldClockAPI - requiere conversión
-          final dateTimeString = data['currentDateTime'] as String;
-          final utcTime = DateTime.parse(dateTimeString);
-          return utcTime.subtract(const Duration(hours: 5)); // UTC-5 para Lima
-          
+          final data = json.decode(response.body);
+          return DateTime.parse(data['currentDateTime'] as String);
         default:
           return null;
       }
@@ -159,52 +120,33 @@ class TimeService {
     }
   }
 
-  // Verificar que el tiempo de la API sea razonable
   bool _isTimeReasonable(DateTime apiTime) {
     final now = DateTime.now();
     final difference = apiTime.difference(now).abs();
-    
-    // Aceptar diferencias de hasta 12 horas (para manejar zonas horarias)
     return difference.inHours <= 12;
   }
-
-  // Inicializar servicio con verificaciones periódicas
+  
   void initialize() {
-    _attemptTimeSync();
-    
-    // Verificar conexión cada 30 segundos
-    _connectionCheckTimer = Timer.periodic(
-      const Duration(seconds: 30), 
+    _attemptTimeSync(); 
+    _syncTimer?.cancel();
+    _syncTimer = Timer.periodic(
+      const Duration(minutes: 5), 
       (timer) => _attemptTimeSync()
     );
   }
 
-  // Forzar sincronización manual
   Future<void> forceSync() async {
     _currentTimeSource = 'Sincronizando...';
     await _attemptTimeSync();
   }
 
-  // Limpiar recursos
   void dispose() {
-    _connectionCheckTimer?.cancel();
-  }
-
-  // Obtener información detallada del estado
-  Map<String, dynamic> getStatus() {
-    return {
-      'isOnline': _isOnline,
-      'source': _currentTimeSource,
-      'hasConnection': _hasInternetConnection,
-      'lastSync': _baseLocalTime?.toString() ?? 'Nunca',
-      'timeDrift': _baseApiTime != null && _baseLocalTime != null
-          ? DateTime.now().difference(_baseLocalTime!).inSeconds
-          : 0,
-    };
+    _syncTimer?.cancel();
+    _syncStopwatch.stop();
   }
 }
 
-// Clase mejorada para manejo responsivo (sin cambios)
+// La clase ResponsiveConfig se mantiene como la definiste originalmente.
 class ResponsiveConfig {
   final double screenWidth;
   final double screenHeight;
@@ -258,6 +200,9 @@ class _MainMenuScreenState extends State<MainMenuScreen>
   late Animation<double> _pulseAnimation;
   late Animation<double> _syncAnimation;
   
+  late AnimationController _entryController;
+  late Animation<double> _headerFade, _cardFade, _buttonFade;
+  
   bool _isMenuOpen = false;
   bool _isInitializing = true;
   bool _isSyncing = false;
@@ -266,7 +211,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
 
   static const Color _primaryColor = Color(0xFF6A1B9A);
   static const Color _secondaryColor = Color(0xFF00C853);
-  static const Color _accentColor = Color(0xFF8E24AA);
+  static const Color _accentColor = Color(0xFF4E1386);
 
   @override
   void initState() {
@@ -278,7 +223,6 @@ class _MainMenuScreenState extends State<MainMenuScreen>
     await initializeDateFormatting('es_PE', null);
     _setupAnimations();
     
-    // Inicializar servicio de tiempo
     _timeService.initialize();
     await _initializeTime();
     _setupTimers();
@@ -286,6 +230,8 @@ class _MainMenuScreenState extends State<MainMenuScreen>
     setState(() {
       _isInitializing = false;
     });
+
+    _entryController.forward();
   }
 
   void _setupAnimations() {
@@ -306,6 +252,28 @@ class _MainMenuScreenState extends State<MainMenuScreen>
     _syncAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _syncController, curve: Curves.easeInOut),
     );
+
+    _entryController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 900));
+
+    _headerFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _entryController,
+        curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+      ),
+    );
+    _cardFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _entryController,
+        curve: const Interval(0.2, 0.8, curve: Curves.easeOut),
+      ),
+    );
+    _buttonFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _entryController,
+        curve: const Interval(0.5, 1.0, curve: Curves.easeOut),
+      ),
+    );
   }
 
   Future<void> _initializeTime() async {
@@ -313,7 +281,6 @@ class _MainMenuScreenState extends State<MainMenuScreen>
   }
 
   void _setupTimers() {
-    // Timer principal para actualizar la UI cada segundo
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       if (mounted) {
         final newTime = await _timeService.getCurrentTime();
@@ -324,31 +291,23 @@ class _MainMenuScreenState extends State<MainMenuScreen>
     });
   }
 
-  // Sincronización manual mejorada
   Future<void> _performManualSync() async {
     if (_isSyncing) return;
     
-    setState(() {
-      _isSyncing = true;
-    });
+    setState(() { _isSyncing = true; });
     
     _syncController.reset();
     _syncController.forward();
     
     await _timeService.forceSync();
     
-    // Pequeña pausa para mostrar la animación
     await Future.delayed(const Duration(milliseconds: 500));
     
     if (mounted) {
-      setState(() {
-        _isSyncing = false;
-      });
+      setState(() { _isSyncing = false; });
       
-      // Feedback háptico
       HapticFeedback.lightImpact();
       
-      // Mostrar resultado
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -370,6 +329,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
     _timer.cancel();
     _pulseController.dispose();
     _syncController.dispose();
+    _entryController.dispose();
     _timeService.dispose();
     super.dispose();
   }
@@ -413,16 +373,16 @@ class _MainMenuScreenState extends State<MainMenuScreen>
   }
 
   BoxDecoration _buildGradientBackground() {
-    return BoxDecoration(
+    return const BoxDecoration(
       gradient: LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          _primaryColor,
-          _accentColor,
-          const Color(0xFF4A148C),
+          Color(0xFF2A0D45),
+          Color(0xFF4E1386),
+          Color(0xFF2E0F52),
         ],
-        stops: const [0.0, 0.5, 1.0],
+        stops: [0.0, 0.5, 1.0],
       ),
     );
   }
@@ -452,7 +412,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
                       repeat: true,
                       animate: true,
                       errorBuilder: (context, error, stackTrace) {
-                        return CircularProgressIndicator(
+                        return const CircularProgressIndicator(
                           strokeWidth: 3,
                           valueColor: AlwaysStoppedAnimation<Color>(_primaryColor),
                         );
@@ -488,7 +448,6 @@ class _MainMenuScreenState extends State<MainMenuScreen>
   }
 
   Widget _buildMainContent(ResponsiveConfig config) {
-    // Formatear fecha y hora para Lima específicamente
     final limaTimeFormat = DateFormat('EEEE d \'de\' MMMM, yyyy', 'es_PE');
     final clockFormat = DateFormat('HH:mm:ss');
 
@@ -502,11 +461,20 @@ class _MainMenuScreenState extends State<MainMenuScreen>
         child: IntrinsicHeight(
           child: Column(
             children: [
-              _buildHeader(config),
-              Expanded(
-                child: _buildTimeCard(config, limaTimeFormat, clockFormat),
+              FadeTransition(
+                opacity: _headerFade,
+                child: _buildHeader(config),
               ),
-              _buildAdminAccess(config),
+              Expanded(
+                child: FadeTransition(
+                  opacity: _cardFade,
+                  child: _buildTimeCard(config, limaTimeFormat, clockFormat),
+                ),
+              ),
+              FadeTransition(
+                opacity: _buttonFade,
+                child: _buildAdminAccess(config),
+              ),
             ],
           ),
         ),
@@ -579,7 +547,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
                 if (_isSyncing)
                   Transform.rotate(
                     angle: _syncAnimation.value * 6.28,
-                    child: Icon(
+                    child: const Icon(
                       Icons.sync,
                       size: 16,
                       color: Colors.white,
@@ -591,7 +559,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
                     size: 16,
                     color: _timeService.isOnline ? _secondaryColor : Colors.orange[300],
                   ),
-                SizedBox(width: 6),
+                const SizedBox(width: 6),
                 Text(
                   _timeService.isOnline ? 'Online' : 'Local',
                   style: TextStyle(
@@ -632,62 +600,66 @@ class _MainMenuScreenState extends State<MainMenuScreen>
   }
 
   Widget _buildTimeCard(ResponsiveConfig config, DateFormat dateFormat, DateFormat timeFormat) {
-    return Container(
-      margin: EdgeInsets.all(config.padding),
-      padding: EdgeInsets.all(config.padding * 1.5),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Padding(
+      padding: EdgeInsets.all(config.padding),
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            dateFormat.format(_currentTime).toUpperCase(),
-            style: TextStyle(
-              color: _primaryColor,
-              fontSize: config.dateSize,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1.2,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          
-          SizedBox(height: config.padding),
-          
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              timeFormat.format(_currentTime),
-              style: TextStyle(
-                color: const Color(0xFF4A148C),
-                fontSize: config.timeSize,
-                fontWeight: FontWeight.bold,
-                letterSpacing: -2,
-                fontFeatures: const [FontFeature.tabularFigures()],
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+          child: Container(
+            padding: EdgeInsets.all(config.padding * 1.5),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.2),
+                width: 1.5,
               ),
             ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  dateFormat.format(_currentTime).toUpperCase(),
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: config.dateSize,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: config.padding),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    timeFormat.format(_currentTime),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: config.timeSize,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -2,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      shadows: [
+                        Shadow(
+                          blurRadius: 10.0,
+                          color: Colors.black.withOpacity(0.3),
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(height: config.margin),
+                _buildTimeSource(config),
+                SizedBox(height: config.padding * 1.5),
+                _buildAttendanceButton(config),
+                SizedBox(height: config.padding),
+                _buildConnectionStatus(config),
+              ],
+            ),
           ),
-          
-          SizedBox(height: config.margin),
-          
-          _buildTimeSource(config),
-          
-          SizedBox(height: config.padding * 1.5),
-          
-          _buildAttendanceButton(config),
-          
-          SizedBox(height: config.padding),
-          
-          _buildConnectionStatus(config),
-        ],
+        ),
       ),
     );
   }
@@ -718,7 +690,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
             size: config.statusSize,
             color: isOnline ? _secondaryColor : Colors.orange[600],
           ),
-          SizedBox(width: 6),
+          const SizedBox(width: 6),
           Flexible(
             child: Text(
               _timeService.timeSource,
@@ -747,31 +719,47 @@ class _MainMenuScreenState extends State<MainMenuScreen>
             widget.onMarkAttendance(context);
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: _primaryColor,
+            backgroundColor: Colors.transparent,
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            elevation: 6,
-            shadowColor: _primaryColor.withOpacity(0.4),
+            elevation: 0,
+            padding: EdgeInsets.zero,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.fingerprint,
-                size: config.buttonIconSize,
+          child: Ink(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [
+                  _secondaryColor,
+                  Color(0xFF00E676),
+                ],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
               ),
-              SizedBox(width: config.margin),
-              Text(
-                'MARCAR ASISTENCIA',
-                style: TextStyle(
-                  fontSize: config.buttonTextSize,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Container(
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.fingerprint,
+                    size: config.buttonIconSize,
+                  ),
+                  SizedBox(width: config.margin),
+                  Text(
+                    'MARCAR ASISTENCIA',
+                    style: TextStyle(
+                      fontSize: config.buttonTextSize,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -791,21 +779,18 @@ class _MainMenuScreenState extends State<MainMenuScreen>
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: (isOnline ? _secondaryColor : Colors.orange)
-                    .withOpacity(0.4),
-                blurRadius: 4,
-                spreadRadius: 1,
+                color: (isOnline ? _secondaryColor : Colors.orange).withOpacity(0.5),
+                blurRadius: 5,
+                spreadRadius: 2,
               ),
             ],
           ),
         ),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
         Text(
-          isOnline 
-            ? 'Hora sincronizada Online'
-            : 'Tiempo local (UTC-5) - Sin conexión',
+          isOnline ? 'Hora sincronizada Online' : 'Tiempo local (UTC-5) - Sin conexión',
           style: TextStyle(
-            color: Colors.grey[600],
+            color: Colors.white.withOpacity(0.7),
             fontSize: config.statusSize,
             fontWeight: FontWeight.w500,
           ),
@@ -895,11 +880,11 @@ class _MainMenuScreenState extends State<MainMenuScreen>
       children: [
         Container(
           padding: EdgeInsets.all(config.padding),
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [_primaryColor, _accentColor],
             ),
-            borderRadius: const BorderRadius.only(
+            borderRadius: BorderRadius.only(
               topLeft: Radius.circular(16),
               topRight: Radius.circular(16),
             ),
@@ -982,11 +967,11 @@ class _MainMenuScreenState extends State<MainMenuScreen>
       children: [
         Container(
           padding: EdgeInsets.all(config.margin),
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [_primaryColor, _accentColor],
             ),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.all(Radius.circular(12)),
           ),
           child: Icon(
             Icons.face_retouching_natural,
@@ -1008,7 +993,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
                 ),
               ),
               Text(
-                'Versión 2.3.0',
+                'Versión 2.3.1',
                 style: TextStyle(
                   fontSize: config.statusSize,
                   color: Colors.grey[600],
@@ -1023,7 +1008,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
 
   Widget _buildTechnicalInfo(ResponsiveConfig config) {
     return Container(
-      padding: EdgeInsets.all(config.padding),
+      padding: EdgeInsets.symmetric(horizontal: config.padding, vertical: config.margin),
       decoration: BoxDecoration(
         color: Colors.grey[50],
         borderRadius: BorderRadius.circular(12),
@@ -1032,79 +1017,41 @@ class _MainMenuScreenState extends State<MainMenuScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildInfoRow(
-            config,
-            Icons.build,
-            'Build',
-            '20250531-TimeSync',
-          ),
-          SizedBox(height: config.margin),
-          _buildInfoRow(
-            config,
-            Icons.schedule,
-            'Fuente de Tiempo',
-            _timeService.timeSource,
-          ),
-          SizedBox(height: config.margin),
-          _buildInfoRow(
-            config,
-            Icons.cloud,
-            'Estado de Conexión',
-            _timeService.isOnline ? 'Conectado' : 'Sin conexión',
-          ),
-          SizedBox(height: config.margin),
-          _buildInfoRow(
-            config,
-            Icons.location_on,
-            'Zona Horaria',
-            'America/Lima (UTC-5)',
-          ),
-          SizedBox(height: config.margin),
-          _buildInfoRow(
-            config,
-            Icons.phone_android,
-            'Plataforma',
-            'Flutter Mobile',
-          ),
+          _buildInfoRow(config, Icons.build, 'Build', '20250531-TimeSync-V2'),
+          _buildInfoRow(config, Icons.schedule, 'Fuente de Tiempo', _timeService.timeSource),
+          _buildInfoRow(config, Icons.cloud, 'Estado de Conexión', _timeService.isOnline ? 'Conectado' : 'Sin conexión'),
+          _buildInfoRow(config, Icons.location_on, 'Zona Horaria', 'America/Lima (UTC-5)'),
+          _buildInfoRow(config, Icons.phone_android, 'Plataforma', 'Flutter Mobile'),
         ],
       ),
     );
   }
 
   Widget _buildInfoRow(ResponsiveConfig config, IconData icon, String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(
-          icon,
-          size: config.iconSize * 0.6,
-          color: const Color(0xFF1976D2),
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        icon,
+        size: config.iconSize * 0.8,
+        color: _primaryColor,
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontSize: config.statusSize + 1,
+          fontWeight: FontWeight.w600,
+          color: Colors.grey[800],
         ),
-        SizedBox(width: config.margin),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: config.statusSize,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[800],
-                ),
-              ),
-              SizedBox(height: 2),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: config.statusSize,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
+      ),
+      subtitle: Text(
+        value,
+        style: TextStyle(
+          fontSize: config.statusSize,
+          color: Colors.grey[600],
         ),
-      ],
+        overflow: TextOverflow.ellipsis,
+      ),
+      dense: true,
     );
   }
 
@@ -1126,7 +1073,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
                 size: config.statusSize,
                 color: Colors.grey[600],
               ),
-              SizedBox(width: 4),
+              const SizedBox(width: 4),
               Text(
                 '2025 GeoFace Systems',
                 style: TextStyle(

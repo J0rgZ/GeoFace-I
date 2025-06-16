@@ -19,7 +19,7 @@ import 'controllers/reporte_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+  await initializeDateFormatting('es_ES', null);
   try {
     // Inicializar Firebase
     await Firebase.initializeApp();
