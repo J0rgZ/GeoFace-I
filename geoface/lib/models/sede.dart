@@ -74,4 +74,20 @@ class Sede {
       fechaModificacion: fechaModificacion ?? DateTime.now(),
     );
   }
+
+   /// Un constructor estático para crear una instancia de Sede "vacía" o por defecto.
+  /// Útil para inicializaciones o como valor de fallback.
+  static Sede empty() {
+    return Sede(
+      id: '',
+      nombre: 'Sede no encontrada',
+      direccion: '',
+      latitud: 0.0,
+      longitud: 0.0,
+      radioPermitido: 0,
+      activa: false,
+      fechaCreacion: DateTime.now(),
+      fechaModificacion: null,
+    );
+  }
 }

@@ -12,7 +12,7 @@ import '../../utils/date_utils.dart' as date_utils;
 class DashboardPage extends StatefulWidget {
   final void Function(int)? onNavigateToTab;
 
-  const DashboardPage({Key? key, this.onNavigateToTab}) : super(key: key);
+  const DashboardPage({super.key, this.onNavigateToTab});
 
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -32,31 +32,37 @@ class _DashboardPageState extends State<DashboardPage> {
     final empleadoController = Provider.of<EmpleadoController>(context, listen: false);
     final asistenciaController = Provider.of<AsistenciaController>(context, listen: false);
     
-    await sedeController.getSedes();
-    await empleadoController.getEmpleados();
-    await asistenciaController.getAllAsistencias(); // Nuevo método necesario para obtener todas las asistencias
+    await Future.wait([
+      sedeController.getSedes(),
+      empleadoController.getEmpleados(),
+      asistenciaController.getAllAsistencias(),
+    ]);
   }
+  
+  // NOTA DE RENDIMIENTO: El método `getAllAsistencias` puede ser ineficiente si hay
+  // un gran volumen de datos históricos. Para una aplicación a gran escala, sería
+  // ideal tener un endpoint en el backend que devuelva solo las asistencias del día,
+  // por ejemplo: `asistenciaController.getAsistenciasDeHoy()`.
+  // La lógica actual en el cliente es aceptable para volúmenes de datos pequeños/medianos.
 
-  // Calcula las asistencias del día actual
   int _getAsistenciasHoy(List<Asistencia> asistencias) {
+    // AVISO IMPORTANTE: Los errores de Timeout en tus logs indican que obtener la hora de APIs externas está fallando.
+    // Deberías usar DateTime.now() como fallback para que la app no se detenga.
     final hoy = DateTime.now();
     return asistencias.where((a) => date_utils.isSameDay(a.fechaHoraEntrada, hoy)).length;
   }
 
-  // Calcula las asistencias por sede en el día actual
   Map<String, int> _getAsistenciasPorSedeHoy(List<Asistencia> asistencias, List<Sede> sedes) {
     final hoy = DateTime.now();
-    final Map<String, int> asistenciasPorSede = {};
+    final Map<String, int> asistenciasPorSede = {
+      for (var sede in sedes) sede.id: 0
+    };
     
-    // Inicializar el mapa con todas las sedes en 0
-    for (var sede in sedes) {
-      asistenciasPorSede[sede.id] = 0;
-    }
-    
-    // Contar asistencias de hoy por sede
     for (var asistencia in asistencias) {
       if (date_utils.isSameDay(asistencia.fechaHoraEntrada, hoy)) {
-        asistenciasPorSede[asistencia.sedeId] = (asistenciasPorSede[asistencia.sedeId] ?? 0) + 1;
+        if (asistenciasPorSede.containsKey(asistencia.sedeId)) {
+          asistenciasPorSede[asistencia.sedeId] = (asistenciasPorSede[asistencia.sedeId] ?? 0) + 1;
+        }
       }
     }
     
@@ -65,151 +71,117 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Verificar si estamos en tema oscuro o claro
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
     return RefreshIndicator(
       onRefresh: _loadData,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Consumer3<SedeController, EmpleadoController, AsistenciaController>(
-          builder: (context, sedeController, empleadoController, asistenciaController, _) {
-            final sedes = sedeController.sedes;
-            final empleados = empleadoController.empleados;
-            final asistencias = asistenciaController.asistencias;
-            
-            if (sedeController.loading || empleadoController.loading || asistenciaController.loading) {
-              return const Center(child: CircularProgressIndicator());
-            }
+      child: Consumer3<SedeController, EmpleadoController, AsistenciaController>(
+        builder: (context, sedeController, empleadoController, asistenciaController, _) {
+          
+          if (sedeController.loading || empleadoController.loading || asistenciaController.loading) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-            if (sedeController.errorMessage != null) {
-              return Center(child: Text(sedeController.errorMessage!));
-            }
+          final errorMessage = sedeController.errorMessage ?? empleadoController.errorMessage ?? asistenciaController.errorMessage;
+          if (errorMessage != null) {
+            return _buildErrorWidget(errorMessage, _loadData);
+          }
 
-            if (empleadoController.errorMessage != null) {
-              return Center(child: Text(empleadoController.errorMessage!));
-            }
-            
-            if (asistenciaController.errorMessage != null) {
-              return Center(child: Text(asistenciaController.errorMessage!));
-            }
+          final sedes = sedeController.sedes;
+          final empleados = empleadoController.empleados;
+          final asistencias = asistenciaController.asistencias;
 
-            final sedesActivas = sedes.where((sede) => sede.activa).length;
-            final empleadosActivos = empleados.where((emp) => emp.activo).length;
-            final totalSedes = sedes.length;
-            final totalEmpleados = empleados.length;
-            
-            // Nuevas métricas para asistencias
-            final asistenciasHoy = _getAsistenciasHoy(asistencias);
-            final asistenciasPorSedeHoy = _getAsistenciasPorSedeHoy(asistencias, sedes);
+          final sedesActivas = sedes.where((sede) => sede.activa).length;
+          final empleadosActivos = empleados.where((emp) => emp.activo).length;
+          final totalSedes = sedes.length;
+          final totalEmpleados = empleados.length;
+          
+          final asistenciasHoy = _getAsistenciasHoy(asistencias);
+          final asistenciasPorSedeHoy = _getAsistenciasPorSedeHoy(asistencias, sedes);
+          final tasaAsistencia = empleadosActivos > 0 
+              ? (asistenciasHoy / empleadosActivos * 100)
+              : 0.0;
 
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                // Determinar si estamos en un dispositivo móvil o tablet/desktop
-                final isSmallScreen = constraints.maxWidth < 600;
-                
-                // Ajustar aspectRatio según el tamaño de la pantalla
-                final cardAspectRatio = isSmallScreen ? 1.1 : 1.5;
-      
-                return SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final isSmallScreen = constraints.maxWidth < 600;
+              final gridCrossAxisCount = isSmallScreen ? 2 : 4;
+              final cardAspectRatio = isSmallScreen ? 1.1 : 1.4;
+    
+              return SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Encabezado
                       _buildDashboardHeader(),
-                      
                       const SizedBox(height: 16),
                       
-                      // Tarjetas de estadísticas principales - VERSIÓN RESPONSIVA
-                      LayoutBuilder(
-                        builder: (context, cardConstraints) {
-                          return GridView.builder(
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2, // Siempre 2 columnas
-                              childAspectRatio: cardAspectRatio,
-                              crossAxisSpacing: 0,
-                              mainAxisSpacing: 0,
-                            ),
-                            itemCount: 4,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemBuilder: (context, index) {
-                              switch (index) {
-                                case 0:
-                                  return _buildStatCard(
-                                    title: 'Sedes Activas',
-                                    value: sedesActivas.toString(),
-                                    total: totalSedes.toString(),
-                                    icon: Icons.location_city,
-                                    color: Colors.blue,
-                                    isDarkMode: isDarkMode,
-                                  );
-                                case 1:
-                                  return _buildStatCard(
-                                    title: 'Empleados Activos',
-                                    value: empleadosActivos.toString(),
-                                    total: totalEmpleados.toString(),
-                                    icon: Icons.people,
-                                    color: Colors.green,
-                                    isDarkMode: isDarkMode,
-                                  );
-                                case 2:
-                                  return _buildStatCard(
-                                    title: 'Asistencias Hoy',
-                                    value: asistenciasHoy.toString(),
-                                    total: empleadosActivos.toString(),
-                                    icon: Icons.calendar_today,
-                                    color: Colors.orange,
-                                    isDarkMode: isDarkMode,
-                                  );
-                                case 3:
-                                  return _buildStatCard(
-                                    title: 'Tasa de Asistencia',
-                                    value: '${empleadosActivos > 0 ? (asistenciasHoy / empleadosActivos * 100).toStringAsFixed(0) : 0}%',
-                                    description: 'Hoy',
-                                    icon: Icons.analytics,
-                                    color: Colors.cyan,
-                                    isDarkMode: isDarkMode,
-                                  );
-                                default:
-                                  return const SizedBox();
-                              }
-                            },
-                          );
-                        },
+                      GridView(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: gridCrossAxisCount,
+                          childAspectRatio: cardAspectRatio,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                        ),
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        children: [
+                          _buildStatCard(
+                            title: 'Sedes Activas',
+                            value: sedesActivas.toString(),
+                            total: totalSedes.toString(),
+                            icon: Icons.location_city,
+                            color: Colors.blue,
+                            isDarkMode: isDarkMode,
+                          ),
+                          _buildStatCard(
+                            title: 'Empleados Activos',
+                            value: empleadosActivos.toString(),
+                            total: totalEmpleados.toString(),
+                            icon: Icons.people,
+                            color: Colors.green,
+                            isDarkMode: isDarkMode,
+                          ),
+                          _buildStatCard(
+                            title: 'Asistencias Hoy',
+                            value: asistenciasHoy.toString(),
+                            total: empleadosActivos.toString(),
+                            icon: Icons.calendar_today,
+                            color: Colors.orange,
+                            isDarkMode: isDarkMode,
+                          ),
+                          _buildStatCard(
+                            title: 'Tasa de Asistencia',
+                            value: '${tasaAsistencia.toStringAsFixed(0)}%',
+                            description: 'Hoy',
+                            icon: Icons.analytics,
+                            color: Colors.cyan,
+                            isDarkMode: isDarkMode,
+                          ),
+                        ],
                       ),
 
                       const SizedBox(height: 24),
                       
-                      // Sección de asistencias por sede hoy
                       _buildSectionHeader(
                         title: 'Asistencias Hoy por Sede',
-                        actionLabel: sedes.length > 5 ? 'Ver detalle' : null,
-                        onAction: sedes.length > 5 ? () {
-                          widget.onNavigateToTab?.call(3); // Asumo que 3 es el índice para "Asistencias"
-                        } : null,
+                        actionLabel: 'Ver detalle',
+                        onAction: () => widget.onNavigateToTab?.call(3),
                       ),
-                      
                       const SizedBox(height: 16),
-                      
-                      // Gráfico de asistencias por sede
                       _buildAsistenciasSedeChart(asistenciasPorSedeHoy, sedes, isDarkMode),
                       
                       const SizedBox(height: 24),
                       
-                      // Sección de sedes
                       _buildSectionHeader(
-                        title: 'Sedes',
+                        title: 'Sedes Recientes',
                         actionLabel: sedes.length > 5 ? 'Ver todas' : null,
-                        onAction: sedes.length > 5 ? () {
-                          widget.onNavigateToTab?.call(1); // 1 es el índice de "Sedes"
-                        } : null,
+                        onAction: sedes.length > 5 ? () => widget.onNavigateToTab?.call(1) : null,
                       ),
-                      
                       const SizedBox(height: 16),
                       
-                      // Lista de sedes con asistencias de hoy
                       ...sedes.take(5).map((sede) => _buildSedeCard(
                         sede, 
                         empleados, 
@@ -219,7 +191,6 @@ class _DashboardPageState extends State<DashboardPage> {
                       
                       const SizedBox(height: 24),
                       
-                      // Resumen de datos
                       _buildSummaryCard(
                         totalSedes: totalSedes,
                         sedesActivas: sedesActivas,
@@ -230,33 +201,44 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                     ],
                   ),
-                );
-              }
-            );
-          },
+                ),
+              );
+            }
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget(String message, VoidCallback onRetry) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 60),
+            const SizedBox(height: 16),
+            Text('Ocurrió un error', style: Theme.of(context).textTheme.headlineSmall, textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            Text(message, style: Theme.of(context).textTheme.bodyMedium, textAlign: TextAlign.center),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh), label: const Text('Reintentar')),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildDashboardHeader() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 8.0),
-      child: Text(
-        'Estadisticas',
-        style: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Text('Estadísticas', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
     );
   }
 
-  Widget _buildSectionHeader({
-    required String title,
-    String? actionLabel,
-    VoidCallback? onAction,
-  }) {
+  // ===== INICIO DE LA CORRECCIÓN =====
+  Widget _buildSectionHeader({ required String title, String? actionLabel, VoidCallback? onAction }) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
@@ -266,44 +248,39 @@ class _DashboardPageState extends State<DashboardPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+          // Se envuelve el Text del título en un Expanded para que ocupe el espacio
+          // restante y evite que el botón cause un desbordamiento.
+          Expanded(
+            child: Text(
+              title, 
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              overflow: TextOverflow.ellipsis, // Corta el texto con "..." si no cabe
+              maxLines: 1,
             ),
           ),
           if (actionLabel != null && onAction != null)
             TextButton.icon(
               onPressed: onAction,
-              icon: const Icon(Icons.visibility),
+              icon: const Icon(Icons.arrow_forward_ios, size: 14),
               label: Text(actionLabel),
               style: TextButton.styleFrom(
                 foregroundColor: Theme.of(context).primaryColor,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
               ),
             )
         ],
       ),
     );
   }
+  // ===== FIN DE LA CORRECCIÓN =====
 
   Widget _buildStatCard({
-    required String title,
-    required String value,
-    String? total,
-    String? description,
-    required IconData icon,
-    required Color color,
+    required String title, required String value, String? total,
+    String? description, required IconData icon, required Color color,
     required bool isDarkMode,
   }) {
-    // Ajustar color según tema oscuro/claro
-    final cardColor = isDarkMode 
-        ? Color.alphaBlend(color.withOpacity(0.2), Colors.grey[900]!) 
-        : color.withOpacity(0.1);
-    
-    final borderColor = isDarkMode 
-        ? color.withOpacity(0.3) 
-        : color.withOpacity(0.2);
+    final cardColor = isDarkMode ? Color.alphaBlend(color.withOpacity(0.2), Colors.grey[900]!) : color.withOpacity(0.1);
+    final borderColor = isDarkMode ? color.withOpacity(0.3) : color.withOpacity(0.2);
     
     return Card(
       elevation: 2,
@@ -313,60 +290,49 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       color: cardColor,
       child: Padding(
-        padding: const EdgeInsets.all(12.0), // Reducido de 16 a 12
+        padding: const EdgeInsets.all(12.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, color: color, size: 24), // Reducido de 28 a 24
+                Icon(icon, color: color, size: 28),
                 if (total != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), // Reducido
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(isDarkMode ? 0.2 : 0.1),
+                      color: color.withOpacity(isDarkMode ? 0.3 : 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      'Total: $total',
-                      style: TextStyle(
-                        fontSize: 10, // Reducido de 12 a 10
-                        color: color,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    child: Text('Total: $total', style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
                   ),
               ],
             ),
-            const SizedBox(height: 4), // Reducido de Spacer() a altura fija
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 24, // Reducido de 28 a 24
-                fontWeight: FontWeight.bold,
-                color: color,
+            const SizedBox(height: 8),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color),
+                maxLines: 1,
               ),
-              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 4), // Reducido
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 13, // Reducido de 14 a 13
-                fontWeight: FontWeight.w500,
-                color: isDarkMode ? Colors.white : Colors.black87,
+            const SizedBox(height: 4),
+            Flexible(
+              child: Text(
+                title,
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: isDarkMode ? Colors.white : Colors.black87),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
               ),
-              overflow: TextOverflow.ellipsis,
             ),
             if (description != null)
               Text(
                 description,
-                style: TextStyle(
-                  fontSize: 11, // Reducido de 12 a 11
-                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.grey[400] : Colors.grey[600]),
                 overflow: TextOverflow.ellipsis,
               ),
           ],
@@ -375,45 +341,29 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildAsistenciasSedeChart(
-    Map<String, int> asistenciasPorSede, 
-    List<Sede> sedes,
-    bool isDarkMode,
-  ) {
+  Widget _buildAsistenciasSedeChart(Map<String, int> asistenciasPorSede, List<Sede> sedes, bool isDarkMode) {
     final activeColor = Theme.of(context).primaryColor;
-    final inactiveColor = isDarkMode ? Colors.grey[700] : Colors.grey[300];
-    
-    // Filtrar solo sedes con asistencias y ordenar por cantidad de asistencias
     final sedesConAsistencias = sedes
         .where((sede) => (asistenciasPorSede[sede.id] ?? 0) > 0)
         .toList()
-        ..sort((a, b) => (asistenciasPorSede[b.id] ?? 0).compareTo(asistenciasPorSede[a.id] ?? 0));
+      ..sort((a, b) => (asistenciasPorSede[b.id] ?? 0).compareTo(asistenciasPorSede[a.id] ?? 0));
     
     if (sedesConAsistencias.isEmpty) {
       return Container(
         height: 200,
-        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
+          color: isDarkMode ? Colors.grey[850] : Colors.grey[100],
           borderRadius: BorderRadius.circular(12),
         ),
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.bar_chart_outlined,
-                size: 48,
-                color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
-              ),
+              Icon(Icons.bar_chart_outlined, size: 48, color: isDarkMode ? Colors.grey[600] : Colors.grey[400]),
               const SizedBox(height: 8),
               Text(
                 'No hay asistencias registradas hoy',
-                style: TextStyle(
-                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[600], fontSize: 16),
               ),
             ],
           ),
@@ -422,87 +372,46 @@ class _DashboardPageState extends State<DashboardPage> {
     }
     
     return Container(
-      height: 240, // Aumentado para dar más espacio
+      height: 240,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[800] : Colors.grey[100],
+        color: isDarkMode ? Colors.grey[850] : Colors.grey[100],
         borderRadius: BorderRadius.circular(12),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // Calcular número máximo de sedes que caben sin overflow
-          final availableWidth = constraints.maxWidth - 32; // Margen interno
-          final minBarWidth = 40.0; // Ancho mínimo por barra
-          final maxSedes = (availableWidth / minBarWidth).floor().clamp(1, 8);
-          
-          final sedesAMostrar = sedesConAsistencias.take(maxSedes).toList();
+          final maxSedesAMostrar = (constraints.maxWidth / 60).floor().clamp(1, 8);
+          final sedesAMostrar = sedesConAsistencias.take(maxSedesAMostrar).toList();
           final maxAsistencias = sedesAMostrar.isNotEmpty 
               ? sedesAMostrar.map((s) => asistenciasPorSede[s.id] ?? 0).reduce((a, b) => a > b ? a : b)
               : 1;
           
           return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Título del gráfico
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Distribución de Asistencias',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
-                    ),
-                  ),
-                  if (sedesConAsistencias.length > maxSedes)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: activeColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '+${sedesConAsistencias.length - maxSedes} más',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: activeColor,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+               Text('Distribución de Asistencias', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 16),
-              
-              // Gráfico de barras
               Expanded(
-                child: sedesAMostrar.isEmpty 
-                  ? const SizedBox.shrink()
-                  : SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: sedesAMostrar.map((sede) {
-                          final asistencias = asistenciasPorSede[sede.id] ?? 0;
-                          final barHeight = maxAsistencias > 0 
-                              ? (asistencias / maxAsistencias) * 120 // Altura máxima reducida
-                              : 4.0;
-                          
-                          return Container(
-                            width: (availableWidth / sedesAMostrar.length).clamp(50, 80),
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            child: _buildBarChartItem(
-                              label: _getShortSedeName(sede.nombre),
-                              value: asistencias,
-                              barHeight: barHeight,
-                              color: sede.activa ? activeColor : inactiveColor!,
-                              isDarkMode: isDarkMode,
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: sedesAMostrar.map((sede) {
+                      final asistencias = asistenciasPorSede[sede.id] ?? 0;
+                      final barHeight = maxAsistencias > 0 ? (asistencias / maxAsistencias) * 120 : 4.0;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: _buildBarChartItem(
+                          label: _getShortSedeName(sede.nombre),
+                          value: asistencias,
+                          barHeight: barHeight,
+                          color: activeColor,
+                          isDarkMode: isDarkMode,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
               ),
             ],
           );
@@ -511,229 +420,101 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // Método auxiliar para obtener nombre corto de sede
   String _getShortSedeName(String nombreCompleto) {
-    // Si el nombre es muy largo, tomar las primeras letras de cada palabra
-    final palabras = nombreCompleto.trim().split(' ');
-    
+    final palabras = nombreCompleto.trim().split(' ').where((p) => p.isNotEmpty).toList();
+    if (palabras.isEmpty) return '';
     if (palabras.length == 1) {
-      // Si es una sola palabra, tomar los primeros caracteres
-      return palabras[0].length > 8 ? '${palabras[0].substring(0, 6)}.' : palabras[0];
-    } else if (palabras.length == 2) {
-      // Si son dos palabras, tomar la primera completa si es corta, sino abreviar
-      final primera = palabras[0];
-      return primera.length > 6 ? '${primera.substring(0, 4)}. ${palabras[1].substring(0, 2)}.' : primera;
-    } else {
-      // Si son más de dos palabras, crear siglas
-      return palabras.take(3).map((p) => p.isNotEmpty ? p[0].toUpperCase() : '').join('');
+      return nombreCompleto.length > 10 ? '${nombreCompleto.substring(0, 8)}.' : nombreCompleto;
     }
+    if (palabras.length > 2) {
+      return palabras.take(3).map((p) => p[0].toUpperCase()).join('');
+    }
+    return palabras.join(' ');
   }
 
   Widget _buildBarChartItem({
-    required String label,
-    required int value,
-    required double barHeight,
-    required Color color,
-    required bool isDarkMode,
+    required String label, required int value, required double barHeight,
+    required Color color, required bool isDarkMode,
   }) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.end,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Valor encima de la barra - con altura fija
-        SizedBox(
-          height: 18,
-          child: value > 0 ? Text(
-            value.toString(),
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 11,
-              color: isDarkMode ? Colors.white : Colors.black87,
-            ),
-            textAlign: TextAlign.center,
-          ) : null,
-        ),
-        
-        const SizedBox(height: 4),
-        
-        // Barra con dimensiones controladas
-        Container(
-          width: 32,
-          height: barHeight.clamp(4, 120),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(3),
-            boxShadow: [
-              BoxShadow(
-                color: color.withOpacity(0.3),
-                blurRadius: 1,
-                offset: const Offset(0, 1),
-              ),
-            ],
-          ),
-        ),
-        
-        const SizedBox(height: 6),
-        
-        // Etiqueta debajo de la barra - con altura fija
-        SizedBox(
-          height: 28,
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w500,
-              color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-              height: 1.1,
+    return SizedBox(
+      width: 50,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          if (value > 0)
+            Text(value.toString(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isDarkMode ? Colors.white : Colors.black)),
+          const SizedBox(height: 4),
+          Container(
+            width: 32,
+            height: barHeight.clamp(4.0, 120.0),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: 6),
+          Flexible(
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10, color: isDarkMode ? Colors.grey[400] : Colors.grey[600]),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildSedeCard(
-    Sede sede, 
-    List<Empleado> allEmpleados, 
-    int asistenciasHoy,
-    bool isDarkMode,
-  ) {
+  Widget _buildSedeCard(Sede sede, List<Empleado> allEmpleados, int asistenciasHoy, bool isDarkMode) {
     final empleadosSede = allEmpleados.where((emp) => emp.sedeId == sede.id).toList();
     final empleadosActivos = empleadosSede.where((emp) => emp.activo).length;
-    final porcentajeActivos = empleadosSede.isNotEmpty 
-        ? (empleadosActivos / empleadosSede.length * 100).toStringAsFixed(0) 
-        : '0';
-    final porcentajeAsistencias = empleadosActivos > 0 
-        ? (asistenciasHoy / empleadosActivos * 100).toStringAsFixed(0) 
-        : '0';
+    final porcentajeAsistencias = empleadosActivos > 0 ? (asistenciasHoy / empleadosActivos * 100).toStringAsFixed(0) : '0';
 
-    // Colores para tema oscuro/claro
     final cardColor = isDarkMode ? Colors.grey[850] : Colors.white;
-    final activeColor = sede.activa ? Colors.green : Colors.red;
-    final activeBgColor = activeColor.withOpacity(isDarkMode ? 0.2 : 0.1);
-    final activeTextColor = isDarkMode ? activeColor.withOpacity(0.9) : activeColor.withOpacity(0.8);
+    final statusColor = sede.activa ? Colors.green : Colors.red;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isDarkMode ? Colors.grey[700]! : Colors.grey[300]!,
-          width: 1,
-        ),
+        side: BorderSide(color: isDarkMode ? Colors.grey[700]! : Colors.grey[300]!, width: 1),
       ),
       color: cardColor,
-      elevation: 2,
+      elevation: 1,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                // Indicador de estado
-                Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: activeColor,
-                    shape: BoxShape.circle,
-                  ),
-                ),
+                Icon(Icons.business, color: Theme.of(context).primaryColor),
                 const SizedBox(width: 12),
-                // Nombre de la sede
                 Expanded(
                   child: Text(
                     sede.nombre,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: isDarkMode ? Colors.white : Colors.black,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                // Estado de la sede
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: activeBgColor,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
+                  decoration: BoxDecoration(color: statusColor.withOpacity(0.15), borderRadius: BorderRadius.circular(16)),
                   child: Text(
                     sede.activa ? 'Activa' : 'Inactiva',
-                    style: TextStyle(
-                      color: activeTextColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.w500),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            // Dirección de la sede
+            const Divider(height: 24),
             Row(
               children: [
-                Icon(
-                  Icons.location_on_outlined, 
-                  size: 16, 
-                  color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    sede.direccion,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Datos de empleados y asistencias
-            Row(
-              children: [
-                Expanded(
-                  child: _buildSedeDataItem(
-                    title: 'Empleados',
-                    value: '${empleadosSede.length} totales',
-                    isDarkMode: isDarkMode,
-                  ),
-                ),
-                Expanded(
-                  child: _buildSedeDataItem(
-                    title: 'Activos',
-                    value: '$empleadosActivos ($porcentajeActivos%)',
-                    isDarkMode: isDarkMode,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // Nueva fila para asistencias
-            Row(
-              children: [
-                Expanded(
-                  child: _buildSedeDataItem(
-                    title: 'Asistencias Hoy',
-                    value: '$asistenciasHoy',
-                    isDarkMode: isDarkMode,
-                  ),
-                ),
-                Expanded(
-                  child: _buildSedeDataItem(
-                    title: 'Tasa Asistencia',
-                    value: '$porcentajeAsistencias%',
-                    isDarkMode: isDarkMode,
-                  ),
-                ),
+                _buildSedeDataItem(title: 'Empleados Activos', value: empleadosActivos.toString(), isDarkMode: isDarkMode),
+                _buildSedeDataItem(title: 'Asistencias Hoy', value: asistenciasHoy.toString(), isDarkMode: isDarkMode),
+                _buildSedeDataItem(title: 'Tasa Asistencia', value: '$porcentajeAsistencias%', isDarkMode: isDarkMode),
               ],
             ),
           ],
@@ -742,95 +523,50 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
   
-  Widget _buildSedeDataItem({
-    required String title,
-    required String value,
-    required bool isDarkMode,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 12,
-            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-          ),
+  Widget _buildSedeDataItem({ required String title, required String value, required bool isDarkMode }) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.grey[400] : Colors.grey[600]), overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 4),
+            Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis),
+          ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: isDarkMode ? Colors.white : Colors.black,
-          ),
-        ),
-      ],
+      ),
     );
   }
 
   Widget _buildSummaryCard({
-    required int totalSedes,
-    required int sedesActivas,
-    required int totalEmpleados,
-    required int empleadosActivos,
-    required int asistenciasHoy,
-    required bool isDarkMode,
+    required int totalSedes, required int sedesActivas,
+    required int totalEmpleados, required int empleadosActivos,
+    required int asistenciasHoy, required bool isDarkMode,
   }) {
     final cardColor = isDarkMode ? Colors.grey[850] : Colors.grey[100];
-    final textColor = isDarkMode ? Colors.white : Colors.black;
-    final _ = isDarkMode ? Colors.grey[400] : Colors.grey[700];
     
     return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       color: cardColor,
-      elevation: 2,
+      elevation: 0,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Resumen General',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: textColor,
-              ),
-            ),
+            Text('Resumen General', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
-            _buildSummaryRow(
-              label: 'Total de sedes:',
-              value: totalSedes.toString(),
-              isDarkMode: isDarkMode,
-            ),
-            _buildSummaryRow(
-              label: 'Sedes activas:',
-              value: sedesActivas.toString(),
-              isDarkMode: isDarkMode,
-            ),
-            _buildSummaryRow(
-              label: 'Total de empleados:',
-              value: totalEmpleados.toString(),
-              isDarkMode: isDarkMode,
-            ),
-            _buildSummaryRow(
-              label: 'Empleados activos:',
-              value: empleadosActivos.toString(),
-              isDarkMode: isDarkMode,
-            ),
-            _buildSummaryRow(
-              label: 'Asistencias registradas hoy:',
-              value: asistenciasHoy.toString(),
-              isDarkMode: isDarkMode,
-            ),
+            _buildSummaryRow(label: 'Total de sedes:', value: totalSedes.toString(), isDarkMode: isDarkMode),
+            _buildSummaryRow(label: 'Sedes activas:', value: sedesActivas.toString(), isDarkMode: isDarkMode),
+            const Divider(height: 20),
+            _buildSummaryRow(label: 'Total de empleados:', value: totalEmpleados.toString(), isDarkMode: isDarkMode),
+            _buildSummaryRow(label: 'Empleados activos:', value: empleadosActivos.toString(), isDarkMode: isDarkMode),
+             const Divider(height: 20),
+            _buildSummaryRow(label: 'Asistencias registradas hoy:', value: asistenciasHoy.toString(), isDarkMode: isDarkMode),
             _buildSummaryRow(
               label: 'Porcentaje de asistencia hoy:',
-              value: empleadosActivos > 0 
-                  ? '${(asistenciasHoy / empleadosActivos * 100).toStringAsFixed(1)}%' 
-                  : '0%',
+              value: empleadosActivos > 0 ? '${(asistenciasHoy / empleadosActivos * 100).toStringAsFixed(1)}%' : 'N/A',
               isDarkMode: isDarkMode,
             ),
           ],
@@ -839,31 +575,14 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildSummaryRow({
-    required String label,
-    required String value,
-    required bool isDarkMode,
-  }) {
+  Widget _buildSummaryRow({ required String label, required String value, required bool isDarkMode }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
-              fontSize: 14,
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-              color: isDarkMode ? Colors.white : Colors.black87,
-            ),
-          ),
+          Text(label, style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[700], fontSize: 14)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         ],
       ),
     );

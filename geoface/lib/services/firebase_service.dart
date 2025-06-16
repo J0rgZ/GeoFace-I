@@ -195,6 +195,37 @@ class FirebaseService {
     return null;
   }
 
+  /// Obtiene asistencias filtradas por un rango de fechas y opcionalmente por sede.
+  /// Es mucho más eficiente que obtener todas las asistencias y filtrarlas en el cliente.
+  Future<List<Asistencia>> getAsistenciasFiltradas({
+    required DateTime fechaInicio,
+    required DateTime fechaFin,
+    String? sedeId,
+  }) async {
+    try {
+      // Construimos la consulta base con el filtro de fecha
+      Query query = _firestore
+          .collection(AppConfig.asistenciasCollection)
+          .where('fechaHoraEntrada', isGreaterThanOrEqualTo: fechaInicio)
+          .where('fechaHoraEntrada', isLessThan: fechaFin)
+          .orderBy('fechaHoraEntrada', descending: true);
+
+      // Si se proporciona un sedeId, añadimos ese filtro a la consulta
+      if (sedeId != null && sedeId.isNotEmpty) {
+        query = query.where('sedeId', isEqualTo: sedeId);
+      }
+      
+      final querySnapshot = await query.get();
+      
+      return querySnapshot.docs
+          .map((doc) => Asistencia.fromJson(doc.data() as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      print('Error al obtener asistencias filtradas: ${e.toString()}');
+      throw Exception('No se pudieron cargar las asistencias filtradas');
+    }
+  }
+
    /// Busca si existe una asistencia ya completada (con entrada y salida) para un empleado en el día actual.
   Future<Asistencia?> getCompletedAsistenciaForToday(String empleadoId) async {
     try {
