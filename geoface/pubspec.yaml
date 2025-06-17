@@ -33,6 +33,7 @@ dependencies:
   collection: ^1.19.1
   month_picker_dialog: ^6.2.3
   http_parser: ^4.1.2
+  google_fonts: ^6.2.1
 
 dev_dependencies:
   flutter_test:

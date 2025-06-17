@@ -9,8 +9,40 @@ class UserController with ChangeNotifier {
   
   bool _isLoading = false;
   bool get isLoading => _isLoading;
-  
-  // Crear usuario administrador
+
+  // --- MÉTODOS PARA GESTIÓN DE ADMINISTRADORES ---
+
+  /// Obtiene una lista de todos los usuarios con tipo 'ADMIN'.
+  /// Requerido por AdministradoresPage.
+  Future<List<Usuario>> getAdministradores() async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+      
+      final snapshot = await _firestore
+          .collection('usuarios')
+          .where('tipoUsuario', isEqualTo: 'ADMIN')
+          .get();
+      
+      final administradores = snapshot.docs.map((doc) {
+        return Usuario.fromJson({
+          'id': doc.id,
+          ...doc.data(),
+        });
+      }).toList();
+      
+      return administradores;
+    } catch (e) {
+      print('Error al obtener administradores: $e');
+      throw Exception('Error al cargar los administradores: ${e.toString()}');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Crea un nuevo usuario administrador en Auth y Firestore.
+  /// Requerido por AddEditAdminPage.
   Future<void> createAdminUser({
     required String nombreUsuario,
     required String correo,
@@ -19,17 +51,6 @@ class UserController with ChangeNotifier {
     try {
       _isLoading = true;
       notifyListeners();
-      
-      // Verificar que el correo no esté en uso
-      final existingUserQuery = await _firestore
-          .collection('usuarios')
-          .where('correo', isEqualTo: correo)
-          .limit(1)
-          .get();
-      
-      if (existingUserQuery.docs.isNotEmpty) {
-        throw Exception('El correo electrónico ya está registrado');
-      }
       
       // Crear usuario en Firebase Auth
       final userCredential = await _auth.createUserWithEmailAndPassword(
@@ -46,7 +67,7 @@ class UserController with ChangeNotifier {
         'tipoUsuario': 'ADMIN',
         'empleadoId': null,
         'activo': true,
-        'fechaCreacion': DateTime.now().toIso8601String(),
+        'fechaCreacion': FieldValue.serverTimestamp(), // Mejor usar timestamp del servidor
         'fechaUltimoAcceso': null,
       };
       
@@ -56,11 +77,11 @@ class UserController with ChangeNotifier {
       if (e is FirebaseAuthException) {
         switch (e.code) {
           case 'email-already-in-use':
-            throw Exception('El correo electrónico ya está en uso');
+            throw Exception('El correo electrónico ya está en uso.');
           case 'weak-password':
-            throw Exception('La contraseña es demasiado débil');
+            throw Exception('La contraseña es demasiado débil (mínimo 6 caracteres).');
           case 'invalid-email':
-            throw Exception('El correo electrónico no es válido');
+            throw Exception('El correo electrónico no es válido.');
           default:
             throw Exception('Error al crear usuario: ${e.message}');
         }
@@ -73,29 +94,62 @@ class UserController with ChangeNotifier {
     }
   }
   
-  // Obtener la lista de empleados sin usuario asignado
+  /// Actualiza el nombre de un usuario administrador.
+  /// Requerido por AddEditAdminPage al editar.
+  Future<void> updateAdminUser({
+    required String userId,
+    required String nombreUsuario,
+  }) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+      
+      await _firestore.collection('usuarios').doc(userId).update({
+        'nombreUsuario': nombreUsuario,
+      });
+
+    } catch (e) {
+      print('Error al actualizar administrador: $e');
+      throw Exception('Error al actualizar los datos: ${e.toString()}');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+  
+  /// Cambia el estado 'activo' de un usuario (lo activa si está inactivo, y viceversa).
+  /// Requerido por AdministradoresPage para el Switch.
+  Future<void> toggleUserStatus(Usuario user) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+      
+      final newStatus = !user.activo; // Calcula el estado opuesto
+      
+      await _firestore.collection('usuarios').doc(user.id).update({
+        'activo': newStatus,
+      });
+      
+    } catch (e) {
+      print('Error al cambiar estado del usuario: $e');
+      throw Exception('Error al actualizar el usuario: ${e.toString()}');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // --- MÉTODOS PARA GESTIÓN DE EMPLEADOS ---
+
+  /// Obtiene la lista de empleados sin usuario asignado.
   Future<List<Map<String, dynamic>>> getEmpleadosSinUsuario() async {
     try {
       _isLoading = true;
       notifyListeners();
       
-      // Obtener todos los empleados
-      final empleadosSnapshot = await _firestore.collection('empleados').get();
+      final empleadosSnapshot = await _firestore.collection('empleados').where('tieneUsuario', isEqualTo: false).get();
       
-      // Obtener usuarios con tipo EMPLEADO
-      final usuariosSnapshot = await _firestore
-          .collection('usuarios')
-          .where('tipoUsuario', isEqualTo: 'EMPLEADO')
-          .get();
-      
-      // Crear conjunto de IDs de empleados que ya tienen usuario
-      final empleadosConUsuario = Set<String>.from(
-        usuariosSnapshot.docs.map((doc) => doc['empleadoId'] as String)
-      );
-      
-      // Filtrar empleados que no tienen usuario asignado
       final empleadosSinUsuario = empleadosSnapshot.docs
-          .where((doc) => !empleadosConUsuario.contains(doc.id))
           .map((doc) => {
                 'id': doc.id,
                 ...doc.data(),
@@ -112,7 +166,7 @@ class UserController with ChangeNotifier {
     }
   }
   
-  // Asignar usuario a un empleado existente
+  /// Asigna un usuario a un empleado existente, creándolo en Auth y Firestore.
   Future<void> assignUserToEmpleado({
     required String empleadoId,
     required String dni,
@@ -121,36 +175,17 @@ class UserController with ChangeNotifier {
       _isLoading = true;
       notifyListeners();
       
-      // Verificar que el empleado exista
       final empleadoDoc = await _firestore.collection('empleados').doc(empleadoId).get();
-      
-      if (!empleadoDoc.exists) {
-        throw Exception('El empleado no existe');
-      }
+      if (!empleadoDoc.exists) throw Exception('El empleado no existe.');
       
       final empleadoData = empleadoDoc.data() as Map<String, dynamic>;
       final nombreEmpleado = empleadoData['nombre'] as String;
       
-      // Verificar que el DNI coincida con el del empleado
-      if (empleadoData['dni'] != dni) {
-        throw Exception('El DNI no coincide con el del empleado');
-      }
+      if (empleadoData['dni'] != dni) throw Exception('El DNI no coincide con el del empleado.');
       
-      // Crear correo para el empleado basado en su DNI
       final correo = '$dni@geoface.com';
       
-      // Verificar si ya existe un usuario con ese correo
-      final existingUserQuery = await _firestore
-          .collection('usuarios')
-          .where('correo', isEqualTo: correo)
-          .limit(1)
-          .get();
-      
-      if (existingUserQuery.docs.isNotEmpty) {
-        throw Exception('Ya existe un usuario con este DNI');
-      }
-      
-      // Crear usuario en Firebase Auth (usando DNI como correo y contraseña)
+      // Crear usuario en Firebase Auth
       final userCredential = await _auth.createUserWithEmailAndPassword(
         email: correo,
         password: dni, // Contraseña inicial igual al DNI
@@ -165,7 +200,7 @@ class UserController with ChangeNotifier {
         'tipoUsuario': 'EMPLEADO',
         'empleadoId': empleadoId,
         'activo': true,
-        'fechaCreacion': DateTime.now().toIso8601String(),
+        'fechaCreacion': FieldValue.serverTimestamp(),
         'fechaUltimoAcceso': null,
       };
       
@@ -180,11 +215,11 @@ class UserController with ChangeNotifier {
       if (e is FirebaseAuthException) {
         switch (e.code) {
           case 'email-already-in-use':
-            throw Exception('Ya existe un usuario con este DNI');
+            throw Exception('Ya existe un usuario con este DNI.');
           case 'weak-password':
-            throw Exception('El DNI no cumple los requisitos como contraseña');
+            throw Exception('El DNI no cumple los requisitos como contraseña.');
           case 'invalid-email':
-            throw Exception('No se pudo crear un correo válido con el DNI');
+            throw Exception('No se pudo crear un correo válido con el DNI.');
           default:
             throw Exception('Error al crear usuario: ${e.message}');
         }
@@ -197,7 +232,7 @@ class UserController with ChangeNotifier {
     }
   }
   
-  // Obtener todos los usuarios
+  /// Obtiene todos los usuarios (útil para vistas generales, si es necesario).
   Future<List<Usuario>> getAllUsers() async {
     try {
       _isLoading = true;
@@ -216,25 +251,6 @@ class UserController with ChangeNotifier {
     } catch (e) {
       print('Error al obtener usuarios: $e');
       throw Exception('Error al cargar los usuarios: ${e.toString()}');
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-  
-  // Activar/Desactivar usuario
-  Future<void> toggleUserActive(String userId, bool isActive) async {
-    try {
-      _isLoading = true;
-      notifyListeners();
-      
-      await _firestore.collection('usuarios').doc(userId).update({
-        'activo': isActive,
-      });
-      
-    } catch (e) {
-      print('Error al cambiar estado del usuario: $e');
-      throw Exception('Error al actualizar el usuario: ${e.toString()}');
     } finally {
       _isLoading = false;
       notifyListeners();

@@ -252,4 +252,30 @@ class FirebaseService {
       return null;
     }
   }
+
+  // --- MÉTODOS DE ADMINISTRADOR ---
+
+  /// Obtiene una lista de todos los usuarios con el rol de Administrador.
+  Future<List<Usuario>> getAdministradores() async {
+    try {
+      final snapshot = await _firestore
+          .collection('usuarios')
+          .where('tipoUsuario', isEqualTo: 'ADMIN')
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        return []; // Retorna una lista vacía si no hay administradores
+      }
+
+      return snapshot.docs.map((doc) {
+        return Usuario.fromJson({
+          'id': doc.id,
+          ...doc.data(),
+        });
+      }).toList();
+    } catch (e) {
+      print('Error al obtener administradores desde el servicio: $e');
+      throw Exception('No se pudieron cargar los administradores.');
+    }
+  }
 }

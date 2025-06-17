@@ -10,6 +10,7 @@ import 'empleados_page.dart';
 import 'reportes_page.dart';
 import 'crear_administrador.dart';
 import 'asignar_usuario.dart';
+import 'cambiar_contrasena_page.dart';
 
 class AdminLayout extends StatefulWidget {
   const AdminLayout({Key? key}) : super(key: key);
@@ -65,143 +66,9 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
     }
   }
 
-  void _showChangePasswordDialog() {
-    final TextEditingController currentPasswordController = TextEditingController();
-    final TextEditingController newPasswordController = TextEditingController();
-    final TextEditingController confirmPasswordController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          bool isLoading = false;
-          return AlertDialog(
-            title: const Text('Cambiar Contraseña'),
-            content: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: currentPasswordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Contraseña actual',
-                      prefixIcon: Icon(Icons.lock_outline),
-                    ),
-                    obscureText: true,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Ingrese su contraseña actual';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: newPasswordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nueva contraseña',
-                      prefixIcon: Icon(Icons.lock),
-                    ),
-                    obscureText: true,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Ingrese su nueva contraseña';
-                      }
-                      if (value.length < 6) {
-                        return 'La contraseña debe tener al menos 6 caracteres';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: confirmPasswordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Confirmar nueva contraseña',
-                      prefixIcon: Icon(Icons.lock),
-                    ),
-                    obscureText: true,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Confirme su nueva contraseña';
-                      }
-                      if (value != newPasswordController.text) {
-                        return 'Las contraseñas no coinciden';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                // ignore: dead_code
-                onPressed: isLoading ? null : () {
-                  // Liberar controladores antes de cerrar para evitar fugas de memoria
-                  currentPasswordController.dispose();
-                  newPasswordController.dispose();
-                  confirmPasswordController.dispose();
-                  Navigator.pop(context);
-                },
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton(
-                onPressed: isLoading
-                    // ignore: dead_code
-                    ? null
-                    : () async {
-                        if (formKey.currentState!.validate()) {
-                          setState(() {
-                            isLoading = true;
-                          });
-                          
-                          final authController = Provider.of<AuthController>(context, listen: false);
-                          try {
-                            await authController.changePassword(
-                              currentPasswordController.text,
-                              newPasswordController.text
-                            );
-                            
-                            if (context.mounted) {
-                              // Liberar controladores
-                              currentPasswordController.dispose();
-                              newPasswordController.dispose();
-                              confirmPasswordController.dispose();
-                              
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Contraseña actualizada correctamente')),
-                              );
-                              Navigator.pop(context);
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error: ${e.toString()}')),
-                              );
-                              setState(() {
-                                isLoading = false;
-                              });
-                            }
-                          }
-                        }
-                      },
-                child: isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Guardar'),
-              ),
-            ],
-          );
-        }
-      ),
-    );
-  }
+  // 2. MÉTODO DE DIÁLOGO ELIMINADO
+  // El método _showChangePasswordDialog() ha sido removido de este archivo
+  // y su funcionalidad se encuentra ahora en 'cambiar_contrasena_page.dart'.
 
   void _showLogoutConfirmation() {
     showDialog(
@@ -229,8 +96,10 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
     );
   }
 
+  // --- MÉTODOS DE NAVEGACIÓN PARA LAS ACCIONES DEL DRAWER ---
+
   void _navigateToAddAdmin() {
-    Navigator.pop(context);
+    Navigator.pop(context); // Cierra el Drawer antes de navegar
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const CrearAdministradorPage(),
@@ -239,10 +108,20 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
   }
 
   void _navigateToAssignUser() {
-    Navigator.pop(context);
+    Navigator.pop(context); // Cierra el Drawer
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const AsignarUsuarioPage(),
+      ),
+    );
+  }
+
+  // 3. NUEVO MÉTODO DE NAVEGACIÓN PARA CAMBIAR CONTRASEÑA
+  void _navigateToChangePassword() {
+    Navigator.pop(context); // Cierra el Drawer
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const CambiarContrasenaPage(),
       ),
     );
   }
@@ -257,29 +136,17 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
     
-    // Colores personalizados desde el tema
     final primaryColor = theme.colorScheme.primary;
     final surfaceColor = theme.colorScheme.surface;
-    final unselectedColor = isDarkMode 
-        ? const Color(0xFF9E9E9E) 
-        : const Color(0xFF9E9E9E);
-    final containerColor = isDarkMode
-        ? theme.colorScheme.primaryContainer
-        : theme.colorScheme.primaryContainer;
+    final unselectedColor = isDarkMode ? const Color(0xFF9E9E9E) : const Color(0xFF9E9E9E);
+    final containerColor = theme.colorScheme.primaryContainer;
 
-    // Obtener datos del usuario actual
     final authController = Provider.of<AuthController>(context);
     final Usuario? currentUser = authController.currentUser;
     final String userName = currentUser?.nombreUsuario ?? "Administrador";
     final String userEmail = currentUser?.correo ?? "admin@geoface.com";
 
-    final List<String> _titles = [
-      'Dashboard',
-      'Sedes',
-      'Empleados',
-      'Reportes',
-    ];
-
+    final List<String> _titles = ['Dashboard', 'Sedes', 'Empleados', 'Reportes'];
     final List<IconData> _icons = [
       Icons.dashboard_rounded,
       Icons.location_city_rounded,
@@ -305,12 +172,9 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.menu),
-          onPressed: () {
-            _scaffoldKey.currentState?.openDrawer();
-          },
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
         actions: [
-          // Botón de cambio de tema
           IconButton(
             icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode),
             onPressed: _toggleTheme,
@@ -333,7 +197,7 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
       ),
       body: TabBarView(
         controller: _tabController,
-        physics: const NeverScrollableScrollPhysics(), // Desactivar deslizamiento
+        physics: const NeverScrollableScrollPhysics(),
         children: _pageCache,
       ),
       bottomNavigationBar: _buildBottomNavigationBar(
@@ -361,19 +225,9 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
       child: SafeArea(
         child: Column(
           children: [
-            // Header con información del usuario
             Container(
               padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-              decoration: BoxDecoration(
-                color: primaryColor,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
+              decoration: BoxDecoration(color: primaryColor),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -382,19 +236,12 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
                       Container(
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 2,
-                          ),
+                          border: Border.all(color: Colors.white, width: 2),
                         ),
                         child: CircleAvatar(
                           radius: 30,
                           backgroundColor: isDarkMode ? Colors.grey[800] : Colors.white,
-                          child: Icon(
-                            Icons.person,
-                            size: 36,
-                            color: primaryColor,
-                          ),
+                          child: Icon(Icons.person, size: 36, color: primaryColor),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -433,21 +280,13 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
-                  // Menú de navegación principal
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                     child: Text(
                       'MENÚ PRINCIPAL',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: primaryColor,
-                        letterSpacing: 1.2,
-                      ),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryColor, letterSpacing: 1.2),
                     ),
                   ),
-                  
-                  // Items de navegación principal
                   for (int i = 0; i < titles.length; i++)
                     _buildDrawerItem(
                       icon: icons[i],
@@ -462,17 +301,11 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
                   
                   const Divider(height: 32),
                   
-                  // Sección de Administración de Usuarios
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                     child: Text(
                       'ADMINISTRACIÓN DE USUARIOS',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: primaryColor,
-                        letterSpacing: 1.2,
-                      ),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryColor, letterSpacing: 1.2),
                     ),
                   ),
                   
@@ -483,7 +316,6 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
                     onTap: _navigateToAddAdmin,
                     primaryColor: primaryColor,
                   ),
-                  
                   _buildDrawerItem(
                     icon: Icons.assignment_ind,
                     title: 'Asignar Usuario a Empleado',
@@ -494,31 +326,22 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
                   
                   const Divider(height: 32),
                   
-                  // Sección de Configuración Personal
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                     child: Text(
                       'CONFIGURACIÓN PERSONAL',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: primaryColor,
-                        letterSpacing: 1.2,
-                      ),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryColor, letterSpacing: 1.2),
                     ),
                   ),
                   
+                  // 4. ACTUALIZAR EL onTap PARA NAVEGAR A LA NUEVA PÁGINA
                   _buildDrawerItem(
                     icon: Icons.password,
                     title: 'Cambiar Contraseña',
                     isSelected: false,
-                    onTap: () {
-                      Navigator.pop(context);
-                      _showChangePasswordDialog();
-                    },
+                    onTap: _navigateToChangePassword,
                     primaryColor: primaryColor,
                   ),
-                  
                   _buildDrawerItem(
                     icon: Icons.dark_mode,
                     title: isDarkMode ? 'Cambiar a Tema Claro' : 'Cambiar a Tema Oscuro',
@@ -529,7 +352,6 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
                     },
                     primaryColor: primaryColor,
                   ),
-                  
                   _buildDrawerItem(
                     icon: Icons.logout,
                     title: 'Cerrar Sesión',
@@ -544,43 +366,20 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
               ),
             ),
             
-            // Pie del Drawer
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: isDarkMode ? Colors.black12 : Colors.grey[100],
-                border: Border(
-                  top: BorderSide(
-                    color: isDarkMode ? Colors.grey[800]! : Colors.grey[300]!,
-                    width: 1,
-                  ),
-                ),
+                border: Border(top: BorderSide(color: isDarkMode ? Colors.grey[800]! : Colors.grey[300]!, width: 1)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.face_retouching_natural,
-                    color: primaryColor,
-                    size: 20,
-                  ),
+                  Icon(Icons.face_retouching_natural, color: primaryColor, size: 20),
                   const SizedBox(width: 8),
-                  Text(
-                    'GeoFace',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: primaryColor,
-                    ),
-                  ),
+                  Text('GeoFace', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primaryColor)),
                   const SizedBox(width: 4),
-                  Text(
-                    'v1.0.0',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                    ),
-                  ),
+                  Text('v1.0.0', style: TextStyle(fontSize: 12, color: isDarkMode ? Colors.grey[400] : Colors.grey[600])),
                 ],
               ),
             ),
@@ -602,17 +401,8 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
     return Container(
       decoration: BoxDecoration(
         color: surfaceColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, -2))],
+        borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
       ),
       child: SafeArea(
         child: Padding(
@@ -645,11 +435,7 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        Icon(
-                          icons[index],
-                          color: isSelected ? primaryColor : unselectedColor,
-                          size: isSelected ? 26 : 24,
-                        ),
+                        Icon(icons[index], color: isSelected ? primaryColor : unselectedColor, size: isSelected ? 26 : 24),
                         const SizedBox(height: 4),
                         Text(
                           titles[index],
@@ -681,11 +467,7 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: ListTile(
-        leading: Icon(
-          icon,
-          color: isSelected ? primaryColor : null,
-          size: 22,
-        ),
+        leading: Icon(icon, color: isSelected ? primaryColor : null, size: 22),
         title: Text(
           title,
           style: TextStyle(
@@ -695,9 +477,7 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
           ),
         ),
         selected: isSelected,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         dense: true,
         onTap: onTap,
         selectedTileColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
