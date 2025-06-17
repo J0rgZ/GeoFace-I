@@ -21,7 +21,12 @@ class Usuario {
     this.fechaUltimoAcceso,
   });
 
+  /// Comprueba si el tipo de usuario es 'ADMIN'.
   bool get isAdmin => tipoUsuario == 'ADMIN';
+
+  /// --- AÑADIDO ---
+  /// Comprueba si el tipo de usuario es 'EMPLEADO'.
+  bool get isEmpleado => tipoUsuario == 'EMPLEADO';
 
   factory Usuario.fromJson(Map<String, dynamic> json) {
     return Usuario(
@@ -48,12 +53,15 @@ class Usuario {
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
+      // El 'id' no se suele guardar en el documento mismo, sino que es el nombre del documento.
+      // Pero lo mantengo si tu lógica lo requiere.
       'nombreUsuario': nombreUsuario,
       'correo': correo,
       'tipoUsuario': tipoUsuario,
       'empleadoId': empleadoId,
       'activo': activo,
+      // Se recomienda usar FieldValue.serverTimestamp() al crear/actualizar en lugar de Dart DateTime.
+      // Pero para la serialización a JSON, toIso8601String() es correcto.
       'fechaCreacion': fechaCreacion.toIso8601String(),
       'fechaUltimoAcceso': fechaUltimoAcceso?.toIso8601String(),
     };

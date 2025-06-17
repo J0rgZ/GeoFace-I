@@ -278,4 +278,6 @@ class FirebaseService {
       throw Exception('No se pudieron cargar los administradores.');
     }
   }
+
+  sendPasswordResetEmail(String correo) {}
 }

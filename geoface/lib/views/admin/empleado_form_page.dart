@@ -1,12 +1,13 @@
 // views/admin/empleado_form_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geoface/models/empleado.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/empleado_controller.dart';
 import '../../controllers/sede_controller.dart';
 
 class EmpleadoFormPage extends StatefulWidget {
-  const EmpleadoFormPage({Key? key}) : super(key: key);
+  const EmpleadoFormPage({Key? key, Empleado? empleado}) : super(key: key);
 
   @override
   State<EmpleadoFormPage> createState() => _EmpleadoFormPageState();

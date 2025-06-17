@@ -1,454 +1,1150 @@
 // views/admin/empleados_page.dart
 import 'package:flutter/material.dart';
-import 'package:geoface/views/admin/empleado_detail_page.dart';
+import 'package:flutter/services.dart';
 import 'package:geoface/views/admin/empleado_form_page.dart';
 import 'package:geoface/views/admin/registro_biometrico_page.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/empleado_controller.dart';
 import '../../models/empleado.dart';
 
+/// EmpleadosPage: Versión mejorada con mejor UX y animaciones
 class EmpleadosPage extends StatefulWidget {
-  const EmpleadosPage({Key? key}) : super(key: key);
+  const EmpleadosPage({super.key});
 
   @override
   State<EmpleadosPage> createState() => _EmpleadosPageState();
 }
 
-class _EmpleadosPageState extends State<EmpleadosPage> {
+class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
-  
+  final FocusNode _searchFocusNode = FocusNode();
+  late AnimationController _fabAnimationController;
+  late AnimationController _searchAnimationController;
+  late Animation<double> _fabAnimation;
+  late Animation<double> _searchAnimation;
+  bool _isSearchExpanded = false;
+  String _selectedFilter = 'all'; // all, active, inactive
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadData();
+    
+    // Inicializar controladores de animación
+    _fabAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _searchAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+    
+    _fabAnimation = CurvedAnimation(
+      parent: _fabAnimationController,
+      curve: Curves.elasticOut,
+    );
+    _searchAnimation = CurvedAnimation(
+      parent: _searchAnimationController,
+      curve: Curves.easeInOutCubic,
+    );
+    
+    // Animar FAB al cargar
+    _fabAnimationController.forward();
+    
+    Future.microtask(() {
+      Provider.of<EmpleadoController>(context, listen: false).getEmpleados();
     });
+
+    _searchController.addListener(_onSearchChanged);
+    _searchFocusNode.addListener(_onSearchFocusChanged);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
+    _fabAnimationController.dispose();
+    _searchAnimationController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadData() async {
-    final empleadoController = Provider.of<EmpleadoController>(context, listen: false);
-    await empleadoController.getEmpleados();
+  // --- MÉTODOS DE LÓGICA Y ACCIONES ---
+
+  void _onSearchChanged() {
+    setState(() {});
+  }
+
+  void _onSearchFocusChanged() {
+    if (_searchFocusNode.hasFocus && !_isSearchExpanded) {
+      _expandSearch();
+    }
+  }
+
+  void _expandSearch() {
+    setState(() => _isSearchExpanded = true);
+    _searchAnimationController.forward();
+    HapticFeedback.lightImpact();
+  }
+
+  void _collapseSearch() {
+    if (_searchController.text.isEmpty) {
+      setState(() => _isSearchExpanded = false);
+      _searchAnimationController.reverse();
+      _searchFocusNode.unfocus();
+    }
+  }
+
+  Future<void> _refreshData() async {
+    HapticFeedback.lightImpact();
+    await Provider.of<EmpleadoController>(context, listen: false).getEmpleados();
+  }
+  
+  void _showFeedback(String message, {bool isError = false}) {
+    if (!mounted) return;
+    
+    // Feedback háptico
+    HapticFeedback.mediumImpact();
+    
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isError ? Icons.error_outline : Icons.check_circle_outline,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: isError 
+            ? Theme.of(context).colorScheme.error 
+            : Colors.green.shade600,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 3),
+        action: SnackBarAction(
+          label: 'OK',
+          textColor: Colors.white,
+          onPressed: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
+        ),
+      ),
+    );
   }
 
   Future<void> _toggleEmpleadoStatus(Empleado empleado) async {
-    final empleadoController = Provider.of<EmpleadoController>(context, listen: false);
-    final success = await empleadoController.toggleEmpleadoActivo(empleado);
-
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Estado cambiado: ${empleado.activo ? 'Activo' : 'Inactivo'}'),
-          backgroundColor: empleado.activo 
-              ? Colors.green.shade700 
-              : Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
+    final controller = Provider.of<EmpleadoController>(context, listen: false);
+    final success = await controller.toggleEmpleadoActivo(empleado);
+    if (success) {
+      _showFeedback('Estado de ${empleado.nombreCompleto} actualizado.');
+    } else {
+      _showFeedback('Error al actualizar el estado.', isError: true);
     }
   }
 
   Future<void> _deleteEmpleado(Empleado empleado) async {
-    final empleadoController = Provider.of<EmpleadoController>(context, listen: false);
-    final success = await empleadoController.deleteEmpleado(empleado.id);
-    
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${empleado.nombreCompleto} eliminado correctamente'),
-          backgroundColor: Theme.of(context).colorScheme.secondary,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
+    final controller = Provider.of<EmpleadoController>(context, listen: false);
+    final success = await controller.deleteEmpleado(empleado.id);
+    if (success) {
+      _showFeedback('${empleado.nombreCompleto} ha sido eliminado.');
+    } else {
+      _showFeedback('Error al eliminar el empleado.', isError: true);
     }
   }
 
-  void _navigateToDetail(String empleadoId) {
+  String _getInitials(String nombreCompleto) {
+    if (nombreCompleto.isEmpty) return "?";
+    final names = nombreCompleto.trim().split(' ');
+    if (names.length == 1) return names[0][0].toUpperCase();
+    return '${names.first[0]}${names.last[0]}'.toUpperCase();
+  }
+  
+  List<Empleado> _filterEmpleados(List<Empleado> empleados) {
+    final query = _searchController.text.toLowerCase();
+    
+    // Filtrar por estado
+    List<Empleado> filteredByStatus = empleados;
+    switch (_selectedFilter) {
+      case 'active':
+        filteredByStatus = empleados.where((e) => e.activo).toList();
+        break;
+      case 'inactive':
+        filteredByStatus = empleados.where((e) => !e.activo).toList();
+        break;
+      default:
+        filteredByStatus = empleados;
+    }
+    
+    // Filtrar por texto de búsqueda
+    if (query.isEmpty) return filteredByStatus;
+    return filteredByStatus.where((e) {
+      return e.nombreCompleto.toLowerCase().contains(query) ||
+             e.correo.toLowerCase().contains(query) ||
+             e.dni.toLowerCase().contains(query) ||
+             e.cargo.toLowerCase().contains(query);
+    }).toList();
+  }
+
+  // --- MÉTODOS DE NAVEGACIÓN ---
+
+  void _navigateToForm({Empleado? empleado}) {
+    HapticFeedback.lightImpact();
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => EmpleadoDetailPage(empleadoId: empleadoId),
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => 
+            EmpleadoFormPage(empleado: empleado),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return SlideTransition(
+            position: animation.drive(
+              Tween(begin: const Offset(1.0, 0.0), end: Offset.zero)
+                  .chain(CurveTween(curve: Curves.easeInOutCubic)),
+            ),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 300),
       ),
-    ).then((_) => _loadData());
+    ).then((_) => _refreshData());
   }
 
   void _navigateToBiometrico(Empleado empleado) {
+    HapticFeedback.lightImpact();
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => RegistroBiometricoScreen(empleado: empleado),
-      ),
-    ).then((_) => _loadData()); // Acción posterior si es necesario
+      MaterialPageRoute(builder: (context) => RegistroBiometricoScreen(empleado: empleado)),
+    );
   }
 
-  // Obtiene las iniciales del nombre y apellido
-  String _getInitials(String nombreCompleto) {
-    if (nombreCompleto.isEmpty) return "?";
-    
-    final names = nombreCompleto.split(' ');
-    if (names.length == 1) return names[0][0].toUpperCase();
-    
-    // Primera letra del primer nombre y primera letra del primer apellido
-    return '${names[0][0]}${names.length > 1 ? names[names.length > 2 ? 2 : 1][0] : ''}'.toUpperCase();
+  // --- WIDGETS DE CONSTRUCCIÓN DE UI ---
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Consumer<EmpleadoController>(
+        builder: (context, controller, _) {
+          Widget content;
+          if (controller.loading && controller.empleados.isEmpty) {
+            content = _buildLoadingState();
+          } else if (controller.errorMessage != null) {
+            content = _buildErrorState(controller.errorMessage!);
+          } else {
+            final filteredList = _filterEmpleados(controller.empleados);
+            content = Column(
+              children: [
+                _buildHeader(controller.empleados.length),
+                _buildSearchAndFilters(),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _refreshData,
+                    child: filteredList.isEmpty
+                        ? (_searchController.text.isNotEmpty || _selectedFilter != 'all' 
+                            ? _buildNoResultsState() 
+                            : _buildEmptyState())
+                        : _buildEmpleadosList(filteredList),
+                  ),
+                ),
+              ],
+            );
+          }
+          
+          return AnimatedSwitcher(
+            duration: const Duration(milliseconds: 400),
+            switchInCurve: Curves.easeInOutCubic,
+            switchOutCurve: Curves.easeInOutCubic,
+            child: content,
+          );
+        },
+      ),
+      floatingActionButton: ScaleTransition(
+        scale: _fabAnimation,
+        child: FloatingActionButton.extended(
+          onPressed: () => _navigateToForm(),
+          icon: const Icon(Icons.person_add_rounded),
+          label: const Text('Nuevo Empleado'),
+          heroTag: "empleado_fab",
+        ),
+      ),
+    );
   }
+
+  Widget _buildLoadingState() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(),
+          SizedBox(height: 16),
+          Text('Cargando empleados...'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(int totalEmpleados) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Empleados',
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  '$totalEmpleados empleado${totalEmpleados != 1 ? 's' : ''} registrado${totalEmpleados != 1 ? 's' : ''}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              totalEmpleados.toString(),
+              style: TextStyle(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildSearchAndFilters() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Column(
+        children: [
+          _buildSearchBar(),
+          const SizedBox(height: 12),
+          _buildFilterChips(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    final theme = Theme.of(context);
+    return AnimatedBuilder(
+      animation: _searchAnimation,
+      builder: (context, child) {
+        return Container(
+          height: 56,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(
+              color: _isSearchExpanded 
+                  ? theme.colorScheme.primary 
+                  : theme.colorScheme.outline.withOpacity(0.3),
+              width: _isSearchExpanded ? 2 : 1,
+            ),
+            color: theme.colorScheme.surface,
+          ),
+          child: TextField(
+            controller: _searchController,
+            focusNode: _searchFocusNode,
+            decoration: InputDecoration(
+              hintText: 'Buscar empleados...',
+              hintStyle: TextStyle(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              prefixIcon: AnimatedRotation(
+                turns: _searchAnimation.value * 0.5,
+                duration: const Duration(milliseconds: 300),
+                child: Icon(
+                  Icons.search_rounded,
+                  color: _isSearchExpanded 
+                      ? theme.colorScheme.primary 
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              suffixIcon: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        key: const ValueKey('clear'),
+                        icon: const Icon(Icons.clear_rounded),
+                        onPressed: () {
+                          _searchController.clear();
+                          _collapseSearch();
+                        },
+                      )
+                    : _isSearchExpanded
+                        ? IconButton(
+                            key: const ValueKey('collapse'),
+                            icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                            onPressed: _collapseSearch,
+                          )
+                        : const SizedBox.shrink(),
+              ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            ),
+            onSubmitted: (_) => _collapseSearch(),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterChips() {
+    final theme = Theme.of(context);
+    final filters = [
+      {'key': 'all', 'label': 'Todos', 'icon': Icons.people_rounded},
+      {'key': 'active', 'label': 'Activos', 'icon': Icons.check_circle_rounded},
+      {'key': 'inactive', 'label': 'Inactivos', 'icon': Icons.pause_circle_rounded},
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: filters.map((filter) {
+          final isSelected = _selectedFilter == filter['key'];
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              child: FilterChip(
+                selected: isSelected,
+                onSelected: (selected) {
+                  if (selected) {
+                    setState(() => _selectedFilter = filter['key'] as String);
+                    HapticFeedback.selectionClick();
+                  }
+                },
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      filter['icon'] as IconData,
+                      size: 16,
+                      color: isSelected 
+                          ? theme.colorScheme.onPrimary 
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(filter['label'] as String),
+                  ],
+                ),
+                backgroundColor: theme.colorScheme.surface,
+                selectedColor: theme.colorScheme.primary,
+                labelStyle: TextStyle(
+                  color: isSelected 
+                      ? theme.colorScheme.onPrimary 
+                      : theme.colorScheme.onSurfaceVariant,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+                side: BorderSide(
+                  color: isSelected 
+                      ? theme.colorScheme.primary 
+                      : theme.colorScheme.outline.withOpacity(0.3),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildEmpleadosList(List<Empleado> empleados) {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100), // Espacio para el FAB
+      itemCount: empleados.length,
+      itemBuilder: (context, index) {
+        return AnimatedContainer(
+          duration: Duration(milliseconds: 300 + (index * 50)),
+          curve: Curves.easeOutBack,
+          child: _buildEmpleadoCard(empleados[index], index),
+        );
+      },
+    );
+  }
+  
+  Widget _buildEmpleadoCard(Empleado empleado, int index) {
+    final theme = Theme.of(context);
+    final colorEstado = empleado.activo 
+        ? Colors.green.shade600 
+        : theme.colorScheme.error;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: theme.colorScheme.outline.withOpacity(0.1),
+            width: 1,
+          ),
+        ),
+        child: InkWell(
+          onTap: () => _showEmpleadoOptions(context, empleado),
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Hero(
+                  tag: 'empleado-avatar-${empleado.id}',
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          theme.colorScheme.primaryContainer,
+                          theme.colorScheme.primaryContainer.withOpacity(0.7),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.colorScheme.primary.withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        _getInitials(empleado.nombreCompleto),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.primary,
+                          fontSize: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Hero(
+                        tag: 'empleado-nombre-${empleado.id}',
+                        child: Material(
+                          color: Colors.transparent,
+                          child: Text(
+                            empleado.nombreCompleto,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        empleado.cargo,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorEstado.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: colorEstado,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  empleado.activo ? 'Activo' : 'Inactivo',
+                                  style: TextStyle(
+                                    color: colorEstado,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (empleado.hayDatosBiometricos)
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.fingerprint,
+                                size: 16,
+                                color: Colors.green.shade600,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.more_vert_rounded,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- WIDGETS DE ESTADOS ---
+
+  Widget _buildEmptyState() {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.people_outline_rounded,
+                size: 60,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No hay empleados',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Comienza agregando tu primer empleado',
+              style: TextStyle(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            FilledButton.icon(
+              onPressed: () => _navigateToForm(),
+              icon: const Icon(Icons.person_add_rounded),
+              label: const Text('Agregar Empleado'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoResultsState() {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.search_off_rounded,
+                size: 50,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Sin resultados',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'No se encontraron empleados con los filtros aplicados',
+              style: TextStyle(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            FilledButton.tonalIcon(
+              onPressed: () {
+                _searchController.clear();
+                setState(() => _selectedFilter = 'all');
+                _collapseSearch();
+              },
+              icon: const Icon(Icons.clear_all_rounded),
+              label: const Text('Limpiar Filtros'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(String message) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.errorContainer.withOpacity(0.3),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.error_outline_rounded,
+                size: 50,
+                color: theme.colorScheme.error,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Ocurrió un error',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 32),
+            FilledButton.icon(
+              onPressed: _refreshData,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- BOTTOM SHEET MEJORADO ---
 
   void _showEmpleadoOptions(BuildContext context, Empleado empleado) {
+    HapticFeedback.mediumImpact();
     final theme = Theme.of(context);
-    final size = MediaQuery.of(context).size;
-    final isSmallScreen = size.width < 600;
     
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            vertical: 16, 
-            horizontal: isSmallScreen ? 16 : 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handle indicator
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Container(
-                  height: 5,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle indicator
+                Container(
+                  height: 4,
                   width: 40,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(10),
+                    color: theme.colorScheme.outline.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ),
-              
-              // Avatar
-              Hero(
-                tag: 'empleado-avatar-${empleado.id}',
-                child: CircleAvatar(
-                  backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-                  radius: isSmallScreen ? 36 : 45,
-                  child: Text(
-                    _getInitials(empleado.nombreCompleto),
-                    style: TextStyle(
-                      fontSize: isSmallScreen ? 20 : 26, 
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 12),
-              
-              // Nombre
-              Hero(
-                tag: 'empleado-nombre-${empleado.id}',
-                child: Material(
-                  color: Colors.transparent,
-                  child: Text(
-                    empleado.nombreCompleto,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: isSmallScreen ? 16 : 18,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-              
-              // Email
-              Padding(
-                padding: const EdgeInsets.only(top: 4.0),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
+                const SizedBox(height: 24),
+                
+                // Avatar y información
+                Row(
                   children: [
-                    Icon(Icons.email_outlined, size: 14, color: Colors.grey[600]),
-                    const SizedBox(width: 4),
-                    Text(
-                      empleado.correo,
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 13,
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            theme.colorScheme.primaryContainer,
+                            theme.colorScheme.primaryContainer.withOpacity(0.7),
+                          ],
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: theme.colorScheme.primary.withOpacity(0.2),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          _getInitials(empleado.nombreCompleto),
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            empleado.nombreCompleto,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            empleado.cargo,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            empleado.correo,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-              
-              // Cargo
-              Padding(
-                padding: const EdgeInsets.only(top: 4.0),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceVariant,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    empleado.cargo,
-                    style: TextStyle(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 12),
-              
-              // Estado actual con toggle switch
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: theme.colorScheme.outlineVariant),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.person_outline,
-                          color: empleado.activo ? Colors.green : Colors.red,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Estado del empleado',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: theme.colorScheme.onSurface,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          empleado.activo ? 'Activo' : 'Inactivo',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: empleado.activo ? Colors.green : Colors.red,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Switch.adaptive(
-                          value: empleado.activo,
-                          activeColor: Colors.green,
-                          inactiveThumbColor: Colors.red,
-                          onChanged: (value) {
-                            Navigator.pop(context);
-                            _toggleEmpleadoStatus(empleado);
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              
-              const SizedBox(height: 8),
-              const Divider(),
-              
-              // Opciones del empleado en forma de grid adaptativo
-              Padding(
-                padding: const EdgeInsets.only(top: 4.0),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final availableWidth = constraints.maxWidth;
-                    int crossAxisCount = availableWidth > 500 ? 4 : 2;
-                    
-                    return GridView(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: crossAxisCount,
-                        childAspectRatio: 2.5,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
-                      ),
-                      children: [
-                        _buildOptionButton(
-                          icon: Icons.edit_note_rounded,
-                          color: theme.colorScheme.primary,
-                          label: 'Editar perfil',
-                          onTap: () {
-                            Navigator.pop(context);
-                            _navigateToDetail(empleado.id);
-                          },
-                        ),
-                        _buildOptionButton(
-                          icon: Icons.fingerprint,
-                          color: Colors.blue,
-                          label: 'Biométricos',
-                          badge: empleado.hayDatosBiometricos,
-                          onTap: () {
-                            Navigator.pop(context);
-                            _navigateToBiometrico(empleado); // Llamamos a una función que maneje la navegación
-                          },
-                        ),
-                        _buildOptionButton(
-                          icon: Icons.delete_outline_rounded,
-                          color: Colors.red,
-                          label: 'Eliminar',
-                          onTap: () {
-                            Navigator.pop(context);
-                            _showDeleteConfirmation(empleado);
-                          },
-                        ),
-                        _buildOptionButton(
-                          icon: Icons.history,
-                          color: Colors.amber[700]!,
-                          label: 'Asistencias',
-                          onTap: () {
-                            Navigator.pop(context);
-                            // Navigator.pushNamed(context, '/admin/empleados/asistencias', arguments: empleado);
-                          },
-                        ),
-                      ],
-                    );
+                
+                const SizedBox(height: 32),
+                
+                // Opciones
+                _buildOptionTile(
+                  Icons.edit_rounded,
+                  'Editar Perfil',
+                  'Modificar información del empleado',
+                  () {
+                    Navigator.pop(context);
+                    _navigateToForm(empleado: empleado);
                   },
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildOptionButton({
-    required IconData icon,
-    required Color color,
-    required String label,
-    bool badge = false,
-    required VoidCallback onTap,
-  }) {
-    final theme = Theme.of(context);
-    
-    return Card(
-      elevation: 0,
-      color: theme.colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.colorScheme.outline.withOpacity(0.3)),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: [
-              Stack(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: color.withOpacity(0.1),
-                    radius: 18,
-                    child: Icon(icon, color: color, size: 20),
+                
+                _buildOptionTile(
+                  Icons.fingerprint_rounded,
+                  'Datos Biométricos',
+                  empleado.hayDatosBiometricos 
+                      ? 'Datos configurados' 
+                      : 'Configurar datos biométricos',
+                  () {
+                    Navigator.pop(context);
+                    _navigateToBiometrico(empleado);
+                  },
+                  trailing: empleado.hayDatosBiometricos 
+                      ? Icon(Icons.check_circle_rounded, color: Colors.green.shade600, size: 20)
+                      : Icon(Icons.radio_button_unchecked_rounded, color: theme.colorScheme.onSurfaceVariant, size: 20),
+                ),
+                
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: theme.colorScheme.outline.withOpacity(0.2),
+                    ),
                   ),
-                  if (badge)
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 1.5),
+                  child: Row(
+                    children: [
+                      Icon(
+                        empleado.activo 
+                            ? Icons.toggle_on_rounded 
+                            : Icons.toggle_off_rounded,
+                        color: empleado.activo 
+                            ? theme.colorScheme.primary 
+                            : theme.colorScheme.onSurfaceVariant,
+                        size: 28,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Estado del Empleado',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              empleado.activo ? 'Activo' : 'Inactivo',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: empleado.activo 
+                                    ? Colors.green.shade600 
+                                    : theme.colorScheme.error,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                ],
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: theme.colorScheme.onSurface,
+                      Switch.adaptive(
+                        value: empleado.activo,
+                        onChanged: (value) {
+                          Navigator.pop(context);
+                          _toggleEmpleadoStatus(empleado);
+                        },
+                        activeColor: theme.colorScheme.primary,
+                      ),
+                    ],
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+                
+                const SizedBox(height: 16),
+                
+                _buildOptionTile(
+                  Icons.delete_outline_rounded,
+                  'Eliminar Empleado',
+                  'Esta acción no se puede deshacer',
+                  () {
+                    Navigator.pop(context);
+                    _showDeleteConfirmation(empleado);
+                  },
+                  isDestructive: true,
+                ),
+                
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
-  
+
+  Widget _buildOptionTile(
+    IconData icon,
+    String title,
+    String subtitle,
+    VoidCallback onTap, {
+    Widget? trailing,
+    bool isDestructive = false,
+  }) {
+    final theme = Theme.of(context);
+    final color = isDestructive 
+        ? theme.colorScheme.error 
+        : theme.colorScheme.onSurface;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            onTap();
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDestructive 
+                    ? theme.colorScheme.error.withOpacity(0.2)
+                    : theme.colorScheme.outline.withOpacity(0.1),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: isDestructive 
+                        ? theme.colorScheme.error.withOpacity(0.1)
+                        : theme.colorScheme.primaryContainer.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: color,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: isDestructive 
+                              ? theme.colorScheme.error.withOpacity(0.7)
+                              : theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (trailing != null) ...[
+                  const SizedBox(width: 8),
+                  trailing,
+                ] else
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 16,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showDeleteConfirmation(Empleado empleado) {
     final theme = Theme.of(context);
-    final size = MediaQuery.of(context).size;
-    final isSmallScreen = size.width < 600;
     
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Eliminar empleado'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.error.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.warning_rounded,
+                color: theme.colorScheme.error,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text('Eliminar Empleado'),
+            ),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              backgroundColor: Colors.red.withOpacity(0.1),
-              radius: 28,
-              child: const Icon(Icons.delete_forever, color: Colors.red, size: 28),
-            ),
-            const SizedBox(height: 16),
-            Text('¿Estás seguro de eliminar a ${empleado.nombreCompleto}?'),
-            const SizedBox(height: 8),
             Text(
-              'Esta acción no se puede deshacer.',
-              style: TextStyle(
-                fontSize: 12,
-                color: theme.colorScheme.error,
+              '¿Está seguro de que desea eliminar a ${empleado.nombreCompleto}?',
+              style: theme.textTheme.bodyLarge,
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.errorContainer.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 16,
+                    color: theme.colorScheme.error,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Esta acción no se puede deshacer',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.error,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         actions: [
-          OutlinedButton(
+          TextButton(
             onPressed: () => Navigator.pop(context),
-            style: OutlinedButton.styleFrom(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: EdgeInsets.symmetric(
-                horizontal: isSmallScreen ? 14 : 20,
-                vertical: 10,
-              ),
-            ),
             child: const Text('Cancelar'),
           ),
           FilledButton(
@@ -457,502 +1153,12 @@ class _EmpleadosPageState extends State<EmpleadosPage> {
               _deleteEmpleado(empleado);
             },
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: EdgeInsets.symmetric(
-                horizontal: isSmallScreen ? 14 : 20,
-                vertical: 10,
-              ),
+              backgroundColor: theme.colorScheme.error,
+              foregroundColor: theme.colorScheme.onError,
             ),
             child: const Text('Eliminar'),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: Colors.grey[600]),
-        const SizedBox(width: 4),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 13,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
-
-  List<Empleado> _filterEmpleados(List<Empleado> empleados) {
-    if (_searchQuery.isEmpty) return empleados;
-    
-    return empleados.where((empleado) {
-      return empleado.nombreCompleto.toLowerCase().contains(_searchQuery.toLowerCase()) || 
-             empleado.correo.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             empleado.cargo.toLowerCase().contains(_searchQuery.toLowerCase());
-    }).toList();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final size = MediaQuery.of(context).size;
-    final isSmallScreen = size.width < 600;
-    
-    return Scaffold(
-      body: Consumer<EmpleadoController>(
-        builder: (context, empleadoController, _) {
-          if (empleadoController.loading) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: theme.colorScheme.primary),
-                  const SizedBox(height: 16),
-                  const Text('Cargando empleados...'),
-                ],
-              ),
-            );
-          }
-
-          if (empleadoController.errorMessage != null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline, size: 60, color: theme.colorScheme.error),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Error al cargar empleados',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.error,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                    child: Text(
-                      empleadoController.errorMessage!,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  FilledButton.icon(
-                    onPressed: _loadData,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Reintentar'),
-                    style: FilledButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final empleados = _filterEmpleados(empleadoController.empleados);
-          
-          return RefreshIndicator(
-            onRefresh: _loadData,
-            color: theme.colorScheme.primary,
-            child: CustomScrollView(
-              slivers: [
-                // AppBar adaptativo
-                SliverAppBar(
-                  automaticallyImplyLeading: false,
-                  floating: true,
-                  pinned: true,
-                  elevation: 0,
-                  backgroundColor: theme.scaffoldBackgroundColor,
-                  expandedHeight: isSmallScreen ? 130 : 150,
-                  collapsedHeight: 65,
-                  flexibleSpace: FlexibleSpaceBar(
-                    background: Padding(
-                      padding: EdgeInsets.fromLTRB(16, 65, 16, isSmallScreen ? 12 : 16),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: theme.colorScheme.outlineVariant),
-                        ),
-                        child: TextField(
-                          controller: _searchController,
-                          decoration: InputDecoration(
-                            hintText: 'Buscar empleado por nombre, correo o cargo',
-                            prefixIcon: const Icon(Icons.search),
-                            suffixIcon: _searchController.text.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      setState(() {
-                                        _searchQuery = '';
-                                      });
-                                    },
-                                  )
-                                : null,
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                          onChanged: (value) {
-                            setState(() {
-                              _searchQuery = value;
-                            });
-                          },
-                        ),
-                      ),
-                    ),
-                    centerTitle: false,
-                    titlePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    title: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Empleados',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: isSmallScreen ? 18 : 20,
-                                color: theme.colorScheme.onSurface,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                '${empleados.length} ${empleados.length == 1 ? 'empleado' : 'empleados'}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: theme.colorScheme.onPrimaryContainer,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                
-                // Estados vacíos
-                if (empleados.isEmpty && _searchQuery.isNotEmpty)
-                  SliverFillRemaining(
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.search_off, size: 70, color: Colors.grey.shade300),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No se encontraron resultados',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Intenta con otra búsqueda',
-                            style: TextStyle(color: Colors.grey.shade500),
-                          ),
-                          const SizedBox(height: 16),
-                          OutlinedButton.icon(
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _searchQuery = '';
-                              });
-                            },
-                            icon: const Icon(Icons.clear),
-                            label: const Text('Limpiar búsqueda'),
-                            style: OutlinedButton.styleFrom(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else if (empleados.isEmpty)
-                  SliverFillRemaining(
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.people_outline, size: 80, color: Colors.grey.shade300),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No hay empleados registrados',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Presiona el botón + para agregar un nuevo empleado',
-                            style: TextStyle(color: Colors.grey.shade500),
-                          ),
-                          const SizedBox(height: 20),
-                          FilledButton.icon(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const EmpleadoFormPage(),
-                                ),
-                              ).then((_) => _loadData());
-                            },
-                            icon: const Icon(Icons.add),
-                            label: const Text('Nuevo empleado'),
-                            style: FilledButton.styleFrom(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20, 
-                                vertical: 12,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                
-                // Lista de empleados
-                else
-                  SliverPadding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isSmallScreen ? 12 : 24,
-                      vertical: isSmallScreen ? 8 : 16,
-                    ),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final empleado = empleados[index];
-                          return Column(
-                            children: [
-                              _buildEmpleadoCard(empleado, isSmallScreen),
-                              const SizedBox(height: 12), // Espacio entre tarjetas
-                            ],
-                          );
-                        },
-                        childCount: empleados.length,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const EmpleadoFormPage(),
-            ),
-          ).then((_) => _loadData());
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Empleado'),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildEmpleadoCard(Empleado empleado, bool isSmallScreen) {
-    final theme = Theme.of(context);
-    
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: InkWell(
-        onTap: () => _showEmpleadoOptions(context, empleado),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
-          child: Column(
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Avatar section with initials
-                  Hero(
-                    tag: 'empleado-avatar-${empleado.id}',
-                    child: CircleAvatar(
-                      backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-                      radius: isSmallScreen ? 24 : 28,
-                      child: Text(
-                        _getInitials(empleado.nombreCompleto),
-                        style: TextStyle(
-                          fontSize: isSmallScreen ? 14 : 16, 
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: isSmallScreen ? 12 : 16),
-                  
-                  // Info section
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Hero(
-                                tag: 'empleado-nombre-${empleado.id}',
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: Text(
-                                    empleado.nombreCompleto,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: isSmallScreen ? 15 : 16,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        
-                        const SizedBox(height: 4),
-                        
-                        // Email y cargo en fila o columna según el espacio
-                        if (isSmallScreen)
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildInfoRow(Icons.email_outlined, empleado.correo),
-                              const SizedBox(height: 2),
-                              _buildInfoRow(Icons.work_outline, empleado.cargo),
-                            ],
-                          )
-                        else
-                          Row(
-                            children: [
-                              Expanded(
-                                flex: 6,
-                                child: _buildInfoRow(Icons.email_outlined, empleado.correo),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                flex: 4,
-                                child: _buildInfoRow(Icons.work_outline, empleado.cargo),
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 12),
-              const Divider(height: 1),
-              const SizedBox(height: 12),
-              
-              // Sección inferior con biométricos y switch de estado
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Indicador de biométricos
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: empleado.hayDatosBiometricos 
-                          ? Colors.blue.withOpacity(0.1)
-                          : Colors.grey.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.fingerprint,
-                          size: 16,
-                          color: empleado.hayDatosBiometricos ? Colors.blue : Colors.grey,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          empleado.hayDatosBiometricos ? 'Registrado' : 'No registrado',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: empleado.hayDatosBiometricos ? Colors.blue : Colors.grey,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  // Switch de estado
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        empleado.activo ? 'Activo' : 'Inactivo',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: empleado.activo ? Colors.green : Colors.red,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Switch.adaptive(
-                        value: empleado.activo,
-                        activeColor: Colors.green,
-                        inactiveThumbColor: Colors.red,
-                        onChanged: (value) => _toggleEmpleadoStatus(empleado),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

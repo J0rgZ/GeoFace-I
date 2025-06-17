@@ -1,174 +1,166 @@
-import 'package:firebase_auth/firebase_auth.dart';
+// FILE: lib/controllers/auth_controller.dart
+
 import 'package:flutter/material.dart';
-import '../services/firebase_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/usuario.dart';
 
-enum AuthStatus { initial, authenticated, unauthenticated }
+enum AuthStatus { initial, authenticated, unauthenticated, loading }
 
-class AuthController extends ChangeNotifier {
-  final FirebaseService _firebaseService = FirebaseService();
-  final FirebaseAuth _auth = FirebaseAuth.instance; // 🔧 Agregado
+class AuthController with ChangeNotifier {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   AuthStatus _status = AuthStatus.initial;
   Usuario? _currentUser;
   String? _errorMessage;
-  bool _loading = false;
-
+  
+  // Getters públicos para que la UI reaccione a los cambios
   AuthStatus get status => _status;
   Usuario? get currentUser => _currentUser;
   String? get errorMessage => _errorMessage;
   bool get isAdmin => _currentUser?.isAdmin ?? false;
-  bool get loading => _loading;
+  bool get isEmpleado => _currentUser?.isEmpleado ?? false;
+  bool get loading => _status == AuthStatus.loading;
 
   AuthController() {
-    checkCurrentUser();
+    // Escucha los cambios de estado de autenticación de Firebase en tiempo real.
+    _auth.authStateChanges().listen(_onAuthStateChanged);
   }
 
-  Future<void> checkCurrentUser() async {
-    final user = _firebaseService.getCurrentUser();
-
-    if (user != null) {
-      try {
-        final usuario = await _firebaseService.getUsuarioByEmail(user.email!);
-        if (usuario != null) {
+  /// Escucha los cambios y actualiza el estado de la app.
+  Future<void> _onAuthStateChanged(User? firebaseUser) async {
+    if (firebaseUser == null) {
+      _currentUser = null;
+      _status = AuthStatus.unauthenticated;
+    } else {
+      await _fetchUserData(firebaseUser.uid);
+    }
+    notifyListeners();
+  }
+  
+  /// Busca los datos del usuario en Firestore y actualiza el estado.
+  Future<void> _fetchUserData(String uid) async {
+    try {
+      final userDoc = await _firestore.collection('usuarios').doc(uid).get();
+      if (userDoc.exists) {
+        final usuario = Usuario.fromJson({'id': userDoc.id, ...userDoc.data()!});
+        if (usuario.activo) {
           _currentUser = usuario;
           _status = AuthStatus.authenticated;
         } else {
+          await _auth.signOut();
+          _currentUser = null;
           _status = AuthStatus.unauthenticated;
+          _errorMessage = 'Tu cuenta ha sido desactivada. Contacta al administrador.';
         }
-      } catch (e) {
-        _status = AuthStatus.unauthenticated;
-        _formatErrorMessage(e.toString());
-      }
-    } else {
-      _status = AuthStatus.unauthenticated;
-    }
-
-    notifyListeners();
-  }
-
-  Future<bool> login(String username, String password) async {
-    _loading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      // Construye el correo automáticamente
-      final email = '$username@admin.com';
-
-      // Inicia sesión con Firebase usando el correo generado
-      await _firebaseService.signInWithEmailAndPassword(email, password);
-
-      final usuario = await _firebaseService.getUsuarioByEmail(email);
-      if (usuario != null) {
-        if (!usuario.activo) {
-          _errorMessage = 'Su cuenta de administrador está desactivada. Contacte a soporte.';
-          _status = AuthStatus.unauthenticated;
-          return false;
-        }
-
-        if (!usuario.isAdmin) {
-          _errorMessage = 'Este usuario no tiene permisos de administrador.';
-          _status = AuthStatus.unauthenticated;
-          await _firebaseService.signOut(); // Cierra sesión si no es admin
-          return false;
-        }
-
-        _currentUser = usuario;
-        _status = AuthStatus.authenticated;
-        return true;
       } else {
-        _errorMessage = 'No se encontró una cuenta asociada a este usuario.';
+        await _auth.signOut();
         _status = AuthStatus.unauthenticated;
-        return false;
+        _errorMessage = 'No se encontraron datos de usuario asociados a esta cuenta.';
       }
-    } catch (e) {
-      _formatErrorMessage(e.toString());
-      _status = AuthStatus.unauthenticated;
-      return false;
-    } finally {
-      _loading = false;
-      notifyListeners();
+    } catch(e) {
+        await _auth.signOut();
+        _status = AuthStatus.unauthenticated;
+        _errorMessage = 'Error al cargar los datos del usuario.';
     }
   }
 
-  void _formatErrorMessage(String errorMsg) {
-    errorMsg = errorMsg.toLowerCase();
-
-    if (errorMsg.contains('user-not-found')) {
-      _errorMessage = 'No existe una cuenta con este correo electrónico.';
-    } else if (errorMsg.contains('wrong-password') || errorMsg.contains('invalid-credential')) {
-      _errorMessage = 'La contraseña ingresada es incorrecta.';
-    } else if (errorMsg.contains('invalid-email')) {
-      _errorMessage = 'El formato del correo electrónico no es válido.';
-    } else if (errorMsg.contains('user-disabled')) {
-      _errorMessage = 'Esta cuenta ha sido deshabilitada. Contacte a soporte técnico.';
-    } else if (errorMsg.contains('too-many-requests')) {
-      _errorMessage = 'Demasiados intentos fallidos. Intente nuevamente más tarde.';
-    } else if (errorMsg.contains('network-request-failed')) {
-      _errorMessage = 'Error de conexión. Verifique su conexión a internet.';
-    } else if (errorMsg.contains('email-already-in-use')) {
-      _errorMessage = 'Este correo electrónico ya está registrado.';
-    } else if (errorMsg.contains('operation-not-allowed')) {
-      _errorMessage = 'Esta operación no está permitida. Contacte a soporte.';
-    } else if (errorMsg.contains('weak-password')) {
-      _errorMessage = 'La contraseña proporcionada es demasiado débil.';
-    } else {
-      _errorMessage = 'Ha ocurrido un error al iniciar sesión. Por favor, intente nuevamente.';
-    }
-  }
-
-  Future<void> logout() async {
-    try {
-      await _firebaseService.signOut();
-      _currentUser = null;
-      _status = AuthStatus.unauthenticated;
-    } catch (e) {
-      _formatErrorMessage(e.toString());
-    }
-    notifyListeners();
-  }
-
-  void setErrorMessage(String message) {
+  // --- NUEVO MÉTODO AÑADIDO ---
+  /// Permite a la UI establecer un mensaje de error personalizado.
+  /// Útil para errores de validación en la UI antes de llamar a la lógica de negocio.
+  void setErrorMessage(String? message) {
     _errorMessage = message;
     notifyListeners();
   }
 
-  Future<void> changePassword(String currentPassword, String newPassword) async {
-    try {
-      _loading = true;
-      notifyListeners();
+  /// Inicia sesión con correo y contraseña.
+  /// El formato del correo debe ser preparado por la UI antes de llamar a este método.
+  Future<bool> login(String email, String password) async {
+    _status = AuthStatus.loading;
+    setErrorMessage(null); // Limpia errores previos al iniciar un nuevo intento.
+    notifyListeners();
 
-      final user = _auth.currentUser; // ✅ Ya no da error porque _auth está definido
-      if (user == null) {
-        throw Exception('No hay una sesión activa');
+    try {
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      // El listener _onAuthStateChanged se encargará del resto.
+      return true;
+    } on FirebaseAuthException catch (e) {
+      _formatErrorMessage(e);
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = 'Ocurrió un error inesperado.';
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Cierra la sesión del usuario actual.
+  Future<void> logout() async {
+    await _auth.signOut();
+    // El listener _onAuthStateChanged se encargará de actualizar el estado.
+  }
+
+  /// Permite a cualquier usuario autenticado cambiar su contraseña.
+  Future<void> changePassword(String currentPassword, String newPassword) async {
+    _status = AuthStatus.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final user = _auth.currentUser;
+      if (user == null || user.email == null) {
+        throw Exception('No hay una sesión activa para realizar esta acción.');
       }
 
-      final credential = EmailAuthProvider.credential(
+      AuthCredential credential = EmailAuthProvider.credential(
         email: user.email!,
         password: currentPassword,
       );
-
       await user.reauthenticateWithCredential(credential);
       await user.updatePassword(newPassword);
-    } catch (e) {
-      if (e is FirebaseAuthException) {
-        switch (e.code) {
-          case 'wrong-password':
-            throw Exception('La contraseña actual es incorrecta');
-          case 'too-many-requests':
-            throw Exception('Demasiados intentos fallidos. Intente más tarde');
-          case 'requires-recent-login':
-            throw Exception('Esta operación es sensible y requiere reautenticación reciente');
-          default:
-            throw Exception('Error al cambiar la contraseña: ${e.message}');
-        }
-      } else {
-        throw Exception('Error al cambiar la contraseña: ${e.toString()}');
-      }
-    } finally {
-      _loading = false;
+      
+      _status = AuthStatus.authenticated;
       notifyListeners();
+
+    } on FirebaseAuthException catch (e) {
+      _formatErrorMessage(e);
+      _status = AuthStatus.authenticated;
+      notifyListeners();
+      rethrow;
+    } catch (e) {
+      _errorMessage = e.toString().replaceFirst("Exception: ", "");
+      _status = AuthStatus.authenticated;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Formatea los errores de FirebaseAuth a mensajes amigables.
+  void _formatErrorMessage(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'user-not-found':
+      case 'wrong-password':
+      case 'invalid-credential':
+        _errorMessage = 'Correo o contraseña incorrectos.';
+        break;
+      case 'invalid-email':
+        _errorMessage = 'El formato del correo no es válido.';
+        break;
+      case 'user-disabled':
+        _errorMessage = 'Esta cuenta ha sido deshabilitada.';
+        break;
+      case 'too-many-requests':
+        _errorMessage = 'Demasiados intentos. Inténtalo más tarde.';
+        break;
+      case 'network-request-failed':
+        _errorMessage = 'Error de red. Verifica tu conexión a internet.';
+        break;
+      default:
+        _errorMessage = 'Ocurrió un error de autenticación.';
     }
   }
 }

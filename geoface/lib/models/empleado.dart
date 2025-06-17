@@ -1,3 +1,7 @@
+// lib/models/empleado.dart
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Empleado {
   final String id;
   final String nombre;
@@ -5,12 +9,13 @@ class Empleado {
   final String correo;
   final String cargo;
   final String sedeId;
-  final String dni;  // Nuevo campo DNI
-  final String celular;  // Nuevo campo celular
+  final String dni;
+  final String celular;
   final bool hayDatosBiometricos;
   final bool activo;
   final DateTime fechaCreacion;
   final DateTime? fechaModificacion;
+  final bool tieneUsuario; // CAMPO CLAVE
 
   Empleado({
     required this.id,
@@ -19,54 +24,50 @@ class Empleado {
     required this.correo,
     required this.cargo,
     required this.sedeId,
-    required this.dni,  // Requerido y único
-    required this.celular,  // Requerido
-    required this.hayDatosBiometricos,
-    required this.activo,
+    required this.dni,
+    required this.celular,
+    this.hayDatosBiometricos = false,
+    this.activo = true,
     required this.fechaCreacion,
     this.fechaModificacion,
+    this.tieneUsuario = false, // VALOR POR DEFECTO
   });
 
   String get nombreCompleto => '$nombre $apellidos';
 
+  /// Factory principal para crear una instancia desde un Map/JSON.
+  /// Es robusto y maneja Timestamps de Firestore o Strings de fechas.
   factory Empleado.fromJson(Map<String, dynamic> json) {
+    // Función de ayuda para parsear fechas de forma segura
+    DateTime _parseDate(dynamic date) {
+      if (date is Timestamp) return date.toDate();
+      if (date is String) return DateTime.tryParse(date) ?? DateTime.now();
+      return DateTime.now(); // Fallback por si el dato es nulo o inválido
+    }
+
     return Empleado(
-      id: json['id'],
-      nombre: json['nombre'],
-      apellidos: json['apellidos'],
-      correo: json['correo'],
-      cargo: json['cargo'],
-      sedeId: json['sedeId'],
-      dni: json['dni'],
-      celular: json['celular'],
+      id: json['id'] ?? '',
+      nombre: json['nombre'] ?? '',
+      apellidos: json['apellidos'] ?? '',
+      correo: json['correo'] ?? '',
+      cargo: json['cargo'] ?? '',
+      sedeId: json['sedeId'] ?? '',
+      dni: json['dni'] ?? '',
+      celular: json['celular'] ?? '',
       hayDatosBiometricos: json['hayDatosBiometricos'] ?? false,
-      activo: json['activo'],
-      fechaCreacion: DateTime.parse(json['fechaCreacion']),
-      fechaModificacion: json['fechaModificacion'] != null
-          ? DateTime.parse(json['fechaModificacion'])
-          : null,
+      activo: json['activo'] ?? false,
+      fechaCreacion: _parseDate(json['fechaCreacion']),
+      fechaModificacion: json['fechaModificacion'] != null ? _parseDate(json['fechaModificacion']) : null,
+      tieneUsuario: json['tieneUsuario'] ?? false,
     );
   }
-
+  
+  // Mantenemos fromMap como un alias para compatibilidad con tu código.
   factory Empleado.fromMap(Map<String, dynamic> map) {
-    return Empleado(
-      id: map['id'],
-      nombre: map['nombre'],
-      apellidos: map['apellidos'],
-      correo: map['correo'],
-      cargo: map['cargo'],
-      sedeId: map['sedeId'],
-      dni: map['dni'],
-      celular: map['celular'],
-      hayDatosBiometricos: map['hayDatosBiometricos'] ?? false,
-      activo: map['activo'],
-      fechaCreacion: DateTime.parse(map['fechaCreacion']),
-      fechaModificacion: map['fechaModificacion'] != null
-          ? DateTime.parse(map['fechaModificacion'])
-          : null,
-    );
+    return Empleado.fromJson(map);
   }
 
+  /// Método para convertir el objeto a un Map para guardar en Firestore.
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -79,11 +80,14 @@ class Empleado {
       'celular': celular,
       'hayDatosBiometricos': hayDatosBiometricos,
       'activo': activo,
-      'fechaCreacion': fechaCreacion.toIso8601String(),
-      'fechaModificacion': fechaModificacion?.toIso8601String(),
+      // Al guardar, usamos el formato nativo de Firestore
+      'fechaCreacion': fechaCreacion,
+      'fechaModificacion': fechaModificacion,
+      'tieneUsuario': tieneUsuario,
     };
   }
 
+  /// Método para crear una copia del objeto con algunos campos modificados.
   Empleado copyWith({
     String? id,
     String? nombre,
@@ -97,6 +101,7 @@ class Empleado {
     bool? activo,
     DateTime? fechaCreacion,
     DateTime? fechaModificacion,
+    bool? tieneUsuario,
   }) {
     return Empleado(
       id: id ?? this.id,
@@ -110,7 +115,8 @@ class Empleado {
       hayDatosBiometricos: hayDatosBiometricos ?? this.hayDatosBiometricos,
       activo: activo ?? this.activo,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
-      fechaModificacion: fechaModificacion ?? DateTime.now(),
+      fechaModificacion: fechaModificacion ?? this.fechaModificacion,
+      tieneUsuario: tieneUsuario ?? this.tieneUsuario,
     );
   }
 }

@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
-import '../services/firebase_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../services/firebase_service.dart'; // Tu servicio centralizado
 import '../models/empleado.dart';
 
 class EmpleadoController extends ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final Uuid _uuid = Uuid();
   
   List<Empleado> _empleados = [];
@@ -15,18 +20,37 @@ class EmpleadoController extends ChangeNotifier {
   bool get loading => _loading;
   String? get errorMessage => _errorMessage;
 
-  Future<void> getEmpleados() async {
-    _loading = true;
-    _errorMessage = null;
+  void _setState({bool loading = false, String? error}) {
+    _loading = loading;
+    _errorMessage = error;
     notifyListeners();
-    
+  }
+
+  // --- OBTENCIÓN DE DATOS ---
+
+  /// MÉTODO ANTIGUO: Mantenido para compatibilidad con otras vistas.
+  Future<void> getEmpleados() async {
+    _setState(loading: true);
     try {
       _empleados = await _firebaseService.getEmpleados();
     } catch (e) {
       _errorMessage = 'Error al cargar empleados: ${e.toString()}';
     } finally {
-      _loading = false;
-      notifyListeners();
+      _setState(loading: false);
+    }
+  }
+
+  /// NUEVO MÉTODO: Para ser usado por FutureBuilder en nuevas vistas.
+  Future<List<Empleado>> fetchEmpleados() async {
+    _setState(loading: true);
+    try {
+      _empleados = await _firebaseService.getEmpleados();
+      _setState(loading: false);
+      return _empleados;
+    } catch (e) {
+      final errorMsg = e.toString().replaceFirst("Exception: ", "");
+      _setState(loading: false, error: errorMsg);
+      throw Exception(errorMsg);
     }
   }
 
@@ -39,56 +63,44 @@ class EmpleadoController extends ChangeNotifier {
       return null;
     }
   }
-
+  
   Future<List<Empleado>> getEmpleadosPorSede(String sedeId) async {
-    _loading = true;
-    _errorMessage = null;
-    notifyListeners();
-    
+    _setState(loading: true);
     try {
       final todosEmpleados = await _firebaseService.getEmpleados();
       final empleadosSede = todosEmpleados.where((emp) => emp.sedeId == sedeId).toList();
-      _loading = false;
-      notifyListeners();
+      _setState(loading: false);
       return empleadosSede;
     } catch (e) {
-      _errorMessage = 'Error al cargar empleados por sede: ${e.toString()}';
-      _loading = false;
-      notifyListeners();
+      _setState(loading: false, error: 'Error al cargar empleados por sede: ${e.toString()}');
       return [];
     }
   }
 
-  // Método para verificar si ya existe un empleado con el mismo DNI
-  Future<bool> existeEmpleadoConDni(String dni) async {
-    await getEmpleados();
-    return _empleados.any((empleado) => empleado.dni == dni);
-  }
-
-  // Método para verificar si ya existe un empleado con el mismo correo
-  Future<bool> existeEmpleadoConCorreo(String correo) async {
-    await getEmpleados();
-    return _empleados.any((empleado) => empleado.correo == correo);
-  }
+  // --- VALIDACIÓN ---
 
   Future<Map<String, String?>> validarDatosUnicos({
     required String dni,
     required String correo,
+    String? empleadoIdActual,
   }) async {
     Map<String, String?> errores = {};
+    if (_empleados.isEmpty) {
+      await getEmpleados();
+    }
     
-    // Validar DNI único
-    if (await existeEmpleadoConDni(dni)) {
+    if (_empleados.any((e) => e.dni == dni && e.id != empleadoIdActual)) {
       errores['dni'] = 'Ya existe un empleado con este DNI';
     }
     
-    // Validar correo único
-    if (await existeEmpleadoConCorreo(correo)) {
+    if (_empleados.any((e) => e.correo == correo && e.id != empleadoIdActual)) {
       errores['correo'] = 'Ya existe un empleado con este correo';
     }
     
     return errores;
   }
+
+  // --- CRUD DE EMPLEADOS ---
 
   Future<bool> addEmpleado({
     required String nombre,
@@ -99,24 +111,11 @@ class EmpleadoController extends ChangeNotifier {
     required String cargo,
     required String sedeId,
   }) async {
-    _loading = true;
-    _errorMessage = null;
-    notifyListeners();
-    
+    _setState(loading: true);
     try {
-      // Validar que DNI y correo sean únicos
       final errores = await validarDatosUnicos(dni: dni, correo: correo);
-      
       if (errores.isNotEmpty) {
-        String mensaje = '';
-        errores.forEach((campo, error) {
-          if (error != null) mensaje += '$error. ';
-        });
-        
-        _errorMessage = mensaje.trim();
-        _loading = false;
-        notifyListeners();
-        return false;
+        throw Exception(errores.values.where((e) => e != null).join('. '));
       }
       
       final empleado = Empleado(
@@ -128,8 +127,6 @@ class EmpleadoController extends ChangeNotifier {
         correo: correo,
         cargo: cargo,
         sedeId: sedeId,
-        hayDatosBiometricos: false,
-        activo: true,
         fechaCreacion: DateTime.now(),
       );
       
@@ -137,34 +134,11 @@ class EmpleadoController extends ChangeNotifier {
       await getEmpleados();
       return true;
     } catch (e) {
-      _errorMessage = 'Error al agregar empleado: ${e.toString()}';
-      _loading = false;
-      notifyListeners();
+      _setState(loading: false, error: e.toString().replaceFirst("Exception: ", ""));
       return false;
     }
   }
-
-  Future<bool> toggleEmpleadoActivo(Empleado empleado) async {
-    _loading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      final empleadoActualizado = empleado.copyWith(
-        activo: !empleado.activo,
-        fechaModificacion: DateTime.now(),
-      );
-      await _firebaseService.updateEmpleado(empleadoActualizado);
-      await getEmpleados();
-      return true;
-    } catch (e) {
-      _errorMessage = 'Error al cambiar estado del empleado: ${e.toString()}';
-      _loading = false;
-      notifyListeners();
-      return false;
-    }
-  }
-
+  
   Future<bool> updateEmpleado({
     required String id,
     required String nombre,
@@ -176,38 +150,14 @@ class EmpleadoController extends ChangeNotifier {
     required String sedeId,
     required bool activo,
   }) async {
-    _loading = true;
-    _errorMessage = null;
-    notifyListeners();
-    
+    _setState(loading: true);
     try {
       final empleadoActual = await _firebaseService.getEmpleadoById(id);
+      if (empleadoActual == null) throw Exception("No se encontró el empleado a actualizar.");
       
-      if (empleadoActual == null) {
-        throw Exception('Empleado no encontrado');
-      }
-      
-      // Si el DNI o correo han cambiado, verificar que sean únicos
-      Map<String, String?> errores = {};
-      
-      if (empleadoActual.dni != dni && await existeEmpleadoConDni(dni)) {
-        errores['dni'] = 'Ya existe un empleado con este DNI';
-      }
-      
-      if (empleadoActual.correo != correo && await existeEmpleadoConCorreo(correo)) {
-        errores['correo'] = 'Ya existe un empleado con este correo';
-      }
-      
+      final errores = await validarDatosUnicos(dni: dni, correo: correo, empleadoIdActual: id);
       if (errores.isNotEmpty) {
-        String mensaje = '';
-        errores.forEach((campo, error) {
-          if (error != null) mensaje += '$error. ';
-        });
-        
-        _errorMessage = mensaje.trim();
-        _loading = false;
-        notifyListeners();
-        return false;
+        throw Exception(errores.values.where((e) => e != null).join('. '));
       }
       
       final empleadoActualizado = empleadoActual.copyWith(
@@ -226,26 +176,91 @@ class EmpleadoController extends ChangeNotifier {
       await getEmpleados();
       return true;
     } catch (e) {
-      _errorMessage = 'Error al actualizar empleado: ${e.toString()}';
-      _loading = false;
-      notifyListeners();
+      _setState(loading: false, error: e.toString().replaceFirst("Exception: ", ""));
       return false;
     }
   }
 
   Future<bool> deleteEmpleado(String id) async {
-    _loading = true;
-    _errorMessage = null;
-    notifyListeners();
-    
+    _setState(loading: true);
     try {
       await _firebaseService.deleteEmpleado(id);
       await getEmpleados();
       return true;
     } catch (e) {
-      _errorMessage = 'Error al eliminar empleado: ${e.toString()}';
-      _loading = false;
-      notifyListeners();
+      _setState(loading: false, error: 'Error al eliminar empleado: ${e.toString()}');
+      return false;
+    }
+  }
+
+  // --- MÉTODO RESTAURADO ---
+  /// Cambia el estado de 'activo' a 'inactivo' y viceversa para un empleado.
+  Future<bool> toggleEmpleadoActivo(Empleado empleado) async {
+    _setState(loading: true);
+    try {
+      // Crea una copia del empleado con el estado 'activo' invertido.
+      final empleadoActualizado = empleado.copyWith(
+        activo: !empleado.activo,
+        fechaModificacion: DateTime.now(),
+      );
+      // Llama al servicio para actualizar el documento en Firestore.
+      await _firebaseService.updateEmpleado(empleadoActualizado);
+      
+      // Actualiza la lista local para que la UI refleje el cambio inmediatamente.
+      await getEmpleados();
+      
+      return true;
+    } catch (e) {
+      _setState(loading: false, error: 'Error al cambiar estado del empleado: ${e.toString()}');
+      return false;
+    }
+  }
+
+  // --- GESTIÓN DE USUARIOS DE EMPLEADOS ---
+
+  Future<bool> assignUserToEmpleado({required Empleado empleado}) async {
+    _setState(loading: true);
+    try {
+      final correo = '${empleado.dni}@geoface.com';
+      final password = empleado.dni;
+      
+      final userCredential = await _auth.createUserWithEmailAndPassword(email: correo, password: password);
+      
+      final usuarioData = {
+        'nombreUsuario': empleado.nombre,
+        'correo': correo,
+        'tipoUsuario': 'EMPLEADO',
+        'empleadoId': empleado.id,
+        'activo': true,
+        'fechaCreacion': FieldValue.serverTimestamp(),
+      };
+      await _firestore.collection('usuarios').doc(userCredential.user!.uid).set(usuarioData);
+
+      final empleadoActualizado = empleado.copyWith(tieneUsuario: true);
+      await _firebaseService.updateEmpleado(empleadoActualizado);
+
+      _setState(loading: false);
+      return true;
+    } on FirebaseAuthException catch (e) {
+      final errorMsg = (e.code == 'email-already-in-use') ? 'Ya existe un usuario con este DNI.' : 'Error de autenticación: ${e.message}';
+      _setState(loading: false, error: errorMsg);
+      return false;
+    } catch (e) {
+      _setState(loading: false, error: 'Error inesperado: ${e.toString()}');
+      return false;
+    }
+  }
+
+  Future<bool> resetEmpleadoPassword({required Empleado empleado}) async {
+    _setState(loading: true);
+    try {
+      final correo = '${empleado.dni}@geoface.com';
+      await _firebaseService.sendPasswordResetEmail(correo);
+      _setState(loading: false);
+      return true;
+    } catch (e) {
+      final errorMsg = e.toString().replaceFirst("Exception: ", "");
+      _setState(loading: false, error: errorMsg);
       return false;
     }
   }
