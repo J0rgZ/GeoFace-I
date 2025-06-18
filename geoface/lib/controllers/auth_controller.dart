@@ -76,15 +76,24 @@ class AuthController with ChangeNotifier {
 
   /// Inicia sesión con correo y contraseña.
   /// El formato del correo debe ser preparado por la UI antes de llamar a este método.
-  Future<bool> login(String email, String password) async {
+   Future<bool> login(String username, String password) async {
     _status = AuthStatus.loading;
-    setErrorMessage(null); // Limpia errores previos al iniciar un nuevo intento.
+    setErrorMessage(null);
     notifyListeners();
 
     try {
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
-      // El listener _onAuthStateChanged se encargará del resto.
+      String finalEmail = username.trim();
+      if (!finalEmail.endsWith('@admin.com')) {
+        finalEmail += '@admin.com';
+      }
+      // ==============================
+      
+      // Usa el correo formateado para iniciar sesión.
+      await _auth.signInWithEmailAndPassword(email: finalEmail, password: password);
+      
+      // El listener _onAuthStateChanged se encargará del resto (verificar si está activo, etc.).
       return true;
+
     } on FirebaseAuthException catch (e) {
       _formatErrorMessage(e);
       _status = AuthStatus.unauthenticated;

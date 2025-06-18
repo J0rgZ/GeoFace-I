@@ -1,6 +1,7 @@
 // views/admin/empleados_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geoface/views/admin/empleado_detail_page.dart';
 import 'package:geoface/views/admin/empleado_form_page.dart';
 import 'package:geoface/views/admin/registro_biometrico_page.dart';
 import 'package:provider/provider.dart';
@@ -154,7 +155,7 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
       _showFeedback('Error al eliminar el empleado.', isError: true);
     }
   }
-
+  
   String _getInitials(String nombreCompleto) {
     if (nombreCompleto.isEmpty) return "?";
     final names = nombreCompleto.trim().split(' ');
@@ -211,7 +212,18 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
     ).then((_) => _refreshData());
   }
 
-  void _navigateToBiometrico(Empleado empleado) {
+  // Esta función es para ver los detalles y editar
+  void _navigateToDetail(Empleado empleado) {
+    HapticFeedback.lightImpact();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EmpleadoDetailPage(empleadoId: empleado.id),
+      ),
+    ).then((_) => _refreshData());
+  }
+
+    void _navigateToBiometrico(Empleado empleado) {
     HapticFeedback.lightImpact();
     Navigator.push(
       context,
@@ -888,7 +900,7 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
                   'Modificar información del empleado',
                   () {
                     Navigator.pop(context);
-                    _navigateToForm(empleado: empleado);
+                    _navigateToDetail(empleado);
                   },
                 ),
                 
