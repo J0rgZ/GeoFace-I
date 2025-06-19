@@ -10,7 +10,7 @@ class Asistencia {
   final double longitudEntrada;
   final double? latitudSalida;
   final double? longitudSalida;
-  final String capturaEntrada;
+  final String? capturaEntrada;
   final String? capturaSalida;
 
   Asistencia({

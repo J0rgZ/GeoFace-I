@@ -6,6 +6,7 @@ import '../models/empleado.dart';
 import '../models/sede.dart';
 import '../models/asistencia.dart';
 import '../models/usuario.dart';
+import '../services/time_service.dart';
 
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -23,7 +24,6 @@ class FirebaseService {
     return await _auth.signOut();
   }
 
-  // Get current user
   User? getCurrentUser() {
     return _auth.currentUser;
   }
@@ -37,33 +37,15 @@ class FirebaseService {
           .get();
       
       if (snapshot.docs.isNotEmpty) {
-        final data = snapshot.docs.first.data();
-        print('Datos del usuario encontrado: $data'); // Para depuración
         return Usuario.fromJson({
           'id': snapshot.docs.first.id,
-          ...data,
+          ...snapshot.docs.first.data(),
         });
       }
       return null;
     } catch (e) {
       print('Error al obtener usuario por email: $e');
       throw e;
-    }
-  }
-
-  Future<List<Asistencia>> getAllAsistencias() async {
-    try {
-      final querySnapshot = await _firestore
-          .collection('asistencias')
-          .orderBy('fechaHoraEntrada', descending: true)
-          .get();
-      
-      return querySnapshot.docs
-          .map((doc) => Asistencia.fromMap(doc.data()))
-          .toList();
-    } catch (e) {
-      print('Error al obtener todas las asistencias: ${e.toString()}');
-      throw Exception('No se pudieron cargar las asistencias');
     }
   }
 
@@ -90,10 +72,8 @@ class FirebaseService {
           .get();
 
       if (snapshot.docs.isNotEmpty) {
-        final data = snapshot.docs.first.data();
-        return Empleado.fromJson(data);
+        return Empleado.fromJson(snapshot.docs.first.data());
       }
-
       return null;
     } catch (e) {
       print('Error al buscar empleado por DNI: ${e.toString()}');
@@ -102,7 +82,8 @@ class FirebaseService {
   }
 
   Future<void> addEmpleado(Empleado empleado) async {
-    await _firestore.collection(AppConfig.empleadosCollection).doc(empleado.id).set(empleado.toJson());
+    final docRef = _firestore.collection(AppConfig.empleadosCollection).doc(empleado.id);
+    await docRef.set(empleado.toJson());
   }
 
   Future<void> updateEmpleado(Empleado empleado) async {
@@ -146,7 +127,149 @@ class FirebaseService {
         .where('empleadoId', isEqualTo: empleadoId)
         .orderBy('fechaHoraEntrada', descending: true)
         .get();
-    return snapshot.docs.map((doc) => Asistencia.fromJson(doc.data())).toList();
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      data['id'] = doc.id; // Asegurar que el ID esté incluido
+      return Asistencia.fromJson(data);
+    }).toList();
+  }
+
+  /// Obtiene la asistencia activa (entrada sin salida) para un empleado
+  Future<Asistencia?> getActiveAsistencia(String empleadoId) async {
+    try {
+      final snapshot = await _firestore
+          .collection(AppConfig.asistenciasCollection)
+          .where('empleadoId', isEqualTo: empleadoId)
+          .where('fechaHoraSalida', isNull: true)
+          .orderBy('fechaHoraEntrada', descending: true) // Obtener la más reciente
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final data = snapshot.docs.first.data();
+        data['id'] = snapshot.docs.first.id; // Asegurar que el ID esté incluido
+        return Asistencia.fromJson(data);
+      }
+      return null;
+    } catch (e) {
+      print('Error al obtener asistencia activa: $e');
+      throw Exception('No se pudo obtener la asistencia activa');
+    }
+  }
+
+  Future<void> registrarEntrada(Asistencia asistencia) async {
+    final data = asistencia.toJson();
+    // Usar Timestamp de Firestore para la fecha de entrada
+    data['fechaHoraEntrada'] = Timestamp.fromDate(asistencia.fechaHoraEntrada);
+    // Agregar timestamp de hora de red para auditoria
+    data['networkTimestamp'] = asistencia.fechaHoraEntrada.millisecondsSinceEpoch;
+    await _firestore.collection(AppConfig.asistenciasCollection).doc(asistencia.id).set(data);
+  }
+
+  Future<void> registrarSalida(String asistenciaId, Map<String, dynamic> salidaData) async {
+    final data = {...salidaData};
+    // Usar FieldValue.serverTimestamp() para la fecha de salida
+    data['fechaHoraSalida'] = FieldValue.serverTimestamp();
+    await _firestore.collection(AppConfig.asistenciasCollection).doc(asistenciaId).update(data);
+  }
+
+  Future<Asistencia?> getAsistenciaById(String id) async {
+    final doc = await _firestore.collection(AppConfig.asistenciasCollection).doc(id).get();
+    if (doc.exists) {
+      final data = doc.data()!;
+      data['id'] = doc.id;
+      return Asistencia.fromJson(data);
+    }
+    return null;
+  }
+
+  Future<List<Asistencia>> getAsistenciasFiltradas({
+    required DateTime fechaInicio,
+    required DateTime fechaFin,
+    String? sedeId,
+  }) async {
+    try {
+      Query query = _firestore
+          .collection(AppConfig.asistenciasCollection)
+          .where('fechaHoraEntrada', isGreaterThanOrEqualTo: fechaInicio)
+          .where('fechaHoraEntrada', isLessThan: fechaFin)
+          .orderBy('fechaHoraEntrada', descending: true);
+
+      if (sedeId != null && sedeId.isNotEmpty) {
+        query = query.where('sedeId', isEqualTo: sedeId);
+      }
+      
+      final querySnapshot = await query.get();
+      
+      return querySnapshot.docs
+          .map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            data['id'] = doc.id;
+            return Asistencia.fromJson(data);
+          })
+          .toList();
+    } catch (e) {
+      print('Error al obtener asistencias filtradas: ${e.toString()}');
+      throw Exception('No se pudieron cargar las asistencias filtradas');
+    }
+  }
+
+  /// Verifica si un empleado ya completó su jornada HOY (entrada Y salida)
+  /// Usa hora de red para determinar "hoy"
+  Future<Asistencia?> getCompletedAsistenciaForToday(String empleadoId) async {
+    try {
+      final networkTime = await TimeService.getCurrentNetworkTime();
+      final startOfDay = DateTime(networkTime.year, networkTime.month, networkTime.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+
+      final snapshot = await _firestore
+          .collection(AppConfig.asistenciasCollection)
+          .where('empleadoId', isEqualTo: empleadoId)
+          .where('fechaHoraEntrada', isGreaterThanOrEqualTo: startOfDay)
+          .where('fechaHoraEntrada', isLessThan: endOfDay)
+          .where('fechaHoraSalida', isNotEqualTo: null) // Solo asistencias COMPLETAS
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final data = snapshot.docs.first.data();
+        data['id'] = snapshot.docs.first.id;
+        return Asistencia.fromJson(data);
+      }
+      return null;
+    } catch (e) {
+      print('Error al buscar asistencia completada para hoy: $e');
+      return null;
+    }
+  }
+
+  /// Nuevo método: Obtiene la asistencia del día (completa o incompleta)
+  /// Usa hora de red para determinar "hoy"
+  Future<Asistencia?> getTodayAsistencia(String empleadoId) async {
+    try {
+      final networkTime = await TimeService.getCurrentNetworkTime();
+      final startOfDay = DateTime(networkTime.year, networkTime.month, networkTime.day);
+      final endOfDay = startOfDay.add(const Duration(days: 1));
+
+      final snapshot = await _firestore
+          .collection(AppConfig.asistenciasCollection)
+          .where('empleadoId', isEqualTo: empleadoId)
+          .where('fechaHoraEntrada', isGreaterThanOrEqualTo: startOfDay)
+          .where('fechaHoraEntrada', isLessThan: endOfDay)
+          .orderBy('fechaHoraEntrada', descending: true)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final data = snapshot.docs.first.data();
+        data['id'] = snapshot.docs.first.id;
+        return Asistencia.fromJson(data);
+      }
+      return null;
+    } catch (e) {
+      print('Error al obtener asistencia del día: $e');
+      throw Exception('No se pudo obtener la asistencia del día');
+    }
   }
 
   Future<List<Asistencia>> getAsistenciasBySede(String sedeId) async {
@@ -155,101 +278,30 @@ class FirebaseService {
         .where('sedeId', isEqualTo: sedeId)
         .orderBy('fechaHoraEntrada', descending: true)
         .get();
-    return snapshot.docs.map((doc) => Asistencia.fromJson(doc.data())).toList();
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      data['id'] = doc.id;
+      return Asistencia.fromJson(data);
+    }).toList();
   }
 
-  Future<Asistencia?> getActiveAsistencia(String empleadoId) async {
-    final snapshot = await _firestore
-        .collection(AppConfig.asistenciasCollection)
-        .where('empleadoId', isEqualTo: empleadoId)
-        .where('fechaHoraSalida', isNull: true)
-        .limit(1)
-        .get();
-
-    if (snapshot.docs.isNotEmpty) {
-      return Asistencia.fromJson(snapshot.docs.first.data());
-    }
-    return null;
-  }
-
-   Future<void> registrarEntrada(Asistencia asistencia) async {
-    // Usamos el timestamp del servidor para la máxima fiabilidad.
-    final data = asistencia.toJson();
-    data['fechaHoraEntrada'] = FieldValue.serverTimestamp();
-    await _firestore.collection(AppConfig.asistenciasCollection).doc(asistencia.id).set(data);
-  }
-
-  Future<void> registrarSalida(String asistenciaId, Map<String, dynamic> salidaData) async {
-    // Actualizamos la asistencia existente con los datos de salida.
-    final data = {...salidaData};
-    data['fechaHoraSalida'] = FieldValue.serverTimestamp();
-    await _firestore.collection(AppConfig.asistenciasCollection).doc(asistenciaId).update(data);
-  }
-
-  // Necesario para la lógica de salida en el controller
-  Future<Asistencia?> getAsistenciaById(String id) async {
-    final doc = await _firestore.collection(AppConfig.asistenciasCollection).doc(id).get();
-    if (doc.exists) {
-      return Asistencia.fromJson(doc.data()!);
-    }
-    return null;
-  }
-
-  /// Obtiene asistencias filtradas por un rango de fechas y opcionalmente por sede.
-  /// Es mucho más eficiente que obtener todas las asistencias y filtrarlas en el cliente.
-  Future<List<Asistencia>> getAsistenciasFiltradas({
-    required DateTime fechaInicio,
-    required DateTime fechaFin,
-    String? sedeId,
-  }) async {
+  Future<List<Asistencia>> getAllAsistencias() async {
     try {
-      // Construimos la consulta base con el filtro de fecha
-      Query query = _firestore
-          .collection(AppConfig.asistenciasCollection)
-          .where('fechaHoraEntrada', isGreaterThanOrEqualTo: fechaInicio)
-          .where('fechaHoraEntrada', isLessThan: fechaFin)
-          .orderBy('fechaHoraEntrada', descending: true);
-
-      // Si se proporciona un sedeId, añadimos ese filtro a la consulta
-      if (sedeId != null && sedeId.isNotEmpty) {
-        query = query.where('sedeId', isEqualTo: sedeId);
-      }
-      
-      final querySnapshot = await query.get();
+      final querySnapshot = await _firestore
+          .collection('asistencias')
+          .orderBy('fechaHoraEntrada', descending: true)
+          .get();
       
       return querySnapshot.docs
-          .map((doc) => Asistencia.fromJson(doc.data() as Map<String, dynamic>))
+          .map((doc) {
+            final data = doc.data();
+            data['id'] = doc.id;
+            return Asistencia.fromMap(data);
+          })
           .toList();
     } catch (e) {
-      print('Error al obtener asistencias filtradas: ${e.toString()}');
-      throw Exception('No se pudieron cargar las asistencias filtradas');
-    }
-  }
-
-   /// Busca si existe una asistencia ya completada (con entrada y salida) para un empleado en el día actual.
-  Future<Asistencia?> getCompletedAsistenciaForToday(String empleadoId) async {
-    try {
-      final now = DateTime.now();
-      // Define el rango del día actual (desde las 00:00:00 hasta las 23:59:59)
-      final startOfDay = DateTime(now.year, now.month, now.day);
-      final endOfDay = startOfDay.add(const Duration(days: 1));
-
-      final snapshot = await _firestore
-          .collection(AppConfig.asistenciasCollection)
-          .where('empleadoId', isEqualTo: empleadoId)
-          .where('fechaHoraEntrada', isGreaterThanOrEqualTo: startOfDay)
-          .where('fechaHoraEntrada', isLessThan: endOfDay)
-          .where('fechaHoraSalida', isNotEqualTo: null) // La clave: que ya tenga hora de salida.
-          .limit(1)
-          .get();
-
-      if (snapshot.docs.isNotEmpty) {
-        return Asistencia.fromJson(snapshot.docs.first.data());
-      }
-      return null; // No hay jornada completada hoy.
-    } catch (e) {
-      print('Error al buscar asistencia completada: $e');
-      return null;
+      print('Error al obtener todas las asistencias: ${e.toString()}');
+      throw Exception('No se pudieron cargar las asistencias');
     }
   }
 

@@ -10,10 +10,10 @@ import 'package:geoface/controllers/asistencia_controller.dart';
 import 'package:geoface/models/empleado.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
-import 'package:image/image.dart' as img; // Para procesar la imagen
-import 'dart:typed_data'; // Para Uint8List
-import 'package:geoface/services/azure_face_service.dart'; // CAMBIO: Importar Azure Service
-import 'package:lottie/lottie.dart'; // CAMBIO: Importar Lottie
+import 'package:image/image.dart' as img;
+import 'dart:typed_data';
+import 'package:geoface/services/azure_face_service.dart';
+import 'package:lottie/lottie.dart';
 
 // Enum para un control más claro del flujo de la UI
 enum MarcacionFlowState {
@@ -39,7 +39,6 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
   CameraController? _cameraController;
   final TextEditingController _dniController = TextEditingController();
   final FirebaseService _firebaseService = FirebaseService();
-  // CAMBIO: Instanciar AzureFaceService
   late AzureFaceService _azureFaceService;
 
   // --- Datos del Flujo ---
@@ -49,6 +48,8 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
   Position? _currentPosition;
   bool _isDentroDelRadio = false;
   bool _esEntrada = true;
+  bool _isFaceVerified = false;
+  Uint8List? _capturedImageBytes; // Para guardar la foto y usarla después
 
   // --- Banderas de estado ---
   bool _isCameraInitialized = false;
@@ -59,7 +60,6 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // CAMBIO: Inicializar el servicio de Azure con tus credenciales
     _azureFaceService = AzureFaceService(
       azureEndpoint: 'https://geofaceid.cognitiveservices.azure.com',
       apiKey: 'lA9d0Yecp7LtWRVvumio95p7Ih5BYKYGzvqI3S5A6rN1823aQ8XxJQQJ99BEACYeBjFXJ3w3AAAKACOGvSQn',
@@ -80,11 +80,13 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
   Future<void> _initializeServices() async {
     try {
       await Future.wait([_initializeCamera(), _getCurrentLocation()]);
+      if (!mounted) return;
       setState(() {
         _flowState = MarcacionFlowState.verificacionFacial;
         _statusMessage = "Servicios listos.";
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _flowState = MarcacionFlowState.errorServicios;
         _statusMessage = e.toString();
@@ -92,25 +94,24 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
     }
   }
 
-  // CAMBIO: Lógica real de verificación facial
   Future<void> _handleFaceVerification() async {
-    if (_isProcessing || !_isCameraInitialized) return;
+    if (_isProcessing || !_isCameraInitialized || _cameraController == null) return;
     
     setState(() => _isProcessing = true);
     
     try {
       final XFile photoFile = await _cameraController!.takePicture();
-      final Uint8List imageBytes = await _processImageToBytes(photoFile);
+      _capturedImageBytes = await _processImageToBytes(photoFile);
       
-      bool rostroDetectado = await _azureFaceService.detectarRostroEnImagen(imageBytes);
+      bool rostroDetectado = await _azureFaceService.detectarRostroEnImagen(_capturedImageBytes!);
 
-      if (rostroDetectado) {
-        if (mounted) {
-          setState(() {
-            _flowState = MarcacionFlowState.ingresoDNI;
-            _cameraController?.dispose(); // Liberamos la cámara
-          });
-        }
+      if (rostroDetectado && mounted) {
+        setState(() {
+          _isFaceVerified = true;
+          _flowState = MarcacionFlowState.ingresoDNI;
+          _cameraController?.dispose(); 
+          _cameraController = null;
+        });
       } else {
         _showInfoDialog(
           "Rostro no Detectado",
@@ -122,7 +123,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
     } catch (e) {
       _showInfoDialog(
         "Error de Verificación",
-        "Ocurrió un error al contactar con el servicio de reconocimiento facial. Revisa tu conexión a internet.",
+        "Ocurrió un error al contactar con el servicio de reconocimiento facial. Revisa tu conexión a internet. Detalles: ${e.toString()}",
         Icons.cloud_off,
         Colors.red,
       );
@@ -131,12 +132,10 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
     }
   }
   
-  // --- Método de ayuda para procesar la imagen (necesario para Azure) ---
   Future<Uint8List> _processImageToBytes(XFile photoFile) async {
     final bytes = await photoFile.readAsBytes();
     final imgLib = img.decodeImage(bytes);
     if (imgLib == null) throw Exception("No se pudo decodificar la imagen");
-    // Redimensionar si es necesario para optimizar la subida
     final resizedImg = img.copyResize(imgLib, width: 640);
     return Uint8List.fromList(img.encodeJpg(resizedImg, quality: 90));
   }
@@ -152,37 +151,53 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
     try {
       final dni = _dniController.text.trim();
       
+      // 1. Verificar empleado
       _empleado = await _firebaseService.getEmpleadoByDNI(dni);
       if (_empleado == null) throw Exception("No se encontró empleado con DNI $dni.");
 
-      final asistenciaCompleta = await _firebaseService.getCompletedAsistenciaForToday(_empleado!.id);
-      if (asistenciaCompleta != null) {
-        _asistenciaDelDia = asistenciaCompleta;
-        setState(() => _flowState = MarcacionFlowState.jornadaCompletada);
-        return;
+      if (_empleado!.activo != true) {
+        throw Exception("Este empleado no se encuentra activo. Por favor, contacte a Recursos Humanos.");
       }
 
-      final asistenciaController = Provider.of<AsistenciaController>(context, listen: false);
-      await asistenciaController.checkAsistenciaActiva(_empleado!.id);
-      _asistenciaDelDia = asistenciaController.asistenciaActiva;
-      _esEntrada = _asistenciaDelDia == null;
-
+      // 2. Verificar sede
       _sede = await _firebaseService.getSedeById(_empleado!.sedeId);
-      if (_sede == null) throw Exception("Sede del empleado no encontrada.");
+      if (_sede == null) throw Exception("La sede asignada al empleado no fue encontrada.");
+      
+      if (_sede!.activa != true) {
+        throw Exception("La sede '${_sede!.nombre}' no se encuentra activa. Por favor, contacte a su supervisor.");
+      }
 
+      // 3. NUEVA LÓGICA: Verificar estado de asistencia del empleado HOY
+      final asistenciaController = Provider.of<AsistenciaController>(context, listen: false);
+      final status = await asistenciaController.checkEmpleadoAsistenciaStatus(_empleado!.id);
+      
+      switch (status) {
+        case AsistenciaStatus.debeMarcarEntrada:
+          _esEntrada = true;
+          _asistenciaDelDia = null;
+          break;
+          
+        case AsistenciaStatus.debeMarcarSalida:
+          _esEntrada = false;
+          _asistenciaDelDia = asistenciaController.asistenciaActiva;
+          break;
+          
+        case AsistenciaStatus.jornadaCompleta:
+          // Obtener la asistencia completa para mostrar detalles
+          _asistenciaDelDia = await _firebaseService.getCompletedAsistenciaForToday(_empleado!.id);
+          setState(() => _flowState = MarcacionFlowState.jornadaCompletada);
+          return; // Salir aquí, no continuar con verificación de ubicación
+          
+        case AsistenciaStatus.error:
+          throw Exception(asistenciaController.errorMessage ?? "Error al verificar estado de asistencia");
+      }
+
+      // 4. Verificar ubicación (solo si no tiene jornada completa)
       final distancia = LocationHelper.calcularDistancia(
-        _currentPosition!.latitude, _currentPosition!.longitude, _sede!.latitud, _sede!.longitud
+        _currentPosition!.latitude, _currentPosition!.longitude, 
+        _sede!.latitud, _sede!.longitud
       );
       _isDentroDelRadio = distancia <= _sede!.radioPermitido;
-
-      if (!_isDentroDelRadio) {
-        _showInfoDialog(
-          "Fuera de Rango",
-          "Estás a ${distancia.toStringAsFixed(0)}m de la sede '${_sede!.nombre}'.\n\nDebes estar dentro de los ${_sede!.radioPermitido}m para poder marcar.",
-          Icons.location_off,
-          Colors.orange
-        );
-      }
       
       setState(() => _flowState = MarcacionFlowState.confirmacion);
 
@@ -198,25 +213,28 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
     setState(() => _isProcessing = true);
     final asistenciaController = Provider.of<AsistenciaController>(context, listen: false);
 
+    // TODO: Subir _capturedImageBytes a Firebase Storage y obtener URL.
+    final String capturaString = "face_capture_placeholder";
+
     try {
       bool success;
       if (_esEntrada) {
         success = await asistenciaController.registrarEntrada(
           empleadoId: _empleado!.id, 
           sedeId: _empleado!.sedeId, 
-          capturaEntrada: "face_capture_placeholder"
+          capturaEntrada: capturaString
         );
       } else {
         success = await asistenciaController.registrarSalida(
-          asistenciaId: _asistenciaDelDia!.id,
-          capturaSalida: "face_capture_placeholder"
+          empleadoId: _empleado!.id, // Cambiado: ahora usa empleadoId
+          capturaSalida: capturaString
         );
       }
 
       if (success) {
         _showSuccessDialog();
       } else {
-        throw Exception(asistenciaController.errorMessage ?? "Ocurrió un error desconocido.");
+        throw Exception(asistenciaController.errorMessage ?? "Ocurrió un error desconocido al registrar.");
       }
 
     } catch (e) {
@@ -225,9 +243,12 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
       if(mounted) setState(() => _isProcessing = false);
     }
   }
-
+  
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      return;
+    }
     if (state == AppLifecycleState.inactive) {
       _cameraController?.dispose();
     } else if (state == AppLifecycleState.resumed) {
@@ -263,8 +284,6 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
     _currentPosition = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
   }
 
-  // --- UI & WIDGETS ---
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -280,9 +299,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
           padding: const EdgeInsets.all(24.0),
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 400),
-            transitionBuilder: (child, animation) {
-              return FadeTransition(opacity: animation, child: child);
-            },
+            transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
             child: _buildCurrentView(),
           ),
         ),
@@ -294,7 +311,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
     switch (_flowState) {
       case MarcacionFlowState.inicializando:
       case MarcacionFlowState.errorServicios:
-        return _buildInitialOrErrorView();
+        return _buildInitialOrErrorView(key: ValueKey(_flowState));
       case MarcacionFlowState.verificacionFacial:
         return _buildCameraView(key: const ValueKey('camera'));
       case MarcacionFlowState.ingresoDNI:
@@ -306,19 +323,15 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
       }
   }
 
-  Widget _buildInitialOrErrorView() {
+  // --- Widgets de construcción de vistas ---
+  Widget _buildInitialOrErrorView({required Key key}) {
     bool isError = _flowState == MarcacionFlowState.errorServicios;
     return Column(
-      key: ValueKey(isError ? 'error' : 'loading'),
+      key: key,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // CAMBIO: Usar Lottie en lugar de Icon
         if (!isError)
-          Lottie.asset(
-            'assets/animations/loading.json',
-            width: 150,
-            height: 150,
-          )
+          Lottie.asset('assets/animations/loading.json', width: 150, height: 150)
         else
           Icon(Icons.error_outline, size: 80, color: Colors.red.shade400),
         const SizedBox(height: 24),
@@ -350,7 +363,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(18),
-            child: _isCameraInitialized
+            child: (_isCameraInitialized && _cameraController != null)
                 ? CameraPreview(_cameraController!)
                 : const Center(child: CircularProgressIndicator()),
           ),
@@ -377,28 +390,44 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
           color: Colors.deepPurpleAccent,
         ),
         const SizedBox(height: 24),
-        TextField(
-          controller: _dniController,
-          keyboardType: TextInputType.number,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          decoration: InputDecoration(
-            labelText: 'Número de DNI',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            prefixIcon: const Icon(Icons.person_search_outlined),
+        if (_isProcessing)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 24.0),
+            child: Column(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text("Verificando identidad y jornada..."),
+              ],
+            ),
+          )
+        else
+          Column(
+            children: [
+              TextField(
+                controller: _dniController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                decoration: InputDecoration(
+                  labelText: 'Número de DNI',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: const Icon(Icons.person_search_outlined),
+                ),
+                onSubmitted: (_) => _handleIdentityVerification(),
+              ),
+              const SizedBox(height: 24),
+              _buildActionButton(
+                label: "Verificar Identidad",
+                onPressed: _handleIdentityVerification,
+                icon: Icons.arrow_forward_ios,
+                isLoading: _isProcessing,
+              ),
+            ],
           ),
-          onSubmitted: (_) => _handleIdentityVerification(),
-        ),
-        const SizedBox(height: 24),
-        _buildActionButton(
-          label: "Verificar Identidad",
-          onPressed: _handleIdentityVerification,
-          icon: Icons.arrow_forward_ios,
-          isLoading: _isProcessing,
-        ),
       ],
     );
   }
-
+  
   Widget _buildConfirmationView({required Key key}) {
     bool jornadaCompleta = _flowState == MarcacionFlowState.jornadaCompletada;
 
@@ -425,32 +454,52 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
         ),
         const SizedBox(height: 24),
         
-        _buildStatusCard(
-          title: jornadaCompleta
-            ? 'Jornada Finalizada'
-            : (_esEntrada ? 'Listo para Marcar Entrada' : 'Listo para Marcar Salida'),
-          icon: jornadaCompleta
-            ? Icons.check_circle_outline
-            : (_esEntrada ? Icons.login : Icons.logout),
-          color: jornadaCompleta
-            ? Colors.teal
-            : (_esEntrada ? Colors.green : Colors.orange),
-          children: [
-            if (jornadaCompleta && _asistenciaDelDia != null)
-              _buildInfoRow(Icons.access_time, 'Entrada', DateFormat('hh:mm a').format(_asistenciaDelDia!.fechaHoraEntrada)),
-            if (jornadaCompleta && _asistenciaDelDia != null)
-              _buildInfoRow(Icons.access_time_filled, 'Salida', DateFormat('hh:mm a').format(_asistenciaDelDia!.fechaHoraSalida!)),
-            if(!jornadaCompleta)
-              _buildLocationStatus(),
-          ],
-        ),
-        const SizedBox(height: 24),
+        if (jornadaCompleta)
+          _buildStatusCard(
+            title: 'Jornada Finalizada por Hoy',
+            icon: Icons.check_circle,
+            color: Colors.teal,
+            children: [
+              Text(
+                "Ya has registrado tu entrada y salida el día de hoy. ¡Buen trabajo!",
+                style: TextStyle(color: Colors.grey.shade700, height: 1.5),
+              ),
+              const Divider(height: 24),
+              _buildInfoRow(Icons.login, 'Hora de Entrada', DateFormat('hh:mm a').format(_asistenciaDelDia!.fechaHoraEntrada)),
+              _buildInfoRow(Icons.logout, 'Hora de Salida', DateFormat('hh:mm a').format(_asistenciaDelDia!.fechaHoraSalida!)),
+            ],
+          )
+        else
+          _buildStatusCard(
+            title: _esEntrada ? 'Listo para Marcar Entrada' : 'Listo para Marcar Salida',
+            icon: _esEntrada ? Icons.login : Icons.logout,
+            color: _esEntrada ? Colors.green : Colors.orange,
+            children: [
+              _buildStatusCheckRow(
+                  label: "Reconocimiento Facial", 
+                  success: _isFaceVerified,
+                  icon: Icons.face_retouching_natural
+              ),
+              _buildStatusCheckRow(
+                  label: "Ubicación de Sede", 
+                  success: _isDentroDelRadio,
+                  icon: Icons.location_on_outlined
+              ),
+              _buildStatusCheckRow(
+                  label: "Fecha y Hora", 
+                  success: true,
+                  icon: Icons.today_outlined,
+                  value: DateFormat('dd/MM/yyyy hh:mm a').format(DateTime.now()),
+              ),
+            ],
+          ),
+        const SizedBox(height: 32),
 
         if (!jornadaCompleta)
           _buildActionButton(
-            label: _esEntrada ? "Marcar Entrada" : "Marcar Salida",
-            onPressed: _isDentroDelRadio ? _handleMarkAttendance : null,
-            icon: _esEntrada ? Icons.login : Icons.logout,
+            label: _esEntrada ? "Confirmar Entrada" : "Confirmar Salida",
+            onPressed: _isDentroDelRadio && _isFaceVerified ? _handleMarkAttendance : null,
+            icon: Icons.check_circle_outline,
             color: _esEntrada ? Colors.green : Colors.orange,
             isLoading: _isProcessing,
           ),
@@ -458,7 +507,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
     );
   }
   
-  // --- WIDGETS DE COMPONENTES REUTILIZABLES ---
+  // --- Widgets de componentes reutilizables (sin cambios) ---
   
   Widget _buildStepCard({required IconData icon, required String title, required String message, required Color color}) {
     return Card(
@@ -515,25 +564,24 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
     );
   }
   
-  Widget _buildLocationStatus() {
-    return Row(
-      children: [
-        Icon(
-          _isDentroDelRadio ? Icons.check_circle : Icons.highlight_off,
-          color: _isDentroDelRadio ? Colors.green : Colors.red,
-          size: 20
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            _isDentroDelRadio ? 'Ubicación Verificada' : 'Fuera del Radio Permitido',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: _isDentroDelRadio ? Colors.green.shade700 : Colors.red.shade700,
-            ),
-          ),
-        ),
-      ],
+  Widget _buildStatusCheckRow({required String label, required bool success, required IconData icon, String? value}) {
+    final Color color = success ? Colors.green.shade700 : Colors.red.shade700;
+    final IconData statusIcon = success ? Icons.check_circle : Icons.cancel;
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 22, color: Colors.grey.shade600),
+          const SizedBox(width: 16),
+          Text(label, style: const TextStyle(fontSize: 16)),
+          const Spacer(),
+          if (value != null)
+            Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))
+          else
+            Icon(statusIcon, color: color),
+        ],
+      ),
     );
   }
 
@@ -575,6 +623,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
 
   // --- DIÁLOGOS DE FEEDBACK ---
   void _showInfoDialog(String title, String content, IconData icon, Color color) {
+    if (!mounted) return;
     showDialog(context: context, builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(children: [Icon(icon, color: color), const SizedBox(width: 8), Text(title)]), 
@@ -585,8 +634,8 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
   }
   
   void _showSuccessDialog() {
+    if (!mounted) return;
     showDialog(barrierDismissible: false, context: context, builder: (context) => AlertDialog(
-      // AQUÍ ESTABA EL ERROR
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Row(children: [Icon(Icons.check_circle, color: Colors.green, size: 28), SizedBox(width: 12), Text("¡Éxito!")]),
       content: const Text("Tu asistencia ha sido registrada correctamente."),
