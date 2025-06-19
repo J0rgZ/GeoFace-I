@@ -1,27 +1,6 @@
 import 'package:geolocator/geolocator.dart';
-import 'package:device_apps/device_apps.dart';
-
 
 class FakeGpsDetectorService {
-  /// Verifica si el dispositivo tiene apps de GPS falso conocidas
-  static Future<bool> _hasFakeGpsApps() async {
-    final List<String> fakeGpsPackages = [
-      'com.lexa.fakegps',
-      'com.fakegps.mock',
-      'com.incorporateapps.fakegps.fre',
-      'com.blogspot.newapphorizons.fakegps',
-      'com.just4funtools.fakegps',
-    ];
-
-    try {
-      final apps = await DeviceApps.getInstalledApplications(includeSystemApps: false);
-      return apps.any((app) => fakeGpsPackages.contains(app.packageName));
-    } catch (e) {
-      print("Error verificando apps instaladas: $e");
-      return false;
-    }
-  }
-
   /// Verifica si la ubicación es falsa o manipulada
   static Future<bool> _isMockLocation(Position position) async {
     try {
@@ -39,16 +18,19 @@ class FakeGpsDetectorService {
 
   /// Llama esta función antes de marcar asistencia
   static Future<String?> checkIfFakeGpsUsed() async {
-    final position = await Geolocator.getCurrentPosition();
+    try {
+      final position = await Geolocator.getCurrentPosition();
 
-    final isMock = await _isMockLocation(position);
-    final isLowAccuracy = _isLowAccuracy(position);
-    final hasFakeGpsApp = await _hasFakeGpsApps();
+      final isMock = await _isMockLocation(position);
+      final isLowAccuracy = _isLowAccuracy(position);
 
-    if (isMock) return "Se detectó ubicación falsa (mocked)";
-    if (isLowAccuracy) return "Ubicación con baja precisión";
-    if (hasFakeGpsApp) return "Se detectó app de GPS falso instalada";
+      if (isMock) return "Se detectó ubicación falsa (mocked).";
+      if (isLowAccuracy) return "Ubicación con baja precisión.";
 
-    return null; // Sin problemas detectados
+      return null; // Sin problemas detectados
+    } catch (e) {
+      print("Error obteniendo posición: $e");
+      return "No se pudo verificar la ubicación.";
+    }
   }
 }

@@ -1,3 +1,6 @@
+// <-- CAMBIO: Añadimos las importaciones para http y json
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:geoface/services/firebase_service.dart';
@@ -12,16 +15,15 @@ import 'package:intl/intl.dart';
 import 'dart:async';
 import 'package:image/image.dart' as img;
 import 'dart:typed_data';
-import 'package:geoface/services/azure_face_service.dart';
+// import 'package:geoface/services/azure_face_service.dart'; // <-- CAMBIO: Ya no se necesita
 import 'package:lottie/lottie.dart';
 
-// Enum para un control más claro del flujo de la UI
+// <-- CAMBIO: Modificamos el enum para reflejar el nuevo flujo sin ingreso de DNI manual
 enum MarcacionFlowState {
   inicializando,
   errorServicios,
   verificacionFacial,
-  ingresoDNI,
-  verificandoIdentidad,
+  verificandoIdentidad, // Este estado ahora cubre la llamada a la API y la búsqueda en Firebase
   confirmacion,
   jornadaCompletada,
 }
@@ -33,13 +35,18 @@ class MarcarAsistenciaPage extends StatefulWidget {
   State<MarcarAsistenciaPage> createState() => _MarcarAsistenciaPageState();
 }
 
-class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with WidgetsBindingObserver {
+class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
+    with WidgetsBindingObserver {
   // --- Estado y Controladores ---
   MarcacionFlowState _flowState = MarcacionFlowState.inicializando;
   CameraController? _cameraController;
-  final TextEditingController _dniController = TextEditingController();
+  final TextEditingController _dniController = TextEditingController(); // Lo mantenemos para uso interno
   final FirebaseService _firebaseService = FirebaseService();
-  late AzureFaceService _azureFaceService;
+  // late AzureFaceService _azureFaceService; // <-- CAMBIO: Se elimina Azure
+
+  // <-- CAMBIO: Añadimos la URL de nuestra API de Colab
+  final String _recognitionApiUrl = "https://5758-34-125-156-88.ngrok-free.app/identificar";
+
 
   // --- Datos del Flujo ---
   Empleado? _empleado;
@@ -49,7 +56,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
   bool _isDentroDelRadio = false;
   bool _esEntrada = true;
   bool _isFaceVerified = false;
-  Uint8List? _capturedImageBytes; // Para guardar la foto y usarla después
+  Uint8List? _capturedImageBytes;
 
   // --- Banderas de estado ---
   bool _isCameraInitialized = false;
@@ -60,10 +67,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _azureFaceService = AzureFaceService(
-      azureEndpoint: 'https://geofaceid.cognitiveservices.azure.com',
-      apiKey: 'lA9d0Yecp7LtWRVvumio95p7Ih5BYKYGzvqI3S5A6rN1823aQ8XxJQQJ99BEACYeBjFXJ3w3AAAKACOGvSQn',
-    );
+    // _azureFaceService = ...; // <-- CAMBIO: Se elimina la inicialización de Azure
     _initializeServices();
   }
 
@@ -78,6 +82,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
   // --- LÓGICA DE INICIALIZACIÓN Y FLUJO ---
 
   Future<void> _initializeServices() async {
+    // ... (sin cambios aquí)
     try {
       await Future.wait([_initializeCamera(), _getCurrentLocation()]);
       if (!mounted) return;
@@ -94,45 +99,155 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
     }
   }
 
+  // <-- CAMBIO: REEMPLAZAMOS COMPLETAMENTE LA FUNCIÓN DE VERIFICACIÓN FACIAL
   Future<void> _handleFaceVerification() async {
     if (_isProcessing || !_isCameraInitialized || _cameraController == null) return;
-    
-    setState(() => _isProcessing = true);
-    
+
+    setState(() {
+      _isProcessing = true;
+      _flowState = MarcacionFlowState.verificandoIdentidad;
+      _statusMessage = "Identificando rostro...";
+    });
+
     try {
+      // 1. Tomar y procesar la foto
       final XFile photoFile = await _cameraController!.takePicture();
       _capturedImageBytes = await _processImageToBytes(photoFile);
-      
-      bool rostroDetectado = await _azureFaceService.detectarRostroEnImagen(_capturedImageBytes!);
 
-      if (rostroDetectado && mounted) {
-        setState(() {
-          _isFaceVerified = true;
-          _flowState = MarcacionFlowState.ingresoDNI;
-          _cameraController?.dispose(); 
-          _cameraController = null;
-        });
+      // 2. Preparar y enviar la petición
+      var request = http.MultipartRequest('POST', Uri.parse(_recognitionApiUrl));
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'face_image',
+          _capturedImageBytes!,
+          filename: 'face_capture.jpg',
+        ),
+      );
+      
+      // Añadimos un timeout para manejar servidores lentos o caídos
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 20));
+      final response = await http.Response.fromStream(streamedResponse);
+
+      // 3. Procesar la respuesta del servidor
+      final Map<String, dynamic> data = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        // --- CASO DE ÉXITO ---
+        final String? empleadoId = data['empleadoId'];
+        if (empleadoId == null || !mounted) {
+          throw Exception("Respuesta exitosa pero sin ID de empleado.");
+        }
+        await _handleIdentityVerification(empleadoId: empleadoId);
+
       } else {
-        _showInfoDialog(
-          "Rostro no Detectado",
-          "No se pudo detectar un rostro en la imagen. Por favor, asegúrate de que tu cara esté bien iluminada y centrada en el marco.",
-          Icons.sentiment_very_dissatisfied,
-          Colors.orange,
-        );
+        // --- CASOS DE ERROR CONTROLADOS POR LA API (statusCode 404, etc.) ---
+        final String errorMessage = data['error'] ?? "Error desconocido.";
+
+        if (errorMessage.contains("Desconocido")) {
+          // El rostro fue detectado pero no coincide con nadie
+          _showCustomInfoDialog(
+            title: "Empleado No Registrado",
+            content: "Tu rostro fue detectado, pero no te encontramos en nuestra base de datos. Por favor, contacta a Recursos Humanos si crees que esto es un error.",
+            lottieAsset: 'assets/animations/not-found.json', // <-- Necesitarás una animación para esto
+          );
+        } else if (errorMessage.contains("No se detectó un rostro")) {
+          // La calidad de la imagen es mala
+          _showCustomInfoDialog(
+            title: "Rostro No Detectado",
+            content: "No pudimos encontrar un rostro claro en la foto. Asegúrate de tener buena iluminación, mirar de frente a la cámara y no tener el rostro cubierto.",
+            lottieAsset: 'assets/animations/bad-quality.json', // <-- Necesitarás una animación para esto
+          );
+        } else {
+          // Otro error enviado por la API
+          _showCustomInfoDialog(
+            title: "Error de Verificación",
+            content: errorMessage,
+            lottieAsset: 'assets/animations/not-found.json',
+          );
+        }
+        
+        // En cualquier caso de error controlado, volvemos a la cámara
+        if (mounted) {
+          setState(() {
+            _flowState = MarcacionFlowState.verificacionFacial;
+            _isProcessing = false;
+          });
+        }
       }
     } catch (e) {
-      _showInfoDialog(
-        "Error de Verificación",
-        "Ocurrió un error al contactar con el servicio de reconocimiento facial. Revisa tu conexión a internet. Detalles: ${e.toString()}",
-        Icons.cloud_off,
-        Colors.red,
+      // --- CASO DE ERROR DE CONEXIÓN O TIMEOUT ---
+      // Esto se activa si el servidor está apagado, no hay internet, o la petición tarda demasiado.
+      _showCustomInfoDialog(
+        title: "Servicio en Mantenimiento",
+        content: "No pudimos conectar con el servicio de reconocimiento facial. Por favor, inténtalo de nuevo más tarde o revisa tu conexión a internet.",
+        lottieAsset: 'assets/animations/maintenance.json', // <-- Necesitarás una animación para esto
       );
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
+      if (mounted) {
+        setState(() {
+          _flowState = MarcacionFlowState.verificacionFacial;
+          _isProcessing = false;
+        });
+      }
     }
   }
+
+  // <-- CAMBIO: REEMPLAZA TU DIÁLOGO DE INFO POR ESTE, MÁS VISUAL Y VERSÁTIL
+  void _showCustomInfoDialog({
+    required String title,
+    required String content,
+    required String lottieAsset,
+  }) {
+    if (!mounted) return;
+
+    // Pequeña validación por si el archivo lottie no existe
+    final assetExists = true; // En un proyecto real, podrías verificar si el archivo existe
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.all(24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (assetExists)
+              SizedBox(
+                width: 120,
+                height: 120,
+                child: Lottie.asset(lottieAsset, repeat: false),
+              ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              content,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade700, height: 1.5),
+            ),
+          ],
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actionsPadding: const EdgeInsets.only(bottom: 20),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+            ),
+            child: const Text("Entendido"),
+          )
+        ],
+      ),
+    );
+  }
+
   
   Future<Uint8List> _processImageToBytes(XFile photoFile) async {
+    // ... (sin cambios aquí)
     final bytes = await photoFile.readAsBytes();
     final imgLib = img.decodeImage(bytes);
     if (imgLib == null) throw Exception("No se pudo decodificar la imagen");
@@ -140,34 +255,36 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
     return Uint8List.fromList(img.encodeJpg(resizedImg, quality: 90));
   }
 
-  Future<void> _handleIdentityVerification() async {
-    if (_isProcessing || _dniController.text.trim().isEmpty) return;
-    
-    setState(() {
-      _isProcessing = true;
-      _flowState = MarcacionFlowState.verificandoIdentidad;
-    });
+  // <-- CAMBIO: MODIFICAMOS ESTA FUNCIÓN PARA QUE ACEPTE UN ID DIRECTAMENTE
+  Future<void> _handleIdentityVerification({String? empleadoId}) async {
+    // El estado ya se cambió en la función anterior.
+    // Solo actualizamos el mensaje.
+    if(mounted) setState(() => _statusMessage = "Verificando datos de jornada...");
 
     try {
-      final dni = _dniController.text.trim();
+      if (empleadoId == null) throw Exception("ID de empleado no proporcionado.");
       
-      // 1. Verificar empleado
-      _empleado = await _firebaseService.getEmpleadoByDNI(dni);
-      if (_empleado == null) throw Exception("No se encontró empleado con DNI $dni.");
+      // 1. Verificar empleado usando el ID
+      _empleado = await _firebaseService.getEmpleadoById(empleadoId);
+      if (_empleado == null) throw Exception("Empleado reconocido (ID: $empleadoId), pero no encontrado en la base de datos.");
 
       if (_empleado!.activo != true) {
-        throw Exception("Este empleado no se encuentra activo. Por favor, contacte a Recursos Humanos.");
+        throw Exception("Este empleado no se encuentra activo. Contacte a RR.HH.");
       }
+      
+      _dniController.text = _empleado!.dni; // Guardamos el DNI para mostrarlo
+      _isFaceVerified = true; // El rostro se verificó con éxito
 
+      // El resto de la lógica es la misma que ya tenías...
       // 2. Verificar sede
       _sede = await _firebaseService.getSedeById(_empleado!.sedeId);
-      if (_sede == null) throw Exception("La sede asignada al empleado no fue encontrada.");
+      if (_sede == null) throw Exception("La sede asignada no fue encontrada.");
       
       if (_sede!.activa != true) {
-        throw Exception("La sede '${_sede!.nombre}' no se encuentra activa. Por favor, contacte a su supervisor.");
+        throw Exception("La sede '${_sede!.nombre}' no se encuentra activa.");
       }
 
-      // 3. NUEVA LÓGICA: Verificar estado de asistencia del empleado HOY
+      // 3. Verificar estado de asistencia
       final asistenciaController = Provider.of<AsistenciaController>(context, listen: false);
       final status = await asistenciaController.checkEmpleadoAsistenciaStatus(_empleado!.id);
       
@@ -176,23 +293,19 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
           _esEntrada = true;
           _asistenciaDelDia = null;
           break;
-          
         case AsistenciaStatus.debeMarcarSalida:
           _esEntrada = false;
           _asistenciaDelDia = asistenciaController.asistenciaActiva;
           break;
-          
         case AsistenciaStatus.jornadaCompleta:
-          // Obtener la asistencia completa para mostrar detalles
           _asistenciaDelDia = await _firebaseService.getCompletedAsistenciaForToday(_empleado!.id);
           setState(() => _flowState = MarcacionFlowState.jornadaCompletada);
-          return; // Salir aquí, no continuar con verificación de ubicación
-          
+          return;
         case AsistenciaStatus.error:
           throw Exception(asistenciaController.errorMessage ?? "Error al verificar estado de asistencia");
       }
 
-      // 4. Verificar ubicación (solo si no tiene jornada completa)
+      // 4. Verificar ubicación
       final distancia = LocationHelper.calcularDistancia(
         _currentPosition!.latitude, _currentPosition!.longitude, 
         _sede!.latitud, _sede!.longitud
@@ -202,14 +315,16 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
       setState(() => _flowState = MarcacionFlowState.confirmacion);
 
     } catch (e) {
+      // Si algo falla aquí, volvemos a la cámara para que reintente
       _showInfoDialog("Error de Verificación", e.toString(), Icons.error, Colors.red);
-      setState(() => _flowState = MarcacionFlowState.ingresoDNI);
+      setState(() => _flowState = MarcacionFlowState.verificacionFacial);
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
   }
 
   Future<void> _handleMarkAttendance() async {
+    // ... (sin cambios aquí)
     setState(() => _isProcessing = true);
     final asistenciaController = Provider.of<AsistenciaController>(context, listen: false);
 
@@ -226,7 +341,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
         );
       } else {
         success = await asistenciaController.registrarSalida(
-          empleadoId: _empleado!.id, // Cambiado: ahora usa empleadoId
+          empleadoId: _empleado!.id,
           capturaSalida: capturaString
         );
       }
@@ -244,6 +359,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
     }
   }
   
+  // --- Manejo del ciclo de vida y permisos (sin cambios) ---
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (_cameraController == null || !_cameraController!.value.isInitialized) {
@@ -259,6 +375,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
   }
 
   Future<void> _initializeCamera() async {
+    // ... (sin cambios aquí)
     final cameras = await availableCameras();
     if (cameras.isEmpty) throw Exception("No hay cámaras disponibles.");
     final frontCamera = cameras.firstWhere(
@@ -271,6 +388,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
   }
   
   Future<void> _getCurrentLocation() async {
+    // ... (sin cambios aquí)
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) throw Exception("Los servicios de ubicación están desactivados.");
     
@@ -307,16 +425,22 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
     );
   }
 
+  // <-- CAMBIO: Actualizamos el constructor de vistas para el nuevo flujo
   Widget _buildCurrentView() {
     switch (_flowState) {
       case MarcacionFlowState.inicializando:
       case MarcacionFlowState.errorServicios:
         return _buildInitialOrErrorView(key: ValueKey(_flowState));
+
       case MarcacionFlowState.verificacionFacial:
         return _buildCameraView(key: const ValueKey('camera'));
-      case MarcacionFlowState.ingresoDNI:
+
       case MarcacionFlowState.verificandoIdentidad:
-        return _buildDniInputView(key: const ValueKey('dni'));
+        // Mostramos una vista de carga mientras la API y Firebase trabajan
+        return _buildProcessingView(key: const ValueKey('processing'));
+      
+      // Se elimina el caso de ingresoDNI
+
       case MarcacionFlowState.confirmacion:
       case MarcacionFlowState.jornadaCompletada:
         return _buildConfirmationView(key: const ValueKey('confirmation'));
@@ -343,15 +467,40 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
       ],
     );
   }
+  
+  // <-- CAMBIO: Añadimos una nueva vista de "Procesando"
+  Widget _buildProcessingView({required Key key}) {
+    return Column(
+      key: key,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Lottie.asset('assets/animations/face-detection.json', width: 150, height: 150),
+        const SizedBox(height: 24),
+        Text(
+          _statusMessage,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 16),
+        Text(
+          "Por favor, espera un momento...",
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey.shade600),
+        ),
+      ],
+    );
+  }
+
 
   Widget _buildCameraView({required Key key}) {
     return Column(
       key: key,
       children: [
+        // <-- CAMBIO: Actualizamos el mensaje
         _buildStepCard(
           icon: Icons.camera_alt_outlined,
-          title: "Paso 1: Verificación Facial",
-          message: "Coloca tu rostro en el centro del marco para asegurar que eres tú.",
+          title: "Reconocimiento Facial",
+          message: "Coloca tu rostro en el centro del marco y presiona el botón para marcar tu asistencia.",
           color: Colors.blueAccent,
         ),
         const SizedBox(height: 24),
@@ -369,8 +518,9 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
           ),
         ),
         const SizedBox(height: 24),
+        // <-- CAMBIO: Actualizamos el texto del botón
         _buildActionButton(
-          label: "Verificar Rostro",
+          label: "Identificar y Marcar Asistencia",
           onPressed: _handleFaceVerification,
           icon: Icons.face_retouching_natural,
           isLoading: _isProcessing
@@ -379,56 +529,9 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
     );
   }
   
-  Widget _buildDniInputView({required Key key}) {
-     return Column(
-      key: key,
-      children: [
-        _buildStepCard(
-          icon: Icons.badge_outlined,
-          title: "Paso 2: Identificación",
-          message: "Ingresa tu número de DNI para buscar tu perfil y verificar tu jornada.",
-          color: Colors.deepPurpleAccent,
-        ),
-        const SizedBox(height: 24),
-        if (_isProcessing)
-          const Padding(
-            padding: EdgeInsets.only(bottom: 24.0),
-            child: Column(
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text("Verificando identidad y jornada..."),
-              ],
-            ),
-          )
-        else
-          Column(
-            children: [
-              TextField(
-                controller: _dniController,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                decoration: InputDecoration(
-                  labelText: 'Número de DNI',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  prefixIcon: const Icon(Icons.person_search_outlined),
-                ),
-                onSubmitted: (_) => _handleIdentityVerification(),
-              ),
-              const SizedBox(height: 24),
-              _buildActionButton(
-                label: "Verificar Identidad",
-                onPressed: _handleIdentityVerification,
-                icon: Icons.arrow_forward_ios,
-                isLoading: _isProcessing,
-              ),
-            ],
-          ),
-      ],
-    );
-  }
-  
+      
   Widget _buildConfirmationView({required Key key}) {
+    
     bool jornadaCompleta = _flowState == MarcacionFlowState.jornadaCompletada;
 
     return Column(
@@ -490,7 +593,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
     );
   }
   
-  // --- Widgets de componentes reutilizables (sin cambios) ---
+  // --- El resto de los widgets de componentes reutilizables no necesitan cambios ---
   
   Widget _buildStepCard({required IconData icon, required String title, required String message, required Color color}) {
     return Card(
@@ -563,15 +666,12 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
         children: [
           Icon(icon, size: 22, color: Colors.grey.shade600),
           const SizedBox(width: 12),
-
-          // Contenido en columnas: título y (opcional) subtítulo
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    // Título
                     Expanded(
                       child: Text(
                         label,
@@ -580,13 +680,9 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
                         maxLines: 1,
                       ),
                     ),
-
-                    // Ícono de estado a la derecha
                     Icon(statusIcon, color: color, size: 20),
                   ],
                 ),
-
-                // Subtítulo: fecha/hora (si existe)
                 if (value != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 4.0),
@@ -673,8 +769,8 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
   }
 
 
-  // --- DIÁLOGOS DE FEEDBACK ---
   void _showInfoDialog(String title, String content, IconData icon, Color color) {
+    // ... (sin cambios aquí)
     if (!mounted) return;
     showDialog(context: context, builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -686,6 +782,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
   }
   
   void _showSuccessDialog() {
+    // ... (sin cambios aquí)
     if (!mounted) return;
     showDialog(barrierDismissible: false, context: context, builder: (context) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
