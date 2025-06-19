@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../services/firebase_service.dart';
 import '../services/location_service.dart';
-import '../services/time_service.dart'; // Agregamos el servicio de tiempo
+import '../services/time_service.dart';
 import '../models/asistencia.dart';
 import '../utils/location_helper.dart';
 
@@ -27,7 +27,7 @@ class AsistenciaController extends ChangeNotifier {
     _errorMessage = null;
     
     try {
-      // CORRECCIÓN: Usar el método de Firebase directamente que ya maneja la hora de red
+      // Usar el método de Firebase directamente que ya maneja la hora de red
       final asistenciaHoy = await _firebaseService.getTodayAsistencia(empleadoId);
       
       if (asistenciaHoy == null) {
@@ -89,14 +89,14 @@ class AsistenciaController extends ChangeNotifier {
         id: _uuid.v4(),
         empleadoId: empleadoId,
         sedeId: sedeId,
-        fechaHoraEntrada: networkTime, // Usar hora de red
+        fechaHoraEntrada: networkTime,
         latitudEntrada: position.latitude,
         longitudEntrada: position.longitude,
         capturaEntrada: capturaEntrada,
       );
       
       await _firebaseService.registrarEntrada(nuevaAsistencia);
-      _asistenciaActiva = nuevaAsistencia; // CORRECCIÓN: Actualizar estado local
+      _asistenciaActiva = nuevaAsistencia;
       
       _loading = false;
       notifyListeners();
@@ -123,7 +123,7 @@ class AsistenciaController extends ChangeNotifier {
       // Obtener hora de red para la marcación
       final networkTime = await TimeService.getCurrentNetworkTime();
       
-      // CORRECCIÓN: Primero verificar si hay asistencia activa en el estado local
+      // Primero verificar si hay asistencia activa en el estado local
       Asistencia? asistenciaActiva = _asistenciaActiva;
       
       // Si no hay en el estado local, buscar en Firebase
@@ -156,7 +156,7 @@ class AsistenciaController extends ChangeNotifier {
       
       await _firebaseService.registrarSalida(asistenciaActiva.id, salidaData);
       
-      // CORRECCIÓN: Actualizar la asistencia local con los datos de salida
+      // Actualizar la asistencia local con los datos de salida
       _asistenciaActiva = Asistencia(
         id: asistenciaActiva.id,
         empleadoId: asistenciaActiva.empleadoId,

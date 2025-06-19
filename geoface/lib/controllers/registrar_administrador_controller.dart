@@ -28,12 +28,12 @@ class RegisterAdminController extends ChangeNotifier {
       // Registrar los datos del usuario en Firestore
       await _firestore.collection('usuarios').doc(userCredential.user?.uid).set({
         'correo': usuario.correo,
-        'nombre': usuario.nombreUsuario, // Usa el campo de nombre desde el modelo Usuario
-        'tipoUsuario': 'ADMIN',  // Establecer como superadministrador
-        'empleadoId': null, // Null si es un administrador
+        'nombre': usuario.nombreUsuario,
+        'tipoUsuario': 'ADMIN',
+        'empleadoId': null,
         'activo': true,
-        'fechaUltimoAcceso': null, // Se puede poner `null` si es la primera vez
-        'fechaCreacion': FieldValue.serverTimestamp(), // Timestamp de registro
+        'fechaUltimoAcceso': null,
+        'fechaCreacion': FieldValue.serverTimestamp(),
       });
 
       _loading = false;

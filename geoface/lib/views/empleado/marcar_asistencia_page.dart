@@ -434,24 +434,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
     return Column(
       key: key,
       children: [
-        Card(
-          elevation: 4,
-          shadowColor: Colors.black.withOpacity(0.1),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              children: [
-                Text(_empleado?.nombreCompleto ?? "N/A", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                Text("DNI: ${_empleado?.dni ?? 'N/A'}", style: const TextStyle(color: Colors.grey)),
-                const Divider(height: 32),
-                _buildInfoRow(Icons.work_outline, "Cargo", _empleado?.cargo ?? 'N/A'),
-                const SizedBox(height: 12),
-                _buildInfoRow(Icons.business_outlined, "Sede", _sede?.nombre ?? 'N/A'),
-              ],
-            ),
-          ),
-        ),
+        _buildEmpleadoInfoCard(),
         const SizedBox(height: 24),
         
         if (jornadaCompleta)
@@ -564,26 +547,68 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
     );
   }
   
-  Widget _buildStatusCheckRow({required String label, required bool success, required IconData icon, String? value}) {
+  Widget _buildStatusCheckRow({
+    required String label,
+    required bool success,
+    required IconData icon,
+    String? value,
+  }) {
     final Color color = success ? Colors.green.shade700 : Colors.red.shade700;
     final IconData statusIcon = success ? Icons.check_circle : Icons.cancel;
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 22, color: Colors.grey.shade600),
-          const SizedBox(width: 16),
-          Text(label, style: const TextStyle(fontSize: 16)),
-          const Spacer(),
-          if (value != null)
-            Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))
-          else
-            Icon(statusIcon, color: color),
+          const SizedBox(width: 12),
+
+          // Contenido en columnas: título y (opcional) subtítulo
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    // Título
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+
+                    // Ícono de estado a la derecha
+                    Icon(statusIcon, color: color, size: 20),
+                  ],
+                ),
+
+                // Subtítulo: fecha/hora (si existe)
+                if (value != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4.0),
+                    child: Text(
+                      value,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
+
+
 
   Widget _buildActionButton({required String label, VoidCallback? onPressed, required IconData icon, Color? color, bool isLoading = false}) {
     final effectiveOnPressed = isLoading ? null : onPressed;
@@ -620,6 +645,33 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage> with Widget
       ),
     );
   }
+
+  Widget _buildEmpleadoInfoCard() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          children: [
+            Text(
+              _empleado?.nombreCompleto ?? "N/A",
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            Text(
+              "DNI: ${_empleado?.dni ?? 'N/A'}",
+              style: const TextStyle(color: Colors.grey),
+            ),
+            const Divider(height: 32),
+            _buildInfoRow(Icons.work_outline, "Cargo", _empleado?.cargo ?? 'N/A'),
+            const SizedBox(height: 12),
+            _buildInfoRow(Icons.business_outlined, "Sede", _sede?.nombre ?? 'N/A'),
+          ],
+        ),
+      ),
+    );
+  }
+
 
   // --- DIÁLOGOS DE FEEDBACK ---
   void _showInfoDialog(String title, String content, IconData icon, Color color) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geoface/services/fake_gps_detector_service.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
@@ -35,7 +36,7 @@ class TimeService {
 
   DateTime? _baseApiTime;
   final Stopwatch _syncStopwatch = Stopwatch();
-  
+
   String _currentTimeSource = 'Inicializando...';
   bool _isOnline = false;
   Timer? _syncTimer;
@@ -47,7 +48,7 @@ class TimeService {
     if (_baseApiTime != null && _syncStopwatch.isRunning) {
       return _baseApiTime!.add(_syncStopwatch.elapsed);
     }
-    
+
     await _attemptTimeSync();
 
     if (_baseApiTime != null && _syncStopwatch.isRunning) {
@@ -58,30 +59,31 @@ class TimeService {
     _isOnline = false;
     return DateTime.now().toUtc().subtract(const Duration(hours: 5));
   }
-  
+
   Future<void> _attemptTimeSync() async {
     for (final api in _timeApis) {
       try {
         final uri = Uri.parse(api['url']!);
         final response = api['type'] == 'google-header'
             ? await http.head(uri).timeout(const Duration(seconds: 5))
-            : await http.get(uri, headers: {'Accept': 'application/json'})
+            : await http
+                .get(uri, headers: {'Accept': 'application/json'})
                 .timeout(const Duration(seconds: 8));
 
         if (response.statusCode >= 200 && response.statusCode < 300) {
           final apiTime = _parseTimeResponse(api, response);
-          
+
           if (apiTime != null && _isTimeReasonable(apiTime)) {
             _baseApiTime = apiTime;
             _syncStopwatch.reset();
             _syncStopwatch.start();
-            
+
             _isOnline = true;
             _currentTimeSource = '${api['name']} (Sincronizado)';
-            
+
             print('✓ Sincronizado con: ${api['name']}');
             print('✓ Hora Base API (Lima): ${_baseApiTime.toString()}');
-            
+
             return;
           }
         }
@@ -97,7 +99,7 @@ class TimeService {
     _syncStopwatch.stop();
     _baseApiTime = null;
   }
-  
+
   DateTime? _parseTimeResponse(Map<String, String> api, http.Response response) {
     try {
       switch (api['type']) {
@@ -125,14 +127,12 @@ class TimeService {
     final difference = apiTime.difference(now).abs();
     return difference.inHours <= 12;
   }
-  
+
   void initialize() {
-    _attemptTimeSync(); 
+    _attemptTimeSync();
     _syncTimer?.cancel();
     _syncTimer = Timer.periodic(
-      const Duration(minutes: 5), 
-      (timer) => _attemptTimeSync()
-    );
+        const Duration(minutes: 5), (timer) => _attemptTimeSync());
   }
 
   Future<void> forceSync() async {
@@ -164,7 +164,8 @@ class ResponsiveConfig {
   bool get isXLarge => screenWidth >= 1024;
 
   double get dateSize => isXSmall ? 14 : isSmall ? 16 : isMedium ? 18 : 20;
-  double get timeSize => isXSmall ? 42 : isSmall ? 52 : isMedium ? 64 : isLarge ? 76 : 88;
+  double get timeSize =>
+      isXSmall ? 42 : isSmall ? 52 : isMedium ? 64 : isLarge ? 76 : 88;
   double get titleSize => isXSmall ? 20 : isSmall ? 24 : isMedium ? 28 : 32;
   double get buttonTextSize => isXSmall ? 14 : isSmall ? 16 : 18;
   double get statusSize => isXSmall ? 11 : isSmall ? 12 : 14;
@@ -191,7 +192,7 @@ class MainMenuScreen extends StatefulWidget {
   State<MainMenuScreen> createState() => _MainMenuScreenState();
 }
 
-class _MainMenuScreenState extends State<MainMenuScreen> 
+class _MainMenuScreenState extends State<MainMenuScreen>
     with TickerProviderStateMixin {
   late DateTime _currentTime;
   late Timer _timer;
@@ -199,14 +200,17 @@ class _MainMenuScreenState extends State<MainMenuScreen>
   late AnimationController _syncController;
   late Animation<double> _pulseAnimation;
   late Animation<double> _syncAnimation;
-  
+
   late AnimationController _entryController;
   late Animation<double> _headerFade, _cardFade, _buttonFade;
-  
+
   bool _isMenuOpen = false;
   bool _isInitializing = true;
   bool _isSyncing = false;
   
+  /// Estado para controlar la verificación del GPS
+  bool _isCheckingGps = false;
+
   final TimeService _timeService = TimeService();
 
   static const Color _primaryColor = Color(0xFF6A1B9A);
@@ -222,11 +226,11 @@ class _MainMenuScreenState extends State<MainMenuScreen>
   Future<void> _initializeApp() async {
     await initializeDateFormatting('es_PE', null);
     _setupAnimations();
-    
+
     _timeService.initialize();
     await _initializeTime();
     _setupTimers();
-    
+
     setState(() {
       _isInitializing = false;
     });
@@ -293,36 +297,114 @@ class _MainMenuScreenState extends State<MainMenuScreen>
 
   Future<void> _performManualSync() async {
     if (_isSyncing) return;
-    
-    setState(() { _isSyncing = true; });
-    
+
+    setState(() {
+      _isSyncing = true;
+    });
+
     _syncController.reset();
     _syncController.forward();
-    
+
     await _timeService.forceSync();
-    
+
     await Future.delayed(const Duration(milliseconds: 500));
-    
+
     if (mounted) {
-      setState(() { _isSyncing = false; });
-      
+      setState(() {
+        _isSyncing = false;
+      });
+
       HapticFeedback.lightImpact();
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            _timeService.isOnline 
-              ? '✓ Sincronizado correctamente'
-              : '⚠ Sin conexión - usando tiempo local',
+            _timeService.isOnline
+                ? '✓ Sincronizado correctamente'
+                : '⚠ Sin conexión - usando tiempo local',
           ),
           duration: const Duration(seconds: 2),
-          backgroundColor: _timeService.isOnline 
-            ? _secondaryColor 
-            : Colors.orange,
+          backgroundColor: _timeService.isOnline ? _secondaryColor : Colors.orange,
         ),
       );
     }
   }
+
+  /// Muestra un diálogo de error cuando se detecta un problema con el GPS.
+  void _showGpsErrorDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // El usuario debe confirmar
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.gpp_bad_rounded, color: Colors.red, size: 28),
+              SizedBox(width: 12),
+              Text('Alerta de Seguridad', style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Text(
+            message,
+            style: TextStyle(color: Colors.grey[700], height: 1.4),
+          ),
+          actions: <Widget>[
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).primaryColor,
+              ),
+              child: const Text('ENTENDIDO', style: TextStyle(fontWeight: FontWeight.bold)),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Maneja el proceso de marcar asistencia, incluyendo la verificación de GPS falso.
+  Future<void> _handleMarkAttendance() async {
+    if (_isCheckingGps) return; // Evitar múltiples clics
+
+    setState(() {
+      _isCheckingGps = true;
+    });
+    HapticFeedback.mediumImpact();
+
+    try {
+      // 1. Llamar al servicio de detección de GPS falso
+      final fakeGpsMessage = await FakeGpsDetectorService.checkIfFakeGpsUsed();
+
+      // 2. Comprobar el resultado
+      if (fakeGpsMessage != null) {
+        // Problema detectado: Mostrar alerta y no continuar
+        if (mounted) {
+          _showGpsErrorDialog(fakeGpsMessage);
+        }
+      } else {
+        // Todo en orden: Proceder a marcar asistencia
+        if (mounted) {
+          widget.onMarkAttendance(context);
+        }
+      }
+    } catch (e) {
+      // Manejar errores inesperados (ej. permisos de ubicación denegados)
+      if (mounted) {
+        _showGpsErrorDialog("No se pudo verificar la ubicación. Asegúrate de tener los permisos de GPS activados. Error: ${e.toString()}");
+      }
+    } finally {
+      // 3. Restablecer el estado del botón
+      if (mounted) {
+        setState(() {
+          _isCheckingGps = false;
+        });
+      }
+    }
+  }
+
 
   @override
   void dispose() {
@@ -714,10 +796,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
         width: double.infinity,
         height: config.buttonHeight,
         child: ElevatedButton(
-          onPressed: () {
-            HapticFeedback.mediumImpact();
-            widget.onMarkAttendance(context);
-          },
+          onPressed: _isCheckingGps ? null : _handleMarkAttendance,
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.transparent,
             foregroundColor: Colors.white,
@@ -726,6 +805,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
             ),
             elevation: 0,
             padding: EdgeInsets.zero,
+            disabledBackgroundColor: Colors.grey.withOpacity(0.2), // Estilo para deshabilitado
           ),
           child: Ink(
             decoration: BoxDecoration(
@@ -741,24 +821,33 @@ class _MainMenuScreenState extends State<MainMenuScreen>
             ),
             child: Container(
               alignment: Alignment.center,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.fingerprint,
-                    size: config.buttonIconSize,
-                  ),
-                  SizedBox(width: config.margin),
-                  Text(
-                    'MARCAR ASISTENCIA',
-                    style: TextStyle(
-                      fontSize: config.buttonTextSize,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.8,
+              child: _isCheckingGps
+                  ? SizedBox(
+                      width: config.buttonIconSize,
+                      height: config.buttonIconSize,
+                      child: const CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.fingerprint,
+                          size: config.buttonIconSize,
+                        ),
+                        SizedBox(width: config.margin),
+                        Text(
+                          'MARCAR ASISTENCIA',
+                          style: TextStyle(
+                            fontSize: config.buttonTextSize,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
             ),
           ),
         ),
@@ -829,7 +918,8 @@ class _MainMenuScreenState extends State<MainMenuScreen>
       ),
     );
   }
-
+  
+  // El resto de los métodos para el menú de información no han cambiado...
   Widget _buildMenuOverlay(ResponsiveConfig config) {
     final menuWidth = (config.screenWidth * 0.9).clamp(280.0, 400.0);
     
