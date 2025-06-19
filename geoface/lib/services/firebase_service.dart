@@ -332,4 +332,33 @@ class FirebaseService {
   }
 
   sendPasswordResetEmail(String correo) {}
+
+  // --- NUEVOS MÉTODOS PARA LA CONFIGURACIÓN DE LA API ---
+ /// Guarda la URL de la API de reconocimiento facial en Firestore.
+  Future<void> saveFaceApiUrl(String url) async {
+    try {
+      // Usamos _firestore en lugar de _db
+      await _firestore.collection('app_config').doc('settings').set({
+        'faceRecognitionApiUrl': url,
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print("Error al guardar la URL de la API: $e");
+      throw Exception("No se pudo guardar la configuración. Inténtalo de nuevo.");
+    }
+  }
+
+  /// Obtiene la URL de la API de reconocimiento facial desde Firestore.
+  Future<String?> getFaceApiUrl() async {
+    try {
+      // Usamos _firestore en lugar de _db
+      final docSnapshot = await _firestore.collection('app_config').doc('settings').get();
+      if (docSnapshot.exists && docSnapshot.data() != null) {
+        return docSnapshot.data()!['faceRecognitionApiUrl'] as String?;
+      }
+      return null;
+    } catch (e) {
+      print("Error al obtener la URL de la API: $e");
+      return null;
+    }
+  }
 }

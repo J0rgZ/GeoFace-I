@@ -10,20 +10,20 @@ import 'package:geoface/utils/location_helper.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:geoface/controllers/asistencia_controller.dart';
+import 'package:geoface/controllers/api_config_controller.dart';
 import 'package:geoface/models/empleado.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
 import 'package:image/image.dart' as img;
 import 'dart:typed_data';
-// import 'package:geoface/services/azure_face_service.dart'; // <-- CAMBIO: Ya no se necesita
 import 'package:lottie/lottie.dart';
 
-// <-- CAMBIO: Modificamos el enum para reflejar el nuevo flujo sin ingreso de DNI manual
+// El enum no cambia
 enum MarcacionFlowState {
   inicializando,
   errorServicios,
   verificacionFacial,
-  verificandoIdentidad, // Este estado ahora cubre la llamada a la API y la búsqueda en Firebase
+  verificandoIdentidad,
   confirmacion,
   jornadaCompletada,
 }
@@ -40,13 +40,11 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
   // --- Estado y Controladores ---
   MarcacionFlowState _flowState = MarcacionFlowState.inicializando;
   CameraController? _cameraController;
-  final TextEditingController _dniController = TextEditingController(); // Lo mantenemos para uso interno
+  final TextEditingController _dniController = TextEditingController();
   final FirebaseService _firebaseService = FirebaseService();
-  // late AzureFaceService _azureFaceService; // <-- CAMBIO: Se elimina Azure
 
-  // <-- CAMBIO: Añadimos la URL de nuestra API de Colab
-  final String _recognitionApiUrl = "https://5758-34-125-156-88.ngrok-free.app/identificar";
-
+  // <-- CAMBIO: La URL ahora es una variable de estado, no una constante.
+  String? _recognitionApiUrl;
 
   // --- Datos del Flujo ---
   Empleado? _empleado;
@@ -67,8 +65,11 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // _azureFaceService = ...; // <-- CAMBIO: Se elimina la inicialización de Azure
-    _initializeServices();
+    // Usamos addPostFrameCallback para asegurarnos de que el `context` esté disponible
+    // para leer el provider.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeServices();
+    });
   }
 
   @override
@@ -81,11 +82,35 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
 
   // --- LÓGICA DE INICIALIZACIÓN Y FLUJO ---
 
+  // <-- CAMBIO: Modificamos la inicialización para incluir la carga de la URL
   Future<void> _initializeServices() async {
-    // ... (sin cambios aquí)
+    setState(() {
+      _flowState = MarcacionFlowState.inicializando;
+      _statusMessage = "Preparando servicios...";
+    });
+
     try {
+      // Obtenemos la URL desde el controlador.
+      final apiConfigController = context.read<ApiConfigController>();
+      
+      // Aseguramos que la configuración esté cargada.
+      // Si el controlador se crea al inicio de la app, esto debería ser instantáneo.
+      if(apiConfigController.apiConfig.faceRecognitionApiUrl.isEmpty){
+        await apiConfigController.loadApiConfig();
+      }
+
+      _recognitionApiUrl = apiConfigController.apiConfig.faceRecognitionApiUrl;
+
+      // Verificamos si la URL fue encontrada.
+      if (_recognitionApiUrl == null || _recognitionApiUrl!.isEmpty) {
+        throw Exception("La URL del servicio de reconocimiento no está configurada. Contacte a un administrador.");
+      }
+
+      // Inicializamos cámara y GPS en paralelo.
       await Future.wait([_initializeCamera(), _getCurrentLocation()]);
+      
       if (!mounted) return;
+      
       setState(() {
         _flowState = MarcacionFlowState.verificacionFacial;
         _statusMessage = "Servicios listos.";
@@ -103,6 +128,16 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
   Future<void> _handleFaceVerification() async {
     if (_isProcessing || !_isCameraInitialized || _cameraController == null) return;
 
+    // <-- CAMBIO: Validación de la URL al inicio de la acción
+    if (_recognitionApiUrl == null || _recognitionApiUrl!.isEmpty) {
+      _showCustomInfoDialog(
+        title: "Servicio No Configurado",
+        content: "La API de reconocimiento facial no ha sido configurada. Por favor, contacta a un administrador para solucionar este problema.",
+        lottieAsset: 'assets/animations/maintenance.json',
+      );
+      return;
+    }
+
     setState(() {
       _isProcessing = true;
       _flowState = MarcacionFlowState.verificandoIdentidad;
@@ -114,8 +149,8 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
       final XFile photoFile = await _cameraController!.takePicture();
       _capturedImageBytes = await _processImageToBytes(photoFile);
 
-      // 2. Preparar y enviar la petición
-      var request = http.MultipartRequest('POST', Uri.parse(_recognitionApiUrl));
+      // 2. Preparar y enviar la petición (usando la variable _recognitionApiUrl!)
+      var request = http.MultipartRequest('POST', Uri.parse(_recognitionApiUrl!));
       request.files.add(
         http.MultipartFile.fromBytes(
           'face_image',
@@ -148,21 +183,21 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
           _showCustomInfoDialog(
             title: "Empleado No Registrado",
             content: "Tu rostro fue detectado, pero no te encontramos en nuestra base de datos. Por favor, contacta a Recursos Humanos si crees que esto es un error.",
-            lottieAsset: 'assets/animations/not-found.json', // <-- Necesitarás una animación para esto
+            lottieAsset: 'assets/animations/not-found.json',
           );
         } else if (errorMessage.contains("No se detectó un rostro")) {
           // La calidad de la imagen es mala
           _showCustomInfoDialog(
             title: "Rostro No Detectado",
             content: "No pudimos encontrar un rostro claro en la foto. Asegúrate de tener buena iluminación, mirar de frente a la cámara y no tener el rostro cubierto.",
-            lottieAsset: 'assets/animations/bad-quality.json', // <-- Necesitarás una animación para esto
+            lottieAsset: 'assets/animations/error.json',
           );
         } else {
           // Otro error enviado por la API
           _showCustomInfoDialog(
             title: "Error de Verificación",
             content: errorMessage,
-            lottieAsset: 'assets/animations/not-found.json',
+            lottieAsset: 'assets/animations/maintenance.json',
           );
         }
         
@@ -174,13 +209,24 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
           });
         }
       }
+    } on TimeoutException {
+      _showCustomInfoDialog(
+        title: "Servidor Lento o Caído",
+        content: "La conexión con el servicio de reconocimiento facial tardó demasiado en responder. Por favor, inténtalo de nuevo más tarde.",
+        lottieAsset: 'assets/animations/maintenance.json',
+      );
+      if (mounted) {
+        setState(() {
+          _flowState = MarcacionFlowState.verificacionFacial;
+          _isProcessing = false;
+        });
+      }
     } catch (e) {
-      // --- CASO DE ERROR DE CONEXIÓN O TIMEOUT ---
-      // Esto se activa si el servidor está apagado, no hay internet, o la petición tarda demasiado.
+      // --- CASO DE ERROR DE CONEXIÓN U OTRO ---
       _showCustomInfoDialog(
         title: "Servicio en Mantenimiento",
-        content: "No pudimos conectar con el servicio de reconocimiento facial. Por favor, inténtalo de nuevo más tarde o revisa tu conexión a internet.",
-        lottieAsset: 'assets/animations/maintenance.json', // <-- Necesitarás una animación para esto
+        content: "No pudimos conectar con el servicio de reconocimiento facial. Revisa tu conexión a internet o inténtalo de nuevo más tarde.",
+        lottieAsset: 'assets/animations/maintenance.json',
       );
       if (mounted) {
         setState(() {
@@ -191,17 +237,17 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
     }
   }
 
-  // <-- CAMBIO: REEMPLAZA TU DIÁLOGO DE INFO POR ESTE, MÁS VISUAL Y VERSÁTIL
+  // --- El resto del código no necesita cambios ---
+  // (incluyendo _showCustomInfoDialog, _processImageToBytes, _handleIdentityVerification,
+  // _handleMarkAttendance, ciclo de vida, permisos, y todos los widgets _build*)
+  // Pego el resto del código para que sea un solo bloque.
+  
   void _showCustomInfoDialog({
     required String title,
     required String content,
     required String lottieAsset,
   }) {
     if (!mounted) return;
-
-    // Pequeña validación por si el archivo lottie no existe
-    final assetExists = true; // En un proyecto real, podrías verificar si el archivo existe
-    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -210,12 +256,11 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (assetExists)
-              SizedBox(
-                width: 120,
-                height: 120,
-                child: Lottie.asset(lottieAsset, repeat: false),
-              ),
+            SizedBox(
+              width: 120,
+              height: 120,
+              child: Lottie.asset(lottieAsset, repeat: false),
+            ),
             const SizedBox(height: 16),
             Text(
               title,
@@ -245,9 +290,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
     );
   }
 
-  
   Future<Uint8List> _processImageToBytes(XFile photoFile) async {
-    // ... (sin cambios aquí)
     final bytes = await photoFile.readAsBytes();
     final imgLib = img.decodeImage(bytes);
     if (imgLib == null) throw Exception("No se pudo decodificar la imagen");
@@ -255,36 +298,23 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
     return Uint8List.fromList(img.encodeJpg(resizedImg, quality: 90));
   }
 
-  // <-- CAMBIO: MODIFICAMOS ESTA FUNCIÓN PARA QUE ACEPTE UN ID DIRECTAMENTE
   Future<void> _handleIdentityVerification({String? empleadoId}) async {
-    // El estado ya se cambió en la función anterior.
-    // Solo actualizamos el mensaje.
     if(mounted) setState(() => _statusMessage = "Verificando datos de jornada...");
 
     try {
       if (empleadoId == null) throw Exception("ID de empleado no proporcionado.");
       
-      // 1. Verificar empleado usando el ID
       _empleado = await _firebaseService.getEmpleadoById(empleadoId);
       if (_empleado == null) throw Exception("Empleado reconocido (ID: $empleadoId), pero no encontrado en la base de datos.");
-
-      if (_empleado!.activo != true) {
-        throw Exception("Este empleado no se encuentra activo. Contacte a RR.HH.");
-      }
+      if (_empleado!.activo != true) throw Exception("Este empleado no se encuentra activo. Contacte a RR.HH.");
       
-      _dniController.text = _empleado!.dni; // Guardamos el DNI para mostrarlo
-      _isFaceVerified = true; // El rostro se verificó con éxito
+      _dniController.text = _empleado!.dni;
+      _isFaceVerified = true;
 
-      // El resto de la lógica es la misma que ya tenías...
-      // 2. Verificar sede
       _sede = await _firebaseService.getSedeById(_empleado!.sedeId);
       if (_sede == null) throw Exception("La sede asignada no fue encontrada.");
-      
-      if (_sede!.activa != true) {
-        throw Exception("La sede '${_sede!.nombre}' no se encuentra activa.");
-      }
+      if (_sede!.activa != true) throw Exception("La sede '${_sede!.nombre}' no se encuentra activa.");
 
-      // 3. Verificar estado de asistencia
       final asistenciaController = Provider.of<AsistenciaController>(context, listen: false);
       final status = await asistenciaController.checkEmpleadoAsistenciaStatus(_empleado!.id);
       
@@ -305,7 +335,6 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
           throw Exception(asistenciaController.errorMessage ?? "Error al verificar estado de asistencia");
       }
 
-      // 4. Verificar ubicación
       final distancia = LocationHelper.calcularDistancia(
         _currentPosition!.latitude, _currentPosition!.longitude, 
         _sede!.latitud, _sede!.longitud
@@ -315,7 +344,6 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
       setState(() => _flowState = MarcacionFlowState.confirmacion);
 
     } catch (e) {
-      // Si algo falla aquí, volvemos a la cámara para que reintente
       _showInfoDialog("Error de Verificación", e.toString(), Icons.error, Colors.red);
       setState(() => _flowState = MarcacionFlowState.verificacionFacial);
     } finally {
@@ -324,7 +352,6 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
   }
 
   Future<void> _handleMarkAttendance() async {
-    // ... (sin cambios aquí)
     setState(() => _isProcessing = true);
     final asistenciaController = Provider.of<AsistenciaController>(context, listen: false);
 
@@ -359,12 +386,9 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
     }
   }
   
-  // --- Manejo del ciclo de vida y permisos (sin cambios) ---
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
-      return;
-    }
+    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
     if (state == AppLifecycleState.inactive) {
       _cameraController?.dispose();
     } else if (state == AppLifecycleState.resumed) {
@@ -375,7 +399,6 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
   }
 
   Future<void> _initializeCamera() async {
-    // ... (sin cambios aquí)
     final cameras = await availableCameras();
     if (cameras.isEmpty) throw Exception("No hay cámaras disponibles.");
     final frontCamera = cameras.firstWhere(
@@ -388,7 +411,6 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
   }
   
   Future<void> _getCurrentLocation() async {
-    // ... (sin cambios aquí)
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) throw Exception("Los servicios de ubicación están desactivados.");
     
@@ -425,7 +447,6 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
     );
   }
 
-  // <-- CAMBIO: Actualizamos el constructor de vistas para el nuevo flujo
   Widget _buildCurrentView() {
     switch (_flowState) {
       case MarcacionFlowState.inicializando:
@@ -436,18 +457,14 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
         return _buildCameraView(key: const ValueKey('camera'));
 
       case MarcacionFlowState.verificandoIdentidad:
-        // Mostramos una vista de carga mientras la API y Firebase trabajan
         return _buildProcessingView(key: const ValueKey('processing'));
       
-      // Se elimina el caso de ingresoDNI
-
       case MarcacionFlowState.confirmacion:
       case MarcacionFlowState.jornadaCompletada:
         return _buildConfirmationView(key: const ValueKey('confirmation'));
       }
   }
 
-  // --- Widgets de construcción de vistas ---
   Widget _buildInitialOrErrorView({required Key key}) {
     bool isError = _flowState == MarcacionFlowState.errorServicios;
     return Column(
@@ -459,7 +476,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
         else
           Icon(Icons.error_outline, size: 80, color: Colors.red.shade400),
         const SizedBox(height: 24),
-        Text(isError ? 'Ocurrió un Error' : 'Preparando Cámara y GPS...', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+        Text(isError ? 'Ocurrió un Error' : 'Preparando Servicios...', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
         const SizedBox(height: 16),
         Text(_statusMessage, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey.shade600)),
         const SizedBox(height: 32),
@@ -468,7 +485,6 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
     );
   }
   
-  // <-- CAMBIO: Añadimos una nueva vista de "Procesando"
   Widget _buildProcessingView({required Key key}) {
     return Column(
       key: key,
@@ -491,12 +507,10 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
     );
   }
 
-
   Widget _buildCameraView({required Key key}) {
     return Column(
       key: key,
       children: [
-        // <-- CAMBIO: Actualizamos el mensaje
         _buildStepCard(
           icon: Icons.camera_alt_outlined,
           title: "Reconocimiento Facial",
@@ -518,7 +532,6 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
           ),
         ),
         const SizedBox(height: 24),
-        // <-- CAMBIO: Actualizamos el texto del botón
         _buildActionButton(
           label: "Identificar y Marcar Asistencia",
           onPressed: _handleFaceVerification,
@@ -529,9 +542,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
     );
   }
   
-      
   Widget _buildConfirmationView({required Key key}) {
-    
     bool jornadaCompleta = _flowState == MarcacionFlowState.jornadaCompletada;
 
     return Column(
@@ -592,8 +603,6 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
       ],
     );
   }
-  
-  // --- El resto de los widgets de componentes reutilizables no necesitan cambios ---
   
   Widget _buildStepCard({required IconData icon, required String title, required String message, required Color color}) {
     return Card(
@@ -704,8 +713,6 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
     );
   }
 
-
-
   Widget _buildActionButton({required String label, VoidCallback? onPressed, required IconData icon, Color? color, bool isLoading = false}) {
     final effectiveOnPressed = isLoading ? null : onPressed;
 
@@ -768,9 +775,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
     );
   }
 
-
   void _showInfoDialog(String title, String content, IconData icon, Color color) {
-    // ... (sin cambios aquí)
     if (!mounted) return;
     showDialog(context: context, builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -782,7 +787,6 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
   }
   
   void _showSuccessDialog() {
-    // ... (sin cambios aquí)
     if (!mounted) return;
     showDialog(barrierDismissible: false, context: context, builder: (context) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),

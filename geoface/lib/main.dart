@@ -1,6 +1,7 @@
 // FILE: main.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:geoface/controllers/api_config_controller.dart';
 import 'package:geoface/controllers/asistencia_controller.dart';
 import 'package:geoface/controllers/administrador_controller.dart'; 
 import 'package:geoface/controllers/biometrico_controller.dart';
@@ -43,6 +44,7 @@ void main() async {
         ChangeNotifierProvider(create: (context) => AsistenciaController()),
         ChangeNotifierProvider(create: (context) => AdministradorController()),
         ChangeNotifierProvider(create: (context) => UserController()),
+        ChangeNotifierProvider(create: (_) => ApiConfigController()),
         ChangeNotifierProvider(create: (_) => BiometricoController()),        
       ],
       child: const MyApp(),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geoface/views/admin/api_config_page.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/auth_controller.dart';
 import '../../controllers/theme_provider.dart';
@@ -347,6 +348,7 @@ class _SettingsMenu extends StatelessWidget {
                   _buildMenuSection(context, "Administración", [
                     _buildOptionTile(Icons.admin_panel_settings_rounded, "Administradores", () => onNavigate(const AdministradoresPage()), theme),
                     _buildOptionTile(Icons.assignment_ind_rounded, "Gestionar Usuario", () => onNavigate(const GestionUsuariosEmpleadosPage()), theme),
+                    _buildOptionTile(Icons.api_rounded, "API Reconocimiento", () => onNavigate(const ApiConfigPage()), theme),
                   ]),
                   _buildMenuSection(context, "Aplicación", [
                     _buildOptionTile(isDarkMode ? Icons.light_mode_rounded : Icons.dark_mode_rounded, isDarkMode ? 'Modo Claro' : 'Modo Oscuro', onToggleTheme, theme),
