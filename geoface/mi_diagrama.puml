@@ -1,0 +1,1409 @@
+@startuml
+set namespaceSeparator ::
+
+class "geoface::app_config.dart::AppConfig" {
+  {static} -SharedPreferences _prefs
+  {static} +String appName
+  {static} +String appVersion
+  {static} +String apiBaseUrl
+  {static} +int geoFenceRadius
+  {static} +Duration locationUpdateInterval
+  {static} +String usuariosCollection
+  {static} +String empleadosCollection
+  {static} +String sedesCollection
+  {static} +String asistenciasCollection
+  {static} +bool isFirstRun
+  {static} +dynamic initialize()
+  {static} +dynamic setFirstRun()
+}
+
+"geoface::app_config.dart::AppConfig" o-- "shared_preferences::src::shared_preferences_legacy.dart::SharedPreferences"
+
+class "geoface::controllers::administrador_controller.dart::AdministradorController" {
+  -AdministradorService _adminService
+  -bool _loading
+  -bool _isLoading
+  -String? _errorMessage
+  +bool loading
+  +bool isLoading
+  +String? errorMessage
+  -void _setState()
+  +dynamic getAdministradores()
+  +dynamic createAdmin()
+  +dynamic updateAdmin()
+  +dynamic toggleAdminStatus()
+}
+
+"geoface::controllers::administrador_controller.dart::AdministradorController" o-- "geoface::services::administrador_service.dart::AdministradorService"
+"flutter::src::foundation::change_notifier.dart::ChangeNotifier" <|-- "geoface::controllers::administrador_controller.dart::AdministradorController"
+
+class "geoface::controllers::api_config_controller.dart::ApiConfigController" {
+  -FirebaseService _firebaseService
+  -ApiConfig _apiConfig
+  -bool _isLoading
+  -bool _isSyncing
+  -String? _error
+  +ApiConfig apiConfig
+  +bool isLoading
+  +bool isSyncing
+  +String? error
+  +dynamic loadApiConfig()
+  +dynamic saveApiConfigFromBaseUrl()
+  +dynamic syncRemoteDatabase()
+  -void _setLoading()
+}
+
+"geoface::controllers::api_config_controller.dart::ApiConfigController" o-- "geoface::services::firebase_service.dart::FirebaseService"
+"geoface::controllers::api_config_controller.dart::ApiConfigController" o-- "geoface::models::api_config.dart::ApiConfig"
+"flutter::src::foundation::change_notifier.dart::ChangeNotifier" <|-- "geoface::controllers::api_config_controller.dart::ApiConfigController"
+
+class "geoface::controllers::asistencia_controller.dart::AsistenciaController" {
+  -FirebaseService _firebaseService
+  -LocationService _locationService
+  -Uuid _uuid
+  -Asistencia? _asistenciaActiva
+  -List<Asistencia> _asistencias
+  -bool _loading
+  -String? _errorMessage
+  +Asistencia? asistenciaActiva
+  +List<Asistencia> asistencias
+  +bool loading
+  +String? errorMessage
+  +dynamic checkEmpleadoAsistenciaStatus()
+  +dynamic registrarEntrada()
+  +dynamic registrarSalida()
+  +dynamic getAsistenciasByEmpleado()
+  +dynamic getAllAsistencias()
+  +void clearState()
+  +dynamic refreshAsistenciaStatus()
+}
+
+"geoface::controllers::asistencia_controller.dart::AsistenciaController" o-- "geoface::services::firebase_service.dart::FirebaseService"
+"geoface::controllers::asistencia_controller.dart::AsistenciaController" o-- "geoface::services::location_service.dart::LocationService"
+"geoface::controllers::asistencia_controller.dart::AsistenciaController" o-- "uuid::uuid.dart::Uuid"
+"geoface::controllers::asistencia_controller.dart::AsistenciaController" o-- "geoface::models::asistencia.dart::Asistencia"
+"flutter::src::foundation::change_notifier.dart::ChangeNotifier" <|-- "geoface::controllers::asistencia_controller.dart::AsistenciaController"
+
+class "geoface::controllers::asistencia_controller.dart::AsistenciaStatus" {
+  +int index
+  {static} +List<AsistenciaStatus> values
+  {static} +AsistenciaStatus debeMarcarEntrada
+  {static} +AsistenciaStatus debeMarcarSalida
+  {static} +AsistenciaStatus jornadaCompleta
+  {static} +AsistenciaStatus error
+}
+
+"geoface::controllers::asistencia_controller.dart::AsistenciaStatus" o-- "geoface::controllers::asistencia_controller.dart::AsistenciaStatus"
+"dart::core::Enum" <|-- "geoface::controllers::asistencia_controller.dart::AsistenciaStatus"
+
+class "geoface::controllers::auth_controller.dart::AuthController" {
+  -FirebaseAuth _auth
+  -FirebaseFirestore _firestore
+  -AuthStatus _status
+  -Usuario? _currentUser
+  -String? _errorMessage
+  +AuthStatus status
+  +Usuario? currentUser
+  +String? errorMessage
+  +bool isAdmin
+  +bool isEmpleado
+  +bool loading
+  -dynamic _onAuthStateChanged()
+  -dynamic _fetchUserData()
+  +void setErrorMessage()
+  +dynamic login()
+  +dynamic logout()
+  +dynamic changePassword()
+  -void _formatErrorMessage()
+}
+
+"geoface::controllers::auth_controller.dart::AuthController" o-- "firebase_auth::firebase_auth.dart::FirebaseAuth"
+"geoface::controllers::auth_controller.dart::AuthController" o-- "cloud_firestore::cloud_firestore.dart::FirebaseFirestore"
+"geoface::controllers::auth_controller.dart::AuthController" o-- "geoface::controllers::auth_controller.dart::AuthStatus"
+"geoface::controllers::auth_controller.dart::AuthController" o-- "geoface::models::usuario.dart::Usuario"
+"flutter::src::foundation::change_notifier.dart::ChangeNotifier" <|-- "geoface::controllers::auth_controller.dart::AuthController"
+
+class "geoface::controllers::auth_controller.dart::AuthStatus" {
+  +int index
+  {static} +List<AuthStatus> values
+  {static} +AuthStatus initial
+  {static} +AuthStatus authenticated
+  {static} +AuthStatus unauthenticated
+  {static} +AuthStatus loading
+}
+
+"geoface::controllers::auth_controller.dart::AuthStatus" o-- "geoface::controllers::auth_controller.dart::AuthStatus"
+"dart::core::Enum" <|-- "geoface::controllers::auth_controller.dart::AuthStatus"
+
+class "geoface::controllers::biometrico_controller.dart::BiometricoController" {
+  -FirebaseStorage _storage
+  -FirebaseFirestore _firestore
+  +CameraController? cameraController
+  -bool _isCameraInitialized
+  -String? _errorMessage
+  -bool _isProcessing
+  +bool isCameraInitialized
+  +String? errorMessage
+  +bool isProcessing
+  +dynamic initCamera()
+  +dynamic stopCamera()
+  +dynamic capturePhoto()
+  -dynamic _eliminarBiometricosExistentes()
+  +dynamic registerBiometrico()
+  +dynamic updateBiometrico()
+  +dynamic registerBiometricoWithFile()
+  +dynamic updateBiometricoWithFile()
+  +dynamic deleteBiometrico()
+  +dynamic getBiometricoByEmpleadoId()
+  +void dispose()
+}
+
+"geoface::controllers::biometrico_controller.dart::BiometricoController" o-- "firebase_storage::firebase_storage.dart::FirebaseStorage"
+"geoface::controllers::biometrico_controller.dart::BiometricoController" o-- "cloud_firestore::cloud_firestore.dart::FirebaseFirestore"
+"geoface::controllers::biometrico_controller.dart::BiometricoController" o-- "camera::src::camera_controller.dart::CameraController"
+"flutter::src::foundation::change_notifier.dart::ChangeNotifier" <|-- "geoface::controllers::biometrico_controller.dart::BiometricoController"
+
+class "geoface::controllers::empleado_controller.dart::EmpleadoController" {
+  -FirebaseService _firebaseService
+  -FirebaseAuth _auth
+  -FirebaseFirestore _firestore
+  -Uuid _uuid
+  -List<Empleado> _empleados
+  -bool _loading
+  -String? _errorMessage
+  +List<Empleado> empleados
+  +bool loading
+  +String? errorMessage
+  -void _setState()
+  +dynamic getEmpleados()
+  +dynamic fetchEmpleados()
+  +dynamic getEmpleadoById()
+  +dynamic getEmpleadosPorSede()
+  +dynamic validarDatosUnicos()
+  +dynamic addEmpleado()
+  +dynamic updateEmpleado()
+  +dynamic deleteEmpleado()
+  +dynamic toggleEmpleadoActivo()
+  +dynamic assignUserToEmpleado()
+  +dynamic resetEmpleadoPassword()
+}
+
+"geoface::controllers::empleado_controller.dart::EmpleadoController" o-- "geoface::services::firebase_service.dart::FirebaseService"
+"geoface::controllers::empleado_controller.dart::EmpleadoController" o-- "firebase_auth::firebase_auth.dart::FirebaseAuth"
+"geoface::controllers::empleado_controller.dart::EmpleadoController" o-- "cloud_firestore::cloud_firestore.dart::FirebaseFirestore"
+"geoface::controllers::empleado_controller.dart::EmpleadoController" o-- "uuid::uuid.dart::Uuid"
+"flutter::src::foundation::change_notifier.dart::ChangeNotifier" <|-- "geoface::controllers::empleado_controller.dart::EmpleadoController"
+
+class "geoface::controllers::reporte_controller.dart::ReporteDetallado" {
+  +EstadisticaAsistencia resumen
+  +Map<DateTime, List<Asistencia>> asistenciasPorDia
+  +Map<DateTime, List<Empleado>> ausenciasPorDia
+}
+
+"geoface::controllers::reporte_controller.dart::ReporteDetallado" o-- "geoface::models::estadistica_asistencia.dart::EstadisticaAsistencia"
+
+class "geoface::controllers::reporte_controller.dart::ReporteController" {
+  -FirebaseService _firebaseService
+  -ReporteDetallado? _reporte
+  -List<Empleado> _todosLosEmpleados
+  -bool _loading
+  -bool _isExporting
+  -String? _errorMessage
+  -bool _reporteGenerado
+  +ReporteDetallado? reporte
+  +bool loading
+  +bool isExporting
+  +String? errorMessage
+  +bool reporteGenerado
+  +Empleado? getEmpleadoById()
+  +dynamic generarReporteDetallado()
+  +dynamic exportarReporteAPDF()
+}
+
+"geoface::controllers::reporte_controller.dart::ReporteController" o-- "geoface::services::firebase_service.dart::FirebaseService"
+"geoface::controllers::reporte_controller.dart::ReporteController" o-- "geoface::controllers::reporte_controller.dart::ReporteDetallado"
+"flutter::src::foundation::change_notifier.dart::ChangeNotifier" <|-- "geoface::controllers::reporte_controller.dart::ReporteController"
+
+class "geoface::controllers::sede_controller.dart::SedeController" {
+  -FirebaseService _firebaseService
+  -Uuid _uuid
+  -List<Sede> _sedes
+  -bool _loading
+  -String? _errorMessage
+  +List<Sede> sedes
+  +bool loading
+  +String? errorMessage
+  +dynamic getSedes()
+  +dynamic addSede()
+  +dynamic updateSede()
+  +dynamic deleteSede()
+}
+
+"geoface::controllers::sede_controller.dart::SedeController" o-- "geoface::services::firebase_service.dart::FirebaseService"
+"geoface::controllers::sede_controller.dart::SedeController" o-- "uuid::uuid.dart::Uuid"
+"flutter::src::foundation::change_notifier.dart::ChangeNotifier" <|-- "geoface::controllers::sede_controller.dart::SedeController"
+
+class "geoface::controllers::theme_controller.dart::ThemeController" {
+  {static} -String _themeKey
+  -bool _isDarkMode
+  -ThemeData _currentTheme
+  +bool isDarkMode
+  +ThemeData currentTheme
+  -dynamic _loadThemePreference()
+  -dynamic _saveThemePreference()
+  +void toggleTheme()
+  +void setTheme()
+}
+
+"geoface::controllers::theme_controller.dart::ThemeController" o-- "flutter::src::material::theme_data.dart::ThemeData"
+"flutter::src::foundation::change_notifier.dart::ChangeNotifier" <|-- "geoface::controllers::theme_controller.dart::ThemeController"
+
+class "geoface::controllers::theme_provider.dart::ThemeProvider" {
+  -bool _isDarkMode
+  +bool isDarkMode
+  +ThemeData currentTheme
+  -dynamic _loadThemeFromPrefs()
+  -dynamic _saveThemeToPrefs()
+  +void toggleTheme()
+}
+
+"geoface::controllers::theme_provider.dart::ThemeProvider" o-- "flutter::src::material::theme_data.dart::ThemeData"
+"flutter::src::foundation::change_notifier.dart::ChangeNotifier" <|-- "geoface::controllers::theme_provider.dart::ThemeProvider"
+
+class "geoface::controllers::user_controller.dart::UserController" {
+  -FirebaseAuth _auth
+  -FirebaseFirestore _firestore
+  -bool _isLoading
+  +bool isLoading
+  -void _setLoading()
+  +dynamic getAdministradores()
+  +dynamic createAdminUser()
+  +dynamic updateAdminUser()
+  +dynamic changePassword()
+  +dynamic toggleUserStatus()
+  +dynamic getEmpleadosSinUsuario()
+  +dynamic assignUserToEmpleado()
+}
+
+"geoface::controllers::user_controller.dart::UserController" o-- "firebase_auth::firebase_auth.dart::FirebaseAuth"
+"geoface::controllers::user_controller.dart::UserController" o-- "cloud_firestore::cloud_firestore.dart::FirebaseFirestore"
+"flutter::src::foundation::change_notifier.dart::ChangeNotifier" <|-- "geoface::controllers::user_controller.dart::UserController"
+
+class "geoface::firebase_options.dart::DefaultFirebaseOptions" {
+  {static} +FirebaseOptions android
+  {static} +FirebaseOptions currentPlatform
+}
+
+"geoface::firebase_options.dart::DefaultFirebaseOptions" o-- "firebase_core_platform_interface::firebase_core_platform_interface.dart::FirebaseOptions"
+
+class "geoface::main.dart::MyApp" {
+  +State<MyApp> createState()
+}
+
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::main.dart::MyApp"
+
+class "geoface::main.dart::_MyAppState" {
+  -bool _isFirstLaunch
+  -bool _isLoading
+  -String _firstLaunchKey
+  +void initState()
+  -dynamic _loadAppState()
+  -void _handlePermissionsGranted()
+  +Widget build()
+  -Widget _buildLoadingScreen()
+  -Widget _buildInitialScreen()
+}
+
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::main.dart::_MyAppState"
+
+class "geoface::models::api_config.dart::ApiConfig" {
+  +String identificationApiUrl
+  +String syncApiUrl
+  +String baseUrl
+  {static} +ApiConfig empty
+  +Map<String, dynamic> toMap()
+}
+
+"geoface::models::api_config.dart::ApiConfig" o-- "geoface::models::api_config.dart::ApiConfig"
+
+class "geoface::models::asistencia.dart::Asistencia" {
+  +String id
+  +String empleadoId
+  +String sedeId
+  +DateTime fechaHoraEntrada
+  +DateTime? fechaHoraSalida
+  +double latitudEntrada
+  +double longitudEntrada
+  +double? latitudSalida
+  +double? longitudSalida
+  +String? capturaEntrada
+  +String? capturaSalida
+  +bool registroCompleto
+  +Duration tiempoTrabajado
+  +Map<String, dynamic> toJson()
+  +Asistencia copyWith()
+}
+
+class "geoface::models::biometrico.dart::Biometrico" {
+  +String id
+  +String empleadoId
+  +String datoFacial
+  +String fechaRegistro
+  +String? fechaActualizacion
+  +Map<String, dynamic> toMap()
+}
+
+class "geoface::models::empleado.dart::Empleado" {
+  +String id
+  +String nombre
+  +String apellidos
+  +String correo
+  +String cargo
+  +String sedeId
+  +String dni
+  +String celular
+  +bool hayDatosBiometricos
+  +bool activo
+  +DateTime fechaCreacion
+  +DateTime? fechaModificacion
+  +bool tieneUsuario
+  +String nombreCompleto
+  +Map<String, dynamic> toJson()
+  +Empleado copyWith()
+}
+
+class "geoface::models::estadistica_asistencia.dart::EstadisticaAsistencia" {
+  +String sedeId
+  +String sedeNombre
+  +String? empleadoId
+  +DateTime fecha
+  +int totalEmpleados
+  +int totalAsistencias
+  +int totalAusencias
+  +int totalTardanzas
+  +double porcentajeAsistencia
+  +Map<String, dynamic> toJson()
+}
+
+class "geoface::models::sede.dart::Sede" {
+  +String id
+  +String nombre
+  +String direccion
+  +double latitud
+  +double longitud
+  +int radioPermitido
+  +bool activa
+  +DateTime fechaCreacion
+  +DateTime? fechaModificacion
+  +Map<String, dynamic> toJson()
+  +Sede copyWith()
+  {static} +Sede empty()
+}
+
+class "geoface::models::usuario.dart::Usuario" {
+  +String id
+  +String nombreUsuario
+  +String correo
+  +String tipoUsuario
+  +String? empleadoId
+  +bool activo
+  +DateTime fechaCreacion
+  +DateTime? fechaUltimoAcceso
+  +bool isAdmin
+  +bool isEmpleado
+  +Map<String, dynamic> toJson()
+}
+
+class "geoface::routes.dart::AppRoutes" {
+  {static} +String mainMenu
+  {static} +String login
+  {static} +String dashboard
+  {static} +String empleados
+  {static} +String empleadoDetail
+  {static} +String sedes
+  {static} +String sedeDetail
+  {static} +String reportes
+  {static} +String marcarAsistencia
+  {static} +String biometrico
+  {static} +String gestionUsuariosEmpleados
+  {static} +String adminLayout
+  {static} +Route<dynamic> generateRoute()
+}
+
+class "geoface::services::administrador_service.dart::AdministradorService" {
+  -FirebaseAuth _auth
+  -FirebaseFirestore _firestore
+  +dynamic getAdministradores()
+  +dynamic createAdminUser()
+  +dynamic updateAdminUser()
+  +dynamic toggleUserStatus()
+}
+
+"geoface::services::administrador_service.dart::AdministradorService" o-- "firebase_auth::firebase_auth.dart::FirebaseAuth"
+"geoface::services::administrador_service.dart::AdministradorService" o-- "cloud_firestore::cloud_firestore.dart::FirebaseFirestore"
+
+class "geoface::services::auth_service.dart::AuthService" {
+  -FirebaseAuth _firebaseAuth
+  -FirebaseFirestore _firestore
+  +Stream<User?> authStateChanges
+  +User? currentUser
+  +dynamic signIn()
+  +dynamic signOut()
+  +dynamic getCurrentUserData()
+  +dynamic isCurrentUserAdmin()
+}
+
+"geoface::services::auth_service.dart::AuthService" o-- "firebase_auth::firebase_auth.dart::FirebaseAuth"
+"geoface::services::auth_service.dart::AuthService" o-- "cloud_firestore::cloud_firestore.dart::FirebaseFirestore"
+"geoface::services::auth_service.dart::AuthService" o-- "dart::async::Stream<User>"
+"geoface::services::auth_service.dart::AuthService" o-- "firebase_auth::firebase_auth.dart::User"
+
+class "geoface::services::empleado_service.dart::EmpleadoService" {
+  -FirebaseFirestore _firestore
+  -FirebaseStorage _storage
+  +dynamic getEmpleados()
+  +dynamic getEmpleadoById()
+  +dynamic createEmpleado()
+  +dynamic updateEmpleado()
+}
+
+"geoface::services::empleado_service.dart::EmpleadoService" o-- "cloud_firestore::cloud_firestore.dart::FirebaseFirestore"
+"geoface::services::empleado_service.dart::EmpleadoService" o-- "firebase_storage::firebase_storage.dart::FirebaseStorage"
+
+class "geoface::services::fake_gps_detector_service.dart::FakeGpsDetectorService" {
+  {static} -dynamic _isMockLocation()
+  {static} -bool _isLowAccuracy()
+  {static} +dynamic checkIfFakeGpsUsed()
+}
+
+class "geoface::services::firebase_service.dart::FirebaseService" {
+  -FirebaseFirestore _firestore
+  -FirebaseAuth _auth
+  +dynamic signInWithEmailAndPassword()
+  +dynamic signOut()
+  +User? getCurrentUser()
+  +dynamic getUsuarioByEmail()
+  +dynamic getEmpleados()
+  +dynamic getEmpleadoById()
+  +dynamic getEmpleadoByDNI()
+  +dynamic addEmpleado()
+  +dynamic updateEmpleado()
+  +dynamic deleteEmpleado()
+  +dynamic getSedes()
+  +dynamic getSedeById()
+  +dynamic addSede()
+  +dynamic updateSede()
+  +dynamic deleteSede()
+  +dynamic getAsistenciasByEmpleado()
+  +dynamic getActiveAsistencia()
+  +dynamic registrarEntrada()
+  +dynamic registrarSalida()
+  +dynamic getAsistenciaById()
+  +dynamic getAsistenciasFiltradas()
+  +dynamic getCompletedAsistenciaForToday()
+  +dynamic getTodayAsistencia()
+  +dynamic getAsistenciasBySede()
+  +dynamic getAllAsistencias()
+  +dynamic getAdministradores()
+  +dynamic sendPasswordResetEmail()
+  +dynamic saveApiConfig()
+  +dynamic getApiConfig()
+}
+
+"geoface::services::firebase_service.dart::FirebaseService" o-- "cloud_firestore::cloud_firestore.dart::FirebaseFirestore"
+"geoface::services::firebase_service.dart::FirebaseService" o-- "firebase_auth::firebase_auth.dart::FirebaseAuth"
+
+class "geoface::services::location_service.dart::LocationService" {
+  +dynamic getCurrentPosition()
+}
+
+class "geoface::services::sede_services.dart::SedeService" {
+  -FirebaseFirestore _firestore
+  +dynamic getSedes()
+  +dynamic getSedeById()
+  +dynamic createSede()
+  +dynamic updateSede()
+  +dynamic toggleSedeActiva()
+  +bool coordenadasEnPerimetro()
+}
+
+"geoface::services::sede_services.dart::SedeService" o-- "cloud_firestore::cloud_firestore.dart::FirebaseFirestore"
+
+class "geoface::services::time_service.dart::TimeService" {
+  {static} +dynamic getCurrentNetworkTime()
+}
+
+class "geoface::themes::app_theme.dart::AppTheme" {
+  {static} -Color _primarySeed
+  {static} -Color _secondarySeed
+  {static} -Color _tertiarySeed
+  {static} -Color _errorSeed
+  {static} +ThemeData lightTheme
+  {static} +ThemeData darkTheme
+  {static} -ThemeData _buildTheme()
+}
+
+"geoface::themes::app_theme.dart::AppTheme" o-- "dart::ui::Color"
+"geoface::themes::app_theme.dart::AppTheme" o-- "flutter::src::material::theme_data.dart::ThemeData"
+
+class "geoface::utils::location_helper.dart::LocationHelper" {
+  {static} +double calcularDistancia()
+}
+
+class "geoface::utils::pdf_report_generator.dart::PdfReportGenerator" {
+  +ReporteDetallado reporte
+  -Map<String, Empleado> _empleadoMap
+  {static} -PdfColor _primaryColor
+  {static} -PdfColor _accentColor
+  {static} -PdfColor _lightGreyColor
+  {static} -PdfColor _darkGreyColor
+  {static} -PdfColor _successColor
+  {static} -PdfColor _warningColor
+  {static} -PdfColor _errorColor
+  {static} -String _logoAssetPath
+  {static} -String _fontRegularPath
+  {static} -String _fontBoldPath
+  {static} -DateTime _horaLimiteTardanza
+  -String _getNombreEmpleado()
+  -dynamic _loadThemeData()
+  -dynamic _loadLogo()
+  +dynamic generateAndSharePdf()
+  -Widget _buildHeader()
+  -Widget _buildFooter()
+  -Widget _buildTitle()
+  -Widget _buildSummaryTable()
+  -Widget _summaryCell()
+  -Widget _buildDetails()
+  -Widget _buildDailyTable()
+  -TableRow _buildDataRow()
+  -Widget _statusCell()
+  -Page _buildEmptyReportPage()
+}
+
+"geoface::utils::pdf_report_generator.dart::PdfReportGenerator" o-- "geoface::controllers::reporte_controller.dart::ReporteDetallado"
+"geoface::utils::pdf_report_generator.dart::PdfReportGenerator" o-- "pdf::src::pdf::color.dart::PdfColor"
+
+class "geoface::utils::validators.dart::Validators" {
+  {static} +String? validateRequired()
+  {static} +String? validateEmail()
+  {static} +String? validatePassword()
+}
+
+class "geoface::views::admin::add_edit_admin_page.dart::AddEditAdminPage" {
+  +Usuario? admin
+  +State<AddEditAdminPage> createState()
+}
+
+"geoface::views::admin::add_edit_admin_page.dart::AddEditAdminPage" o-- "geoface::models::usuario.dart::Usuario"
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::admin::add_edit_admin_page.dart::AddEditAdminPage"
+
+class "geoface::views::admin::add_edit_admin_page.dart::_AddEditAdminPageState" {
+  -GlobalKey<FormState> _formKey
+  -TextEditingController _nombreController
+  -TextEditingController _correoController
+  -TextEditingController _passwordController
+  -bool _isEditMode
+  -bool _obscurePassword
+  -AnimationController _animationController
+  -AnimationController _formAnimationController
+  -Animation<double> _fadeAnimation
+  -Animation<Offset> _slideAnimation
+  +void initState()
+  +void dispose()
+  -dynamic _saveForm()
+  -Widget _buildHeaderSection()
+  -Widget _buildFormField()
+  +Widget build()
+}
+
+"geoface::views::admin::add_edit_admin_page.dart::_AddEditAdminPageState" o-- "flutter::src::widgets::framework.dart::GlobalKey<FormState>"
+"geoface::views::admin::add_edit_admin_page.dart::_AddEditAdminPageState" o-- "flutter::src::widgets::editable_text.dart::TextEditingController"
+"geoface::views::admin::add_edit_admin_page.dart::_AddEditAdminPageState" o-- "flutter::src::animation::animation_controller.dart::AnimationController"
+"geoface::views::admin::add_edit_admin_page.dart::_AddEditAdminPageState" o-- "flutter::src::animation::animation.dart::Animation<double>"
+"geoface::views::admin::add_edit_admin_page.dart::_AddEditAdminPageState" o-- "flutter::src::animation::animation.dart::Animation<Offset>"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::add_edit_admin_page.dart::_AddEditAdminPageState"
+"flutter::src::widgets::ticker_provider.dart::TickerProviderStateMixin" <|-- "geoface::views::admin::add_edit_admin_page.dart::_AddEditAdminPageState"
+
+class "geoface::views::admin::administradores_page.dart::AdministradoresPage" {
+  +State<AdministradoresPage> createState()
+}
+
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::admin::administradores_page.dart::AdministradoresPage"
+
+class "geoface::views::admin::administradores_page.dart::_AdministradoresPageState" {
+  -dynamic _administradoresFuture
+  -AnimationController _fabAnimationController
+  -Animation<double> _fabAnimation
+  +void initState()
+  +void dispose()
+  -void _loadData()
+  -dynamic _refreshData()
+  -void _navigateAndRefresh()
+  -void _toggleStatus()
+  +Widget build()
+}
+
+"geoface::views::admin::administradores_page.dart::_AdministradoresPageState" o-- "flutter::src::animation::animation_controller.dart::AnimationController"
+"geoface::views::admin::administradores_page.dart::_AdministradoresPageState" o-- "flutter::src::animation::animation.dart::Animation<double>"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::administradores_page.dart::_AdministradoresPageState"
+"flutter::src::widgets::ticker_provider.dart::TickerProviderStateMixin" <|-- "geoface::views::admin::administradores_page.dart::_AdministradoresPageState"
+
+class "geoface::views::admin::admin_layout.dart::AdminLayout" {
+  +State<AdminLayout> createState()
+}
+
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::admin::admin_layout.dart::AdminLayout"
+
+class "geoface::views::admin::admin_layout.dart::_AdminLayoutState" {
+  -TabController _tabController
+  -int _selectedIndex
+  -List<Widget> _pageCache
+  -List<String> _titles
+  -List<IconData> _icons
+  +void initState()
+  +void dispose()
+  -void _onItemTapped()
+  -void _showSettingsMenu()
+  -PageRouteBuilder<dynamic> _createSettingsRoute()
+  -void _showLogoutConfirmation()
+  +Widget build()
+  -PreferredSizeWidget _buildAppBar()
+  -Widget _buildBottomNav()
+  -Widget _buildNavItem()
+}
+
+"geoface::views::admin::admin_layout.dart::_AdminLayoutState" o-- "flutter::src::material::tab_controller.dart::TabController"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::admin_layout.dart::_AdminLayoutState"
+"flutter::src::widgets::ticker_provider.dart::SingleTickerProviderStateMixin" <|-- "geoface::views::admin::admin_layout.dart::_AdminLayoutState"
+
+class "geoface::views::admin::admin_layout.dart::_SettingsMenu" {
+  +Usuario currentUser
+  +dynamic Function(Widget) onNavigate
+  +void Function() onToggleTheme
+  +void Function() onLogout
+  +Widget build()
+  -Widget _buildProfileHeader()
+  -Widget _buildMenuSection()
+  -Widget _buildOptionTile()
+}
+
+"geoface::views::admin::admin_layout.dart::_SettingsMenu" o-- "geoface::models::usuario.dart::Usuario"
+"geoface::views::admin::admin_layout.dart::_SettingsMenu" o-- "null::dynamic Function(Widget)"
+"geoface::views::admin::admin_layout.dart::_SettingsMenu" o-- "dart::ui::void Function()"
+"flutter::src::widgets::framework.dart::StatelessWidget" <|-- "geoface::views::admin::admin_layout.dart::_SettingsMenu"
+
+class "geoface::views::admin::api_config_page.dart::ApiConfigPage" {
+  +State<ApiConfigPage> createState()
+}
+
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::admin::api_config_page.dart::ApiConfigPage"
+
+class "geoface::views::admin::api_config_page.dart::_ApiConfigPageState" {
+  -GlobalKey<FormState> _formKey
+  -TextEditingController _urlController
+  +void initState()
+  +void dispose()
+  -dynamic _saveUrl()
+  -dynamic _syncApi()
+  +Widget build()
+}
+
+"geoface::views::admin::api_config_page.dart::_ApiConfigPageState" o-- "flutter::src::widgets::framework.dart::GlobalKey<FormState>"
+"geoface::views::admin::api_config_page.dart::_ApiConfigPageState" o-- "flutter::src::widgets::editable_text.dart::TextEditingController"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::api_config_page.dart::_ApiConfigPageState"
+
+class "geoface::views::admin::cambiar_contrasena_page.dart::CambiarContrasenaPage" {
+  +State<CambiarContrasenaPage> createState()
+}
+
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::admin::cambiar_contrasena_page.dart::CambiarContrasenaPage"
+
+class "geoface::views::admin::cambiar_contrasena_page.dart::_CambiarContrasenaPageState" {
+  -GlobalKey<FormState> _formKey
+  -TextEditingController _currentPasswordController
+  -TextEditingController _newPasswordController
+  -TextEditingController _confirmPasswordController
+  -bool _currentPasswordVisible
+  -bool _newPasswordVisible
+  -bool _confirmPasswordVisible
+  +void dispose()
+  -void _showFeedback()
+  -dynamic _cambiarContrasena()
+  +Widget build()
+  -Widget _buildHeader()
+  -Widget _buildPasswordField()
+}
+
+"geoface::views::admin::cambiar_contrasena_page.dart::_CambiarContrasenaPageState" o-- "flutter::src::widgets::framework.dart::GlobalKey<FormState>"
+"geoface::views::admin::cambiar_contrasena_page.dart::_CambiarContrasenaPageState" o-- "flutter::src::widgets::editable_text.dart::TextEditingController"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::cambiar_contrasena_page.dart::_CambiarContrasenaPageState"
+
+class "geoface::views::admin::crear_administrador.dart::CrearAdministradorPage" {
+  +State<CrearAdministradorPage> createState()
+}
+
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::admin::crear_administrador.dart::CrearAdministradorPage"
+
+class "geoface::views::admin::crear_administrador.dart::_CrearAdministradorPageState" {
+  +TextEditingController nameController
+  +TextEditingController emailController
+  +TextEditingController passwordController
+  +GlobalKey<FormState> formKey
+  +bool isLoading
+  +void dispose()
+  -dynamic _createAdminUser()
+  +Widget build()
+}
+
+"geoface::views::admin::crear_administrador.dart::_CrearAdministradorPageState" o-- "flutter::src::widgets::editable_text.dart::TextEditingController"
+"geoface::views::admin::crear_administrador.dart::_CrearAdministradorPageState" o-- "flutter::src::widgets::framework.dart::GlobalKey<FormState>"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::crear_administrador.dart::_CrearAdministradorPageState"
+
+class "geoface::views::admin::custom_app_bar.dart::LoadingOverlay" {
+  +bool isLoading
+  +Widget child
+  +String? message
+  +Widget build()
+}
+
+"geoface::views::admin::custom_app_bar.dart::LoadingOverlay" o-- "flutter::src::widgets::framework.dart::Widget"
+"flutter::src::widgets::framework.dart::StatelessWidget" <|-- "geoface::views::admin::custom_app_bar.dart::LoadingOverlay"
+
+class "geoface::views::admin::dashboard_page.dart::DashboardPage" {
+  +void Function(int)? onNavigateToTab
+  +State<DashboardPage> createState()
+}
+
+"geoface::views::admin::dashboard_page.dart::DashboardPage" o-- "null::void Function(int)"
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::admin::dashboard_page.dart::DashboardPage"
+
+class "geoface::views::admin::dashboard_page.dart::_DashboardPageState" {
+  -AnimationController _animationController
+  -Animation<double> _fadeAnimation
+  -Animation<Offset> _slideAnimation
+  +void initState()
+  +void dispose()
+  -dynamic _loadData()
+  -int _getAsistenciasHoy()
+  -Map<String, int> _getAsistenciasPorSedeHoy()
+  +Widget build()
+  -Widget _buildLoadingWidget()
+  -Widget _buildErrorWidget()
+  -Widget _buildHeader()
+  -String _getGreeting()
+  -Widget _buildStatsGrid()
+  -Widget _buildModernStatCard()
+  -Widget _buildAsistenciasChart()
+  -Widget _buildEmptyChart()
+  -Widget _buildChart()
+  -String _getShortSedeName()
+  -Widget _buildSedesSection()
+  -Widget _buildEmptySedes()
+  -Widget _buildSedeCard()
+  -Widget _buildInsightCards()
+  -Widget _buildInsightCard()
+  -List<_InsightData> _generateInsights()
+}
+
+"geoface::views::admin::dashboard_page.dart::_DashboardPageState" o-- "flutter::src::animation::animation_controller.dart::AnimationController"
+"geoface::views::admin::dashboard_page.dart::_DashboardPageState" o-- "flutter::src::animation::animation.dart::Animation<double>"
+"geoface::views::admin::dashboard_page.dart::_DashboardPageState" o-- "flutter::src::animation::animation.dart::Animation<Offset>"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::dashboard_page.dart::_DashboardPageState"
+"flutter::src::widgets::ticker_provider.dart::TickerProviderStateMixin" <|-- "geoface::views::admin::dashboard_page.dart::_DashboardPageState"
+
+class "geoface::views::admin::dashboard_page.dart::_StatCardData" {
+  +String title
+  +String value
+  +String? total
+  +String? description
+  +IconData icon
+  +List<Color> gradient
+}
+
+"geoface::views::admin::dashboard_page.dart::_StatCardData" o-- "flutter::src::widgets::icon_data.dart::IconData"
+
+class "geoface::views::admin::dashboard_page.dart::_InsightData" {
+  +String title
+  +String description
+  +IconData icon
+  +Color color
+}
+
+"geoface::views::admin::dashboard_page.dart::_InsightData" o-- "flutter::src::widgets::icon_data.dart::IconData"
+"geoface::views::admin::dashboard_page.dart::_InsightData" o-- "dart::ui::Color"
+
+class "geoface::views::admin::empleados_page.dart::EmpleadosPage" {
+  +State<EmpleadosPage> createState()
+}
+
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::admin::empleados_page.dart::EmpleadosPage"
+
+class "geoface::views::admin::empleados_page.dart::_EmpleadosPageState" {
+  -TextEditingController _searchController
+  -FocusNode _searchFocusNode
+  -AnimationController _fabAnimationController
+  -AnimationController _searchAnimationController
+  -Animation<double> _fabAnimation
+  -Animation<double> _searchAnimation
+  -bool _isSearchExpanded
+  -String _selectedFilter
+  +void initState()
+  +void dispose()
+  -void _onSearchChanged()
+  -void _onSearchFocusChanged()
+  -void _expandSearch()
+  -void _collapseSearch()
+  -dynamic _refreshData()
+  -void _showFeedback()
+  -dynamic _toggleEmpleadoStatus()
+  -dynamic _deleteEmpleado()
+  -String _getInitials()
+  -List<Empleado> _filterEmpleados()
+  -void _navigateToForm()
+  -void _navigateToDetail()
+  -void _navigateToBiometrico()
+  +Widget build()
+  -Widget _buildLoadingState()
+  -Widget _buildHeader()
+  -Widget _buildSearchAndFilters()
+  -Widget _buildSearchBar()
+  -Widget _buildFilterChips()
+  -Widget _buildEmpleadosList()
+  -Widget _buildEmpleadoCard()
+  -Widget _buildEmptyState()
+  -Widget _buildNoResultsState()
+  -Widget _buildErrorState()
+  -void _showEmpleadoOptions()
+  -Widget _buildOptionTile()
+  -void _showDeleteConfirmation()
+}
+
+"geoface::views::admin::empleados_page.dart::_EmpleadosPageState" o-- "flutter::src::widgets::editable_text.dart::TextEditingController"
+"geoface::views::admin::empleados_page.dart::_EmpleadosPageState" o-- "flutter::src::widgets::focus_manager.dart::FocusNode"
+"geoface::views::admin::empleados_page.dart::_EmpleadosPageState" o-- "flutter::src::animation::animation_controller.dart::AnimationController"
+"geoface::views::admin::empleados_page.dart::_EmpleadosPageState" o-- "flutter::src::animation::animation.dart::Animation<double>"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::empleados_page.dart::_EmpleadosPageState"
+"flutter::src::widgets::ticker_provider.dart::TickerProviderStateMixin" <|-- "geoface::views::admin::empleados_page.dart::_EmpleadosPageState"
+
+class "geoface::views::admin::empleado_detail_page.dart::EmpleadoDetailPage" {
+  +String empleadoId
+  +State<EmpleadoDetailPage> createState()
+}
+
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::admin::empleado_detail_page.dart::EmpleadoDetailPage"
+
+class "geoface::views::admin::empleado_detail_page.dart::_EmpleadoDetailPageState" {
+  -GlobalKey<FormState> _formKey
+  -bool _isLoading
+  -bool _isEditing
+  -Empleado? _empleado
+  -TextEditingController _nombreController
+  -TextEditingController _apellidosController
+  -TextEditingController _dniController
+  -TextEditingController _celularController
+  -TextEditingController _correoController
+  -TextEditingController _cargoController
+  -String? _sedeSeleccionada
+  -EmpleadoController _empleadoController
+  -SedeController _sedeController
+  +void initState()
+  +void dispose()
+  -dynamic _loadData()
+  -void _populateControllers()
+  -dynamic _guardarCambios()
+  -void _navigateToBiometrico()
+  -void _mostrarNotificacion()
+  -String _getInitials()
+  -Widget _buildSectionHeader()
+  -Widget _buildTextField()
+  -Widget _buildDropdownField()
+  +Widget build()
+  -Widget _buildBody()
+  -Widget _buildProfileHeader()
+  -Widget _buildBiometricCard()
+  -Widget _buildActionButtons()
+}
+
+"geoface::views::admin::empleado_detail_page.dart::_EmpleadoDetailPageState" o-- "flutter::src::widgets::framework.dart::GlobalKey<FormState>"
+"geoface::views::admin::empleado_detail_page.dart::_EmpleadoDetailPageState" o-- "geoface::models::empleado.dart::Empleado"
+"geoface::views::admin::empleado_detail_page.dart::_EmpleadoDetailPageState" o-- "flutter::src::widgets::editable_text.dart::TextEditingController"
+"geoface::views::admin::empleado_detail_page.dart::_EmpleadoDetailPageState" o-- "geoface::controllers::empleado_controller.dart::EmpleadoController"
+"geoface::views::admin::empleado_detail_page.dart::_EmpleadoDetailPageState" o-- "geoface::controllers::sede_controller.dart::SedeController"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::empleado_detail_page.dart::_EmpleadoDetailPageState"
+
+class "geoface::views::admin::empleado_form_page.dart::EmpleadoFormPage" {
+  +Empleado? empleado
+  +State<EmpleadoFormPage> createState()
+}
+
+"geoface::views::admin::empleado_form_page.dart::EmpleadoFormPage" o-- "geoface::models::empleado.dart::Empleado"
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::admin::empleado_form_page.dart::EmpleadoFormPage"
+
+class "geoface::views::admin::empleado_form_page.dart::_EmpleadoFormPageState" {
+  -GlobalKey<FormState> _formKey
+  -TextEditingController _nombreController
+  -TextEditingController _apellidosController
+  -TextEditingController _dniController
+  -TextEditingController _celularController
+  -TextEditingController _correoController
+  -TextEditingController _cargoController
+  -String? _sedeSeleccionada
+  -bool _isLoading
+  -String? _dniError
+  -String? _correoError
+  -EmpleadoController _empleadoController
+  +void initState()
+  -void _onControllerUpdate()
+  +void dispose()
+  -dynamic _guardarEmpleado()
+  -void _mostrarNotificacion()
+  -Widget _buildSectionHeader()
+  -Widget _buildTextField()
+  -Widget _buildDropdownField()
+  +Widget build()
+}
+
+"geoface::views::admin::empleado_form_page.dart::_EmpleadoFormPageState" o-- "flutter::src::widgets::framework.dart::GlobalKey<FormState>"
+"geoface::views::admin::empleado_form_page.dart::_EmpleadoFormPageState" o-- "flutter::src::widgets::editable_text.dart::TextEditingController"
+"geoface::views::admin::empleado_form_page.dart::_EmpleadoFormPageState" o-- "geoface::controllers::empleado_controller.dart::EmpleadoController"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::empleado_form_page.dart::_EmpleadoFormPageState"
+
+class "geoface::views::admin::gestion_usuarios_empleados_page.dart::GestionUsuariosEmpleadosPage" {
+  +State<GestionUsuariosEmpleadosPage> createState()
+}
+
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::admin::gestion_usuarios_empleados_page.dart::GestionUsuariosEmpleadosPage"
+
+class "geoface::views::admin::gestion_usuarios_empleados_page.dart::_GestionUsuariosEmpleadosPageState" {
+  -dynamic _empleadosFuture
+  +void initState()
+  -void _loadData()
+  -dynamic _refreshData()
+  -void _handleAssignUser()
+  -void _handleResetPassword()
+  -void _showFeedback()
+  +Widget build()
+}
+
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::gestion_usuarios_empleados_page.dart::_GestionUsuariosEmpleadosPageState"
+
+class "geoface::views::admin::loading_overlay.dart::CustomAppBar" {
+  +String title
+  +String? subtitle
+  +void Function()? onBackPressed
+  +List<Widget>? actions
+  +bool centerTitle
+  +Color? backgroundColor
+  +Color? foregroundColor
+  +double elevation
+  +SystemUiOverlayStyle? systemOverlayStyle
+  +Size preferredSize
+  +Widget build()
+}
+
+"geoface::views::admin::loading_overlay.dart::CustomAppBar" o-- "dart::ui::void Function()"
+"geoface::views::admin::loading_overlay.dart::CustomAppBar" o-- "dart::ui::Color"
+"geoface::views::admin::loading_overlay.dart::CustomAppBar" o-- "flutter::src::services::system_chrome.dart::SystemUiOverlayStyle"
+"geoface::views::admin::loading_overlay.dart::CustomAppBar" o-- "dart::ui::Size"
+"flutter::src::widgets::framework.dart::StatelessWidget" <|-- "geoface::views::admin::loading_overlay.dart::CustomAppBar"
+"flutter::src::widgets::preferred_size.dart::PreferredSizeWidget" <|-- "geoface::views::admin::loading_overlay.dart::CustomAppBar"
+
+class "geoface::views::admin::registro_biometrico_page.dart::RegistroBiometricoScreen" {
+  +Empleado empleado
+  +State<RegistroBiometricoScreen> createState()
+}
+
+"geoface::views::admin::registro_biometrico_page.dart::RegistroBiometricoScreen" o-- "geoface::models::empleado.dart::Empleado"
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::admin::registro_biometrico_page.dart::RegistroBiometricoScreen"
+
+class "geoface::views::admin::registro_biometrico_page.dart::_RegistroBiometricoScreenState" {
+  -BiometricoController _controller
+  -bool _isLoading
+  -bool _hasExistingBiometric
+  -String? _biometricoId
+  -String? _biometricoUrl
+  -bool _showPreview
+  -bool _isCameraActive
+  -ImagePicker _picker
+  -File? _selectedImageFile
+  +void initState()
+  +void dispose()
+  -dynamic _disposeCamera()
+  +void didUpdateWidget()
+  +void didChangeAppLifecycleState()
+  -dynamic _initController()
+  -dynamic _checkExistingBiometric()
+  -dynamic _pickImage()
+  -dynamic _captureAndSaveBiometric()
+  -dynamic _deleteBiometric()
+  -dynamic _togglePreview()
+  -void _showErrorDialog()
+  -void _showDeleteConfirmDialog()
+  +Widget build()
+  -Widget _buildEmployeeInfoBar()
+  -Widget _buildMediaSection()
+  -Widget _buildStatusBar()
+  -Widget _buildActionButtons()
+}
+
+"geoface::views::admin::registro_biometrico_page.dart::_RegistroBiometricoScreenState" o-- "geoface::controllers::biometrico_controller.dart::BiometricoController"
+"geoface::views::admin::registro_biometrico_page.dart::_RegistroBiometricoScreenState" o-- "image_picker::image_picker.dart::ImagePicker"
+"geoface::views::admin::registro_biometrico_page.dart::_RegistroBiometricoScreenState" o-- "dart::io::File"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::registro_biometrico_page.dart::_RegistroBiometricoScreenState"
+"flutter::src::widgets::binding.dart::WidgetsBindingObserver" <|-- "geoface::views::admin::registro_biometrico_page.dart::_RegistroBiometricoScreenState"
+
+class "geoface::views::admin::reportes_page.dart::ReportesPage" {
+  +State<ReportesPage> createState()
+}
+
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::admin::reportes_page.dart::ReportesPage"
+
+class "geoface::views::admin::reportes_page.dart::_ReportesPageState" {
+  -DateTimeRange? _selectedDateRange
+  -String? _selectedSedeId
+  +void initState()
+  -dynamic _selectMonth()
+  +Widget build()
+  -Widget _buildFiltros()
+  -Widget _buildReporteContent()
+  -Widget _buildResumenCard()
+  -Widget _buildDiaCard()
+  -ListTile _buildAsistenciaTile()
+  -ListTile _buildAusenciaTile()
+  -Widget _buildInitialMessage()
+  -Widget _buildErrorWidget()
+}
+
+"geoface::views::admin::reportes_page.dart::_ReportesPageState" o-- "flutter::src::material::date.dart::DateTimeRange"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::reportes_page.dart::_ReportesPageState"
+
+class "geoface::views::admin::reportes_page.dart::_ResumenStatItem" {
+  +IconData icon
+  +Color color
+  +String label
+  +String value
+  +Widget build()
+}
+
+"geoface::views::admin::reportes_page.dart::_ResumenStatItem" o-- "flutter::src::widgets::icon_data.dart::IconData"
+"geoface::views::admin::reportes_page.dart::_ResumenStatItem" o-- "dart::ui::Color"
+"flutter::src::widgets::framework.dart::StatelessWidget" <|-- "geoface::views::admin::reportes_page.dart::_ResumenStatItem"
+
+class "geoface::views::admin::sedes_page.dart::SedesPage" {
+  +State<SedesPage> createState()
+}
+
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::admin::sedes_page.dart::SedesPage"
+
+class "geoface::views::admin::sedes_page.dart::_SedesPageState" {
+  -TextEditingController _searchController
+  -String _searchQuery
+  +void initState()
+  +void dispose()
+  -dynamic _loadData()
+  -dynamic _toggleSedeStatus()
+  -dynamic _deleteSede()
+  -void _navigateToDetail()
+  -void _showSedeOptions()
+  -Widget _buildOptionButton()
+  -void _showDeleteConfirmation()
+  -Widget _buildInfoRow()
+  -List<Sede> _filterSedes()
+  +Widget build()
+  -Widget _buildSedeCard()
+  -Widget _buildActionButton()
+}
+
+"geoface::views::admin::sedes_page.dart::_SedesPageState" o-- "flutter::src::widgets::editable_text.dart::TextEditingController"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::sedes_page.dart::_SedesPageState"
+
+class "geoface::views::admin::sede_detail_page.dart::SedeDetailPage" {
+  +String sedeId
+  +Widget build()
+}
+
+"flutter::src::widgets::framework.dart::StatelessWidget" <|-- "geoface::views::admin::sede_detail_page.dart::SedeDetailPage"
+
+class "geoface::views::admin::sede_form_page.dart::SedeFormPage" {
+  +Sede? sede
+  +State<SedeFormPage> createState()
+}
+
+"geoface::views::admin::sede_form_page.dart::SedeFormPage" o-- "geoface::models::sede.dart::Sede"
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::admin::sede_form_page.dart::SedeFormPage"
+
+class "geoface::views::admin::sede_form_page.dart::_SedeFormPageState" {
+  -GlobalKey<FormState> _formKey
+  -TextEditingController _nombreController
+  -TextEditingController _direccionController
+  -TextEditingController _latitudController
+  -TextEditingController _longitudController
+  -TextEditingController _radioPermitidoController
+  -bool _activa
+  -bool _isEditing
+  +void initState()
+  +void dispose()
+  -dynamic _submitForm()
+  +Widget build()
+}
+
+"geoface::views::admin::sede_form_page.dart::_SedeFormPageState" o-- "flutter::src::widgets::framework.dart::GlobalKey<FormState>"
+"geoface::views::admin::sede_form_page.dart::_SedeFormPageState" o-- "flutter::src::widgets::editable_text.dart::TextEditingController"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::sede_form_page.dart::_SedeFormPageState"
+
+class "geoface::views::auth::login_page.dart::LoginPage" {
+  +State<LoginPage> createState()
+}
+
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::auth::login_page.dart::LoginPage"
+
+class "geoface::views::auth::login_page.dart::_LoginPageState" {
+  -GlobalKey<FormState> _formKey
+  -TextEditingController _emailController
+  -TextEditingController _passwordController
+  -bool _obscurePassword
+  +void dispose()
+  -dynamic _login()
+  -void _goBack()
+  +Widget build()
+}
+
+"geoface::views::auth::login_page.dart::_LoginPageState" o-- "flutter::src::widgets::framework.dart::GlobalKey<FormState>"
+"geoface::views::auth::login_page.dart::_LoginPageState" o-- "flutter::src::widgets::editable_text.dart::TextEditingController"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::auth::login_page.dart::_LoginPageState"
+
+class "geoface::views::empleado::marcar_asistencia_page.dart::MarcarAsistenciaPage" {
+  +State<MarcarAsistenciaPage> createState()
+}
+
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::empleado::marcar_asistencia_page.dart::MarcarAsistenciaPage"
+
+class "geoface::views::empleado::marcar_asistencia_page.dart::_MarcarAsistenciaPageState" {
+  -MarcacionFlowState _flowState
+  -CameraController? _cameraController
+  -TextEditingController _dniController
+  -FirebaseService _firebaseService
+  -String? _recognitionApiUrl
+  -Empleado? _empleado
+  -Sede? _sede
+  -Asistencia? _asistenciaDelDia
+  -Position? _currentPosition
+  -bool _isDentroDelRadio
+  -bool _esEntrada
+  -bool _isFaceVerified
+  -Uint8List? _capturedImageBytes
+  -bool _isCameraInitialized
+  -bool _isProcessing
+  -String _statusMessage
+  +void initState()
+  +void dispose()
+  -dynamic _initializeServices()
+  -dynamic _handleFaceVerification()
+  -void _showCustomInfoDialog()
+  -dynamic _processImageToBytes()
+  -dynamic _handleIdentityVerification()
+  -dynamic _handleMarkAttendance()
+  +void didChangeAppLifecycleState()
+  -dynamic _initializeCamera()
+  -dynamic _getCurrentLocation()
+  +Widget build()
+  -Widget _buildCurrentView()
+  -Widget _buildInitialOrErrorView()
+  -Widget _buildProcessingView()
+  -Widget _buildCameraView()
+  -Widget _buildConfirmationView()
+  -Widget _buildStepCard()
+  -Widget _buildStatusCard()
+  -Widget _buildStatusCheckRow()
+  -Widget _buildActionButton()
+  -Widget _buildInfoRow()
+  -Widget _buildEmpleadoInfoCard()
+  -void _showInfoDialog()
+  -void _showSuccessDialog()
+}
+
+"geoface::views::empleado::marcar_asistencia_page.dart::_MarcarAsistenciaPageState" o-- "geoface::views::empleado::marcar_asistencia_page.dart::MarcacionFlowState"
+"geoface::views::empleado::marcar_asistencia_page.dart::_MarcarAsistenciaPageState" o-- "camera::src::camera_controller.dart::CameraController"
+"geoface::views::empleado::marcar_asistencia_page.dart::_MarcarAsistenciaPageState" o-- "flutter::src::widgets::editable_text.dart::TextEditingController"
+"geoface::views::empleado::marcar_asistencia_page.dart::_MarcarAsistenciaPageState" o-- "geoface::services::firebase_service.dart::FirebaseService"
+"geoface::views::empleado::marcar_asistencia_page.dart::_MarcarAsistenciaPageState" o-- "geoface::models::empleado.dart::Empleado"
+"geoface::views::empleado::marcar_asistencia_page.dart::_MarcarAsistenciaPageState" o-- "geoface::models::sede.dart::Sede"
+"geoface::views::empleado::marcar_asistencia_page.dart::_MarcarAsistenciaPageState" o-- "geoface::models::asistencia.dart::Asistencia"
+"geoface::views::empleado::marcar_asistencia_page.dart::_MarcarAsistenciaPageState" o-- "geolocator_platform_interface::src::models::position.dart::Position"
+"geoface::views::empleado::marcar_asistencia_page.dart::_MarcarAsistenciaPageState" o-- "dart::typed_data::Uint8List"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::empleado::marcar_asistencia_page.dart::_MarcarAsistenciaPageState"
+"flutter::src::widgets::binding.dart::WidgetsBindingObserver" <|-- "geoface::views::empleado::marcar_asistencia_page.dart::_MarcarAsistenciaPageState"
+
+class "geoface::views::empleado::marcar_asistencia_page.dart::MarcacionFlowState" {
+  +int index
+  {static} +List<MarcacionFlowState> values
+  {static} +MarcacionFlowState inicializando
+  {static} +MarcacionFlowState errorServicios
+  {static} +MarcacionFlowState verificacionFacial
+  {static} +MarcacionFlowState verificandoIdentidad
+  {static} +MarcacionFlowState confirmacion
+  {static} +MarcacionFlowState jornadaCompletada
+}
+
+"geoface::views::empleado::marcar_asistencia_page.dart::MarcacionFlowState" o-- "geoface::views::empleado::marcar_asistencia_page.dart::MarcacionFlowState"
+"dart::core::Enum" <|-- "geoface::views::empleado::marcar_asistencia_page.dart::MarcacionFlowState"
+
+class "geoface::views::main_menu_screen.dart::TimeService" {
+  {static} -TimeService _instance
+  {static} -List<Map<String, String>> _timeApis
+  -DateTime? _baseApiTime
+  -Stopwatch _syncStopwatch
+  -String _currentTimeSource
+  -bool _isOnline
+  -Timer? _syncTimer
+  +String timeSource
+  +bool isOnline
+  +dynamic getCurrentTime()
+  -dynamic _attemptTimeSync()
+  -DateTime? _parseTimeResponse()
+  -bool _isTimeReasonable()
+  +void initialize()
+  +dynamic forceSync()
+  +void dispose()
+}
+
+"geoface::views::main_menu_screen.dart::TimeService" o-- "geoface::views::main_menu_screen.dart::TimeService"
+"geoface::views::main_menu_screen.dart::TimeService" o-- "dart::async::Timer"
+
+class "geoface::views::main_menu_screen.dart::ResponsiveConfig" {
+  +double screenWidth
+  +double screenHeight
+  +bool isPortrait
+  +bool isXSmall
+  +bool isSmall
+  +bool isMedium
+  +bool isLarge
+  +bool isXLarge
+  +double dateSize
+  +double timeSize
+  +double titleSize
+  +double buttonTextSize
+  +double statusSize
+  +double padding
+  +double margin
+  +double buttonHeight
+  +double iconSize
+  +double buttonIconSize
+}
+
+class "geoface::views::main_menu_screen.dart::MainMenuScreen" {
+  +void Function(BuildContext) onMarkAttendance
+  +void Function(BuildContext) onAdminLogin
+  +State<MainMenuScreen> createState()
+}
+
+"geoface::views::main_menu_screen.dart::MainMenuScreen" o-- "null::void Function(BuildContext)"
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::main_menu_screen.dart::MainMenuScreen"
+
+class "geoface::views::main_menu_screen.dart::_MainMenuScreenState" {
+  -DateTime _currentTime
+  -Timer _timer
+  -AnimationController _pulseController
+  -AnimationController _syncController
+  -Animation<double> _pulseAnimation
+  -Animation<double> _syncAnimation
+  -AnimationController _entryController
+  -Animation<double> _headerFade
+  -Animation<double> _cardFade
+  -Animation<double> _buttonFade
+  -bool _isMenuOpen
+  -bool _isInitializing
+  -bool _isSyncing
+  -bool _isCheckingGps
+  -TimeService _timeService
+  {static} -Color _primaryColor
+  {static} -Color _secondaryColor
+  {static} -Color _accentColor
+  +void initState()
+  -dynamic _initializeApp()
+  -void _setupAnimations()
+  -dynamic _initializeTime()
+  -void _setupTimers()
+  -dynamic _performManualSync()
+  -void _showGpsErrorDialog()
+  -dynamic _handleMarkAttendance()
+  +void dispose()
+  -void _toggleMenu()
+  +Widget build()
+  -BoxDecoration _buildGradientBackground()
+  -Widget _buildLoadingScreen()
+  -Widget _buildMainContent()
+  -Widget _buildHeader()
+  -Widget _buildSyncIndicator()
+  -Widget _buildMenuButton()
+  -Widget _buildTimeCard()
+  -Widget _buildTimeSource()
+  -Widget _buildAttendanceButton()
+  -Widget _buildConnectionStatus()
+  -Widget _buildAdminAccess()
+  -Widget _buildMenuOverlay()
+  -Widget _buildMenuContent()
+  -Widget _buildMenuHeader()
+  -Widget _buildTechnicalInfo()
+  -Widget _buildInfoRow()
+  -Widget _buildCopyright()
+}
+
+"geoface::views::main_menu_screen.dart::_MainMenuScreenState" o-- "dart::async::Timer"
+"geoface::views::main_menu_screen.dart::_MainMenuScreenState" o-- "flutter::src::animation::animation_controller.dart::AnimationController"
+"geoface::views::main_menu_screen.dart::_MainMenuScreenState" o-- "flutter::src::animation::animation.dart::Animation<double>"
+"geoface::views::main_menu_screen.dart::_MainMenuScreenState" o-- "geoface::views::main_menu_screen.dart::TimeService"
+"geoface::views::main_menu_screen.dart::_MainMenuScreenState" o-- "dart::ui::Color"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::main_menu_screen.dart::_MainMenuScreenState"
+"flutter::src::widgets::ticker_provider.dart::TickerProviderStateMixin" <|-- "geoface::views::main_menu_screen.dart::_MainMenuScreenState"
+
+class "geoface::views::permissions_handler.dart::PermissionsHandlerScreen" {
+  +void Function() onPermissionsGranted
+  +State<PermissionsHandlerScreen> createState()
+}
+
+"geoface::views::permissions_handler.dart::PermissionsHandlerScreen" o-- "dart::ui::void Function()"
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::permissions_handler.dart::PermissionsHandlerScreen"
+
+class "geoface::views::permissions_handler.dart::_PermissionsHandlerScreenState" {
+  -List<PermissionInfo> _permissions
+  -PageController _pageController
+  -AnimationController _progressAnimationController
+  -Animation<double> _progressAnimation
+  -int _currentPage
+  -bool _isLoading
+  -bool _showSummary
+  -Map<Permission, PermissionStatus> _permissionStatus
+  +void initState()
+  +void dispose()
+  -void _updateProgressValue()
+  -dynamic _checkPermissions()
+  -dynamic _requestCurrentPermission()
+  -void _goToNextPage()
+  -void _checkAllPermissionsGranted()
+  +Widget build()
+  -Widget _buildPermissionsFlow()
+  -Widget _buildPermissionPage()
+  -Widget _buildPermissionsSummary()
+  -Widget _buildPermissionListItem()
+}
+
+"geoface::views::permissions_handler.dart::_PermissionsHandlerScreenState" o-- "flutter::src::widgets::page_view.dart::PageController"
+"geoface::views::permissions_handler.dart::_PermissionsHandlerScreenState" o-- "flutter::src::animation::animation_controller.dart::AnimationController"
+"geoface::views::permissions_handler.dart::_PermissionsHandlerScreenState" o-- "flutter::src::animation::animation.dart::Animation<double>"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::permissions_handler.dart::_PermissionsHandlerScreenState"
+"flutter::src::widgets::ticker_provider.dart::TickerProviderStateMixin" <|-- "geoface::views::permissions_handler.dart::_PermissionsHandlerScreenState"
+
+class "geoface::views::permissions_handler.dart::PermissionInfo" {
+  +Permission permission
+  +String title
+  +String description
+  +IconData icon
+  +String lottieAsset
+}
+
+"geoface::views::permissions_handler.dart::PermissionInfo" o-- "permission_handler_platform_interface::permission_handler_platform_interface.dart::Permission"
+"geoface::views::permissions_handler.dart::PermissionInfo" o-- "flutter::src::widgets::icon_data.dart::IconData"
+
+
+@enduml

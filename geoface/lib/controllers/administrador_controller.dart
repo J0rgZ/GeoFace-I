@@ -1,11 +1,15 @@
 // FILE: lib/controllers/administrador_controller.dart
-
 import 'package:flutter/material.dart';
 import '../models/usuario.dart';
 import '../services/administrador_service.dart';
 
 class AdministradorController with ChangeNotifier {
   final AdministradorService _adminService = AdministradorService();
+  final bool _loading = false;
+
+  // Getters
+  bool get loading => _loading;
+  
   
   bool _isLoading = false;
   String? _errorMessage;
