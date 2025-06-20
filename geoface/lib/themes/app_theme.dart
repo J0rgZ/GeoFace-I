@@ -9,10 +9,10 @@ class AppTheme {
   AppTheme._();
 
   // --- PALETA DE COLORES BASE ---
-  static const Color _primarySeed = Color.fromARGB(255, 76, 3, 126); // Un verde azulado, elegante y menos saturado.
-  static const Color _secondarySeed = Color.fromARGB(255, 72, 61, 83); // Pizarra/Carbón como secundario.
-  static const Color _tertiarySeed = Color(0xFF546E7A); // Un tono más claro para acentos.
-  static const Color _errorSeed = Color(0xFFE53935);   // Rojo controlado para errores.
+  static const Color _primarySeed = Color.fromARGB(255, 61, 3, 100);
+  static const Color _secondarySeed = Color.fromARGB(255, 72, 61, 83);
+  static const Color _tertiarySeed = Color(0xFF546E7A);
+  static const Color _errorSeed = Color(0xFFE53935);
 
   // --- TEMAS PRINCIPALES ---
   static final ThemeData lightTheme = _buildTheme(

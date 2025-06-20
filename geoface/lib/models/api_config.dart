@@ -1,24 +1,37 @@
-// lib/models/api_config.dart
-
 class ApiConfig {
-  final String faceRecognitionApiUrl;
+  final String identificationApiUrl;
+  final String syncApiUrl;
 
-  ApiConfig({required this.faceRecognitionApiUrl});
+  ApiConfig({
+    required this.identificationApiUrl,
+    required this.syncApiUrl,
+  });
 
-  /// Factory para crear una instancia desde un mapa (como el de Firestore)
+  /// Deriva la URL base (sin /endpoint) desde la URL de identificación.
+  String get baseUrl {
+    if (identificationApiUrl.endsWith('/identificar')) {
+      return identificationApiUrl.substring(0, identificationApiUrl.length - '/identificar'.length);
+    }
+    if (syncApiUrl.endsWith('/sync-database')) {
+       return syncApiUrl.substring(0, syncApiUrl.length - '/sync-database'.length);
+    }
+    // Si no tiene el formato esperado, devolvemos la de identificación como fallback.
+    return identificationApiUrl;
+  }
+
   factory ApiConfig.fromMap(Map<String, dynamic> map) {
     return ApiConfig(
-      faceRecognitionApiUrl: map['faceRecognitionApiUrl'] as String? ?? '',
+      identificationApiUrl: map['identificationApiUrl'] as String? ?? '',
+      syncApiUrl: map['syncApiUrl'] as String? ?? '',
     );
   }
 
-  /// Método para convertir la instancia a un mapa (para guardarlo en Firestore)
   Map<String, dynamic> toMap() {
     return {
-      'faceRecognitionApiUrl': faceRecognitionApiUrl,
+      'identificationApiUrl': identificationApiUrl,
+      'syncApiUrl': syncApiUrl,
     };
   }
 
-  /// Un objeto vacío para estados iniciales o de error
-  static ApiConfig get empty => ApiConfig(faceRecognitionApiUrl: '');
+  static ApiConfig get empty => ApiConfig(identificationApiUrl: '', syncApiUrl: '');
 }

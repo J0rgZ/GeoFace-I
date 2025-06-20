@@ -1,6 +1,7 @@
 // services/firebase_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:geoface/models/api_config.dart';
 import '../app_config.dart';
 import '../models/empleado.dart';
 import '../models/sede.dart';
@@ -333,32 +334,32 @@ class FirebaseService {
 
   sendPasswordResetEmail(String correo) {}
 
-  // --- NUEVOS MÉTODOS PARA LA CONFIGURACIÓN DE LA API ---
- /// Guarda la URL de la API de reconocimiento facial en Firestore.
-  Future<void> saveFaceApiUrl(String url) async {
+  // --- MÉTODOS PARA LA CONFIGURACIÓN DE LA API (VERSIÓN MEJORADA) ---
+  /// Guarda el objeto de configuración completo de la API en Firestore.
+  Future<void> saveApiConfig(ApiConfig config) async {
     try {
-      // Usamos _firestore en lugar de _db
-      await _firestore.collection('app_config').doc('settings').set({
-        'faceRecognitionApiUrl': url,
-      }, SetOptions(merge: true));
+      await _firestore.collection('app_config').doc('settings').set(
+        config.toMap(), 
+        SetOptions(merge: true)
+      );
     } catch (e) {
-      print("Error al guardar la URL de la API: $e");
+      print("Error al guardar la configuración de la API: $e");
       throw Exception("No se pudo guardar la configuración. Inténtalo de nuevo.");
     }
   }
 
-  /// Obtiene la URL de la API de reconocimiento facial desde Firestore.
-  Future<String?> getFaceApiUrl() async {
+  /// Obtiene el objeto de configuración completo de la API desde Firestore.
+  Future<ApiConfig> getApiConfig() async {
     try {
-      // Usamos _firestore en lugar de _db
       final docSnapshot = await _firestore.collection('app_config').doc('settings').get();
       if (docSnapshot.exists && docSnapshot.data() != null) {
-        return docSnapshot.data()!['faceRecognitionApiUrl'] as String?;
+        return ApiConfig.fromMap(docSnapshot.data()!);
       }
-      return null;
+      // Si no existe, devuelve una configuración vacía.
+      return ApiConfig.empty;
     } catch (e) {
-      print("Error al obtener la URL de la API: $e");
-      return null;
+      print("Error al obtener la configuración de la API: $e");
+      throw Exception("No se pudo cargar la configuración de la API.");
     }
   }
 }

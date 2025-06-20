@@ -95,11 +95,11 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
       
       // Aseguramos que la configuración esté cargada.
       // Si el controlador se crea al inicio de la app, esto debería ser instantáneo.
-      if(apiConfigController.apiConfig.faceRecognitionApiUrl.isEmpty){
+      if(apiConfigController.apiConfig.identificationApiUrl.isEmpty){
         await apiConfigController.loadApiConfig();
       }
 
-      _recognitionApiUrl = apiConfigController.apiConfig.faceRecognitionApiUrl;
+      _recognitionApiUrl = apiConfigController.apiConfig.identificationApiUrl;
 
       // Verificamos si la URL fue encontrada.
       if (_recognitionApiUrl == null || _recognitionApiUrl!.isEmpty) {

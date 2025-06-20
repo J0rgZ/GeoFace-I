@@ -1,6 +1,7 @@
 // lib/controllers/api_config_controller.dart
 
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../models/api_config.dart';
 import '../services/firebase_service.dart';
 
@@ -9,26 +10,24 @@ class ApiConfigController with ChangeNotifier {
 
   ApiConfig _apiConfig = ApiConfig.empty;
   bool _isLoading = false;
+  bool _isSyncing = false; // <-- Nuevo estado para el botón de sincronizar
   String? _error;
 
-  // Getters para que la UI acceda al estado de forma segura
+  // Getters
   ApiConfig get apiConfig => _apiConfig;
   bool get isLoading => _isLoading;
+  bool get isSyncing => _isSyncing; // <-- Getter para el nuevo estado
   String? get error => _error;
 
   ApiConfigController() {
-    // Carga la configuración inicial al crear el controlador
     loadApiConfig();
   }
 
-  /// Carga la configuración de la API desde Firebase.
   Future<void> loadApiConfig() async {
     _setLoading(true);
     _error = null;
-
     try {
-      final url = await _firebaseService.getFaceApiUrl();
-      _apiConfig = ApiConfig(faceRecognitionApiUrl: url ?? '');
+      _apiConfig = await _firebaseService.getApiConfig();
     } catch (e) {
       _error = "Error al cargar la configuración: ${e.toString()}";
       _apiConfig = ApiConfig.empty;
@@ -37,33 +36,61 @@ class ApiConfigController with ChangeNotifier {
     }
   }
 
-  /// Guarda la nueva configuración de la API en Firebase.
-  /// Retorna `true` si fue exitoso, `false` en caso de error.
-  Future<bool> saveApiConfig(String newUrl) async {
+  /// Guarda la configuración a partir de una URL base.
+  Future<bool> saveApiConfigFromBaseUrl(String baseUrl) async {
     _setLoading(true);
     _error = null;
 
-    // Validación simple
-    if (newUrl.trim().isEmpty || !Uri.tryParse(newUrl.trim())!.isAbsolute) {
-      _error = "Por favor, ingresa una URL válida.";
+    final trimmedUrl = baseUrl.trim();
+    if (trimmedUrl.isEmpty || !Uri.tryParse(trimmedUrl)!.isAbsolute) {
+      _error = "Por favor, ingresa una URL base válida (ej: https://...).";
       _setLoading(false);
       return false;
     }
 
+    // Construimos las URLs completas
+    final newConfig = ApiConfig(
+      identificationApiUrl: '$trimmedUrl/identificar',
+      syncApiUrl: '$trimmedUrl/sync-database',
+    );
+
     try {
-      await _firebaseService.saveFaceApiUrl(newUrl.trim());
-      // Actualiza el estado local después de guardar exitosamente
-      _apiConfig = ApiConfig(faceRecognitionApiUrl: newUrl.trim());
+      await _firebaseService.saveApiConfig(newConfig);
+      _apiConfig = newConfig; // Actualiza el estado local
       _setLoading(false);
-      return true; // Éxito
+      return true;
     } catch (e) {
-      _error = "Error al guardar la configuración: ${e.toString()}";
+      _error = "Error al guardar: ${e.toString()}";
       _setLoading(false);
-      return false; // Error
+      return false;
+    }
+  }
+  
+  /// NUEVO: Llama al endpoint de sincronización de la API.
+  Future<String> syncRemoteDatabase() async {
+    if (_apiConfig.syncApiUrl.isEmpty) {
+      return "Error: No hay una URL de sincronización configurada.";
+    }
+
+    _isSyncing = true;
+    notifyListeners();
+
+    try {
+      final response = await http.post(Uri.parse(_apiConfig.syncApiUrl));
+
+      if (response.statusCode == 200) {
+        return "✅ ¡Éxito! La base de datos de la API se está actualizando.";
+      } else {
+        return "❌ Error (${response.statusCode}): No se pudo sincronizar. Revisa la consola de la API.";
+      }
+    } catch (e) {
+      return "❌ Error de conexión: No se pudo contactar a la API. ¿Está encendida y la URL es correcta?";
+    } finally {
+      _isSyncing = false;
+      notifyListeners();
     }
   }
 
-  // Método privado para manejar el estado de carga y notificar a los oyentes.
   void _setLoading(bool loadingState) {
     _isLoading = loadingState;
     notifyListeners();
