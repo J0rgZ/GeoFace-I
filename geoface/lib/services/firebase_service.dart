@@ -121,6 +121,14 @@ class FirebaseService {
     await _firestore.collection(AppConfig.sedesCollection).doc(id).delete();
   }
 
+  
+  Future<void> updateSedeStatus(String id, bool activa) async {
+    return _firestore.collection(AppConfig.sedesCollection).doc(id).update({
+      'activa': activa,
+      'fechaModificacion': Timestamp.now(),
+    });
+  }
+
   // Asistencia methods
   Future<List<Asistencia>> getAsistenciasByEmpleado(String empleadoId) async {
     final snapshot = await _firestore

@@ -4,7 +4,7 @@ class Sede {
   final String direccion;
   final double latitud;
   final double longitud;
-  final int radioPermitido; // Radio en metros para marcar asistencia
+  final int radioPermitido;
   final bool activa;
   final DateTime fechaCreacion;
   final DateTime? fechaModificacion;
@@ -75,8 +75,6 @@ class Sede {
     );
   }
 
-   /// Un constructor estático para crear una instancia de Sede "vacía" o por defecto.
-  /// Útil para inicializaciones o como valor de fallback.
   static Sede empty() {
     return Sede(
       id: '',
