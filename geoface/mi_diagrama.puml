@@ -494,6 +494,7 @@ class "geoface::services::firebase_service.dart::FirebaseService" {
   +dynamic addSede()
   +dynamic updateSede()
   +dynamic deleteSede()
+  +dynamic updateSedeStatus()
   +dynamic getAsistenciasByEmpleado()
   +dynamic getActiveAsistencia()
   +dynamic registrarEntrada()
@@ -535,8 +536,6 @@ class "geoface::services::time_service.dart::TimeService" {
 
 class "geoface::themes::app_theme.dart::AppTheme" {
   {static} -Color _primarySeed
-  {static} -Color _secondarySeed
-  {static} -Color _tertiarySeed
   {static} -Color _errorSeed
   {static} +ThemeData lightTheme
   {static} +ThemeData darkTheme
@@ -787,21 +786,21 @@ class "geoface::views::admin::dashboard_page.dart::_DashboardPageState" {
   -int _getAsistenciasHoy()
   -Map<String, int> _getAsistenciasPorSedeHoy()
   +Widget build()
-  -Widget _buildLoadingWidget()
+  -Widget _buildLoadingSkeleton()
   -Widget _buildErrorWidget()
   -Widget _buildHeader()
   -String _getGreeting()
   -Widget _buildStatsGrid()
   -Widget _buildModernStatCard()
   -Widget _buildAsistenciasChart()
-  -Widget _buildEmptyChart()
-  -Widget _buildChart()
-  -String _getShortSedeName()
+  -Widget _buildChartContent()
   -Widget _buildSedesSection()
-  -Widget _buildEmptySedes()
   -Widget _buildSedeCard()
   -Widget _buildInsightCards()
   -Widget _buildInsightCard()
+  -Widget _buildSectionHeader()
+  -Widget _buildEmptyState()
+  -Widget _buildStatChip()
   -List<_InsightData> _generateInsights()
 }
 
@@ -817,10 +816,12 @@ class "geoface::views::admin::dashboard_page.dart::_StatCardData" {
   +String? total
   +String? description
   +IconData icon
-  +List<Color> gradient
+  +Color color
+  +Color onColor
 }
 
 "geoface::views::admin::dashboard_page.dart::_StatCardData" o-- "flutter::src::widgets::icon_data.dart::IconData"
+"geoface::views::admin::dashboard_page.dart::_StatCardData" o-- "dart::ui::Color"
 
 class "geoface::views::admin::dashboard_page.dart::_InsightData" {
   +String title
@@ -1059,23 +1060,47 @@ class "geoface::views::admin::reportes_page.dart::ReportesPage" {
 "flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::admin::reportes_page.dart::ReportesPage"
 
 class "geoface::views::admin::reportes_page.dart::_ReportesPageState" {
-  -DateTimeRange? _selectedDateRange
-  -String? _selectedSedeId
+  -DateTime _selectedMonth
   +void initState()
   -dynamic _selectMonth()
   +Widget build()
-  -Widget _buildFiltros()
+  -Widget _buildReporteBody()
+  -Widget _buildLoadingSkeleton()
   -Widget _buildReporteContent()
-  -Widget _buildResumenCard()
-  -Widget _buildDiaCard()
-  -ListTile _buildAsistenciaTile()
-  -ListTile _buildAusenciaTile()
-  -Widget _buildInitialMessage()
-  -Widget _buildErrorWidget()
 }
 
-"geoface::views::admin::reportes_page.dart::_ReportesPageState" o-- "flutter::src::material::date.dart::DateTimeRange"
 "flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::reportes_page.dart::_ReportesPageState"
+
+class "geoface::views::admin::reportes_page.dart::_FiltrosCard" {
+  +DateTime selectedMonth
+  +List<Sede> sedes
+  +void Function() onSelectMonth
+  +dynamic Function(String?) onGenerarReporte
+  +State<_FiltrosCard> createState()
+}
+
+"geoface::views::admin::reportes_page.dart::_FiltrosCard" o-- "dart::ui::void Function()"
+"geoface::views::admin::reportes_page.dart::_FiltrosCard" o-- "null::dynamic Function(String)"
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::admin::reportes_page.dart::_FiltrosCard"
+
+class "geoface::views::admin::reportes_page.dart::_FiltrosCardState" {
+  -String? _selectedSedeId
+  -GlobalKey<FormState> _formKey
+  +Widget build()
+}
+
+"geoface::views::admin::reportes_page.dart::_FiltrosCardState" o-- "flutter::src::widgets::framework.dart::GlobalKey<FormState>"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::reportes_page.dart::_FiltrosCardState"
+
+class "geoface::views::admin::reportes_page.dart::_ResumenReporteCard" {
+  +dynamic resumen
+  +bool isExporting
+  +void Function() onExport
+  +Widget build()
+}
+
+"geoface::views::admin::reportes_page.dart::_ResumenReporteCard" o-- "dart::ui::void Function()"
+"flutter::src::widgets::framework.dart::StatelessWidget" <|-- "geoface::views::admin::reportes_page.dart::_ResumenReporteCard"
 
 class "geoface::views::admin::reportes_page.dart::_ResumenStatItem" {
   +IconData icon
@@ -1089,6 +1114,32 @@ class "geoface::views::admin::reportes_page.dart::_ResumenStatItem" {
 "geoface::views::admin::reportes_page.dart::_ResumenStatItem" o-- "dart::ui::Color"
 "flutter::src::widgets::framework.dart::StatelessWidget" <|-- "geoface::views::admin::reportes_page.dart::_ResumenStatItem"
 
+class "geoface::views::admin::reportes_page.dart::_DiaExpansionTile" {
+  +DateTime dia
+  +List<Asistencia> asistencias
+  +List<Empleado> ausentes
+  +Empleado? Function(String) getEmpleadoById
+  +Widget build()
+  -Widget _buildAsistenciaTile()
+  -Widget _buildAusenciaTile()
+}
+
+"geoface::views::admin::reportes_page.dart::_DiaExpansionTile" o-- "null::Empleado Function(String)"
+"flutter::src::widgets::framework.dart::StatelessWidget" <|-- "geoface::views::admin::reportes_page.dart::_DiaExpansionTile"
+
+class "geoface::views::admin::reportes_page.dart::_InitialState" {
+  +Widget build()
+}
+
+"flutter::src::widgets::framework.dart::StatelessWidget" <|-- "geoface::views::admin::reportes_page.dart::_InitialState"
+
+class "geoface::views::admin::reportes_page.dart::_ErrorState" {
+  +String message
+  +Widget build()
+}
+
+"flutter::src::widgets::framework.dart::StatelessWidget" <|-- "geoface::views::admin::reportes_page.dart::_ErrorState"
+
 class "geoface::views::admin::sedes_page.dart::SedesPage" {
   +State<SedesPage> createState()
 }
@@ -1097,25 +1148,48 @@ class "geoface::views::admin::sedes_page.dart::SedesPage" {
 
 class "geoface::views::admin::sedes_page.dart::_SedesPageState" {
   -TextEditingController _searchController
-  -String _searchQuery
+  -FocusNode _searchFocusNode
+  -AnimationController _fabAnimationController
+  -AnimationController _searchAnimationController
+  -Animation<double> _fabAnimation
+  -Animation<double> _searchAnimation
+  -bool _isSearchExpanded
+  -String _selectedFilter
   +void initState()
   +void dispose()
-  -dynamic _loadData()
+  -void _onSearchChanged()
+  -void _onSearchFocusChanged()
+  -void _expandSearch()
+  -void _collapseSearch()
+  -dynamic _refreshData()
+  -void _showFeedback()
   -dynamic _toggleSedeStatus()
   -dynamic _deleteSede()
-  -void _navigateToDetail()
-  -void _showSedeOptions()
-  -Widget _buildOptionButton()
-  -void _showDeleteConfirmation()
-  -Widget _buildInfoRow()
+  -String _getSedeInitials()
   -List<Sede> _filterSedes()
+  -void _navigateToForm()
   +Widget build()
+  -Widget _buildLoadingState()
+  -Widget _buildHeader()
+  -Widget _buildSearchAndFilters()
+  -Widget _buildSearchBar()
+  -Widget _buildFilterChips()
+  -Widget _buildSedesList()
   -Widget _buildSedeCard()
-  -Widget _buildActionButton()
+  -Widget _buildEmptyState()
+  -Widget _buildNoResultsState()
+  -Widget _buildErrorState()
+  -void _showSedeOptions()
+  -Widget _buildOptionTile()
+  -void _showDeleteConfirmation()
 }
 
 "geoface::views::admin::sedes_page.dart::_SedesPageState" o-- "flutter::src::widgets::editable_text.dart::TextEditingController"
+"geoface::views::admin::sedes_page.dart::_SedesPageState" o-- "flutter::src::widgets::focus_manager.dart::FocusNode"
+"geoface::views::admin::sedes_page.dart::_SedesPageState" o-- "flutter::src::animation::animation_controller.dart::AnimationController"
+"geoface::views::admin::sedes_page.dart::_SedesPageState" o-- "flutter::src::animation::animation.dart::Animation<double>"
 "flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::sedes_page.dart::_SedesPageState"
+"flutter::src::widgets::ticker_provider.dart::TickerProviderStateMixin" <|-- "geoface::views::admin::sedes_page.dart::_SedesPageState"
 
 class "geoface::views::admin::sede_detail_page.dart::SedeDetailPage" {
   +String sedeId
@@ -1135,21 +1209,80 @@ class "geoface::views::admin::sede_form_page.dart::SedeFormPage" {
 class "geoface::views::admin::sede_form_page.dart::_SedeFormPageState" {
   -GlobalKey<FormState> _formKey
   -TextEditingController _nombreController
-  -TextEditingController _direccionController
-  -TextEditingController _latitudController
-  -TextEditingController _longitudController
-  -TextEditingController _radioPermitidoController
   -bool _activa
+  -String? _direccion
+  -LatLng? _ubicacion
+  -double _radioPermitido
+  -GoogleMapController? _mapPreviewController
+  -dynamic _initialLocationFuture
+  {static} -SizedBox _gapH8
+  {static} -SizedBox _gapH16
+  {static} -SizedBox _gapH24
   -bool _isEditing
   +void initState()
+  -dynamic _getInitialLocation()
+  -dynamic _getCurrentDeviceLocation()
   +void dispose()
+  -dynamic _openMapSelection()
   -dynamic _submitForm()
+  -void _retryGetLocation()
   +Widget build()
+  -Widget _buildLocationCard()
+  -Widget _buildDetailsCard()
+  -Widget _buildSectionTitle()
+  -Widget _buildMapPreview()
+  -Widget _buildRadioSlider()
+  -InputDecoration _buildInputDecoration()
+  -Widget _buildActionButton()
 }
 
 "geoface::views::admin::sede_form_page.dart::_SedeFormPageState" o-- "flutter::src::widgets::framework.dart::GlobalKey<FormState>"
 "geoface::views::admin::sede_form_page.dart::_SedeFormPageState" o-- "flutter::src::widgets::editable_text.dart::TextEditingController"
+"geoface::views::admin::sede_form_page.dart::_SedeFormPageState" o-- "google_maps_flutter_platform_interface::src::types::location.dart::LatLng"
+"geoface::views::admin::sede_form_page.dart::_SedeFormPageState" o-- "google_maps_flutter::google_maps_flutter.dart::GoogleMapController"
+"geoface::views::admin::sede_form_page.dart::_SedeFormPageState" o-- "flutter::src::widgets::basic.dart::SizedBox"
 "flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::sede_form_page.dart::_SedeFormPageState"
+
+class "geoface::views::admin::sede_mapa_seleccion_page.dart::MapSelectionPage" {
+  +LatLng initialLocation
+  +State<MapSelectionPage> createState()
+}
+
+"geoface::views::admin::sede_mapa_seleccion_page.dart::MapSelectionPage" o-- "google_maps_flutter_platform_interface::src::types::location.dart::LatLng"
+"flutter::src::widgets::framework.dart::StatefulWidget" <|-- "geoface::views::admin::sede_mapa_seleccion_page.dart::MapSelectionPage"
+
+class "geoface::views::admin::sede_mapa_seleccion_page.dart::_MapSelectionPageState" {
+  -GoogleMapController _mapController
+  -AnimationController _pinAnimationController
+  -LatLng _selectedLocation
+  -String _selectedAddress
+  -bool _isGeocoding
+  -bool _showHelpOverlay
+  -Animation<double> _pinAnimation
+  +void initState()
+  +void dispose()
+  -void _onMapCreated()
+  -void _onCameraMoveStarted()
+  -void _onCameraIdle()
+  -void _onCameraMove()
+  -dynamic _getAddressFromLatLng()
+  -void _confirmSelection()
+  -dynamic _goToCurrentUserLocation()
+  -void _zoomIn()
+  -void _zoomOut()
+  +Widget build()
+  -Widget _buildCenterMarker()
+  -Widget _buildInfoPanel()
+  -Widget _buildMapControls()
+  -Widget _buildHelpOverlay()
+}
+
+"geoface::views::admin::sede_mapa_seleccion_page.dart::_MapSelectionPageState" o-- "google_maps_flutter::google_maps_flutter.dart::GoogleMapController"
+"geoface::views::admin::sede_mapa_seleccion_page.dart::_MapSelectionPageState" o-- "flutter::src::animation::animation_controller.dart::AnimationController"
+"geoface::views::admin::sede_mapa_seleccion_page.dart::_MapSelectionPageState" o-- "google_maps_flutter_platform_interface::src::types::location.dart::LatLng"
+"geoface::views::admin::sede_mapa_seleccion_page.dart::_MapSelectionPageState" o-- "flutter::src::animation::animation.dart::Animation<double>"
+"flutter::src::widgets::framework.dart::State" <|-- "geoface::views::admin::sede_mapa_seleccion_page.dart::_MapSelectionPageState"
+"flutter::src::widgets::ticker_provider.dart::SingleTickerProviderStateMixin" <|-- "geoface::views::admin::sede_mapa_seleccion_page.dart::_MapSelectionPageState"
 
 class "geoface::views::auth::login_page.dart::LoginPage" {
   +State<LoginPage> createState()
