@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:lottie/lottie.dart' hide Marker;
 import 'package:provider/provider.dart';
 import '../../controllers/sede_controller.dart';
 import '../../models/sede.dart';
@@ -92,6 +93,7 @@ class _SedeFormPageState extends State<SedeFormPage> {
   }
 
   Future<void> _openMapSelection() async {
+    // Si la ubicación inicial aún se está cargando, no hacemos nada.
     if (_ubicacion == null) return;
 
     final result = await Navigator.push<Map<String, dynamic>>(
@@ -101,7 +103,7 @@ class _SedeFormPageState extends State<SedeFormPage> {
       ),
     );
 
-    if (result != null) {
+    if (result != null && mounted) {
       setState(() {
         _ubicacion = result['location'];
         _direccion = result['address'];
@@ -155,6 +157,12 @@ class _SedeFormPageState extends State<SedeFormPage> {
     }
   }
 
+  void _retryGetLocation() {
+    setState(() {
+      _initialLocationFuture = _getInitialLocation();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -163,43 +171,81 @@ class _SedeFormPageState extends State<SedeFormPage> {
         future: _initialLocationFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
+            // MEJORA: Se reemplaza el CircularProgressIndicator por una animación Lottie grande y descriptiva.
+            return Center(
               child: Column(
-                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(),
-                  _gapH16,
-                  Text("Obteniendo ubicación...")
+                  Lottie.asset(
+                    'assets/animations/location_animation.json',
+                    width: 280, // Tamaño grande para mayor impacto visual
+                    height: 280,
+                  ),
+                  _gapH24,
+                  Text(
+                    "Obteniendo ubicación...",
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                 ],
               ),
             );
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text("Error: ${snapshot.error}"));
+            // MEJORA: El estado de error ahora es más útil, con un botón para reintentar.
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.location_off_rounded,
+                        size: 60, color: Colors.redAccent),
+                    _gapH16,
+                    Text(
+                      "Error al obtener la ubicación",
+                      style: Theme.of(context).textTheme.titleLarge,
+                      textAlign: TextAlign.center,
+                    ),
+                    _gapH8,
+                    Text(
+                      "${snapshot.error}",
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    _gapH24,
+                    FilledButton.icon(
+                      onPressed: _retryGetLocation,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text("Reintentar"),
+                    )
+                  ],
+                ),
+              ),
+            );
           }
 
           if (snapshot.hasData && _ubicacion == null) {
             _ubicacion = snapshot.data;
           }
-
-          // MEJORA: Usamos SingleChildScrollView. Si el contenido cabe, no habrá scroll.
-          // Esto elimina la necesidad de un botón flotante y cumple con el requisito.
+          
+          // MEJORA: Usamos SingleChildScrollView. Este widget es la solución perfecta para tu requisito:
+          // 1. Si el contenido cabe en la pantalla (móviles grandes, tablets), NO habrá scroll.
+          // 2. Si el contenido es más alto que la pantalla (móviles pequeños, o si el teclado aparece),
+          //    habilitará el scroll automáticamente.
+          // Esto lo hace perfectamente responsivo sin sacrificar la experiencia en pantallas grandes.
           return SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Form(
                 key: _formKey,
                 child: Column(
-                  // MEJORA: `crossAxisAlignment` en `start` es mejor para formularios.
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildLocationCard(),
                     _gapH24,
                     _buildDetailsCard(),
                     _gapH24,
-                    // MEJORA: El botón de acción ahora es parte del flujo del formulario.
-                    // Ya no está en una barra flotante.
                     _buildActionButton(),
                   ],
                 ),
@@ -411,8 +457,6 @@ class _SedeFormPageState extends State<SedeFormPage> {
     );
   }
 
-  // MEJORA: El botón ahora es un widget independiente que se coloca al final.
-  // Tiene un estilo más limpio y ocupa todo el ancho disponible.
   Widget _buildActionButton() {
     return Consumer<SedeController>(
       builder: (context, controller, _) {
@@ -432,7 +476,6 @@ class _SedeFormPageState extends State<SedeFormPage> {
                   : Icons.add_circle_outline),
           label: Text(_isEditing ? 'Guardar Cambios' : 'Crear Sede'),
           style: FilledButton.styleFrom(
-            // Ocupa todo el ancho y tiene una altura fija para un mejor look & feel.
             minimumSize: const Size.fromHeight(50),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

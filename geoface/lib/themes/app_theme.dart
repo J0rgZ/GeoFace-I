@@ -83,7 +83,11 @@ class AppTheme {
         style: FilledButton.styleFrom(
           // La forma de "píldora" o estadio es muy común y moderna en M3.
           shape: const StadiumBorder(),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          // ----- AJUSTE DE RESPONSIVIDAD -----
+          // ELIMINADO: El padding fijo es una causa común de problemas de responsividad.
+          // Al quitarlo, los botones usarán el padding por defecto de Material 3,
+          // que es más adaptable a diferentes tamaños de pantalla.
+          // padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         ),
       ),
       
@@ -107,7 +111,12 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: colorScheme.surfaceContainer,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        // ----- AJUSTE DE RESPONSIVIDAD -----
+        // ELIMINADO: Al igual que con los botones, un padding de contenido fijo
+        // puede hacer que los campos de texto sean demasiado altos y causen overflows.
+        // Dejamos que Flutter maneje el padding interno para una mejor adaptabilidad.
+        // contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        
         // Borde por defecto, sutil pero visible.
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),

@@ -44,7 +44,6 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
 
   Future<void> _loadData() async {
     if (!mounted) return;
-    // Reinicia la animación para el RefreshIndicator
     _animationController.reset();
 
     final sedeController = Provider.of<SedeController>(context, listen: false);
@@ -60,7 +59,6 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     if (mounted) _animationController.forward();
   }
 
-  // --- LÓGICA DE DATOS (SIN CAMBIOS) ---
   int _getAsistenciasHoy(List<Asistencia> asistencias) {
     final hoy = DateTime.now();
     return asistencias.where((a) => date_utils.isSameDay(a.fechaHoraEntrada, hoy)).length;
@@ -77,7 +75,6 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     return asistenciasPorSede;
   }
   
-  // --- BUILDER PRINCIPAL ---
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -90,7 +87,6 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
           final String? errorMessage = sedeController.errorMessage ?? empleadoController.errorMessage ?? asistenciaController.errorMessage;
 
           if (isLoading) {
-            // MEJORA VISUAL: Usamos un skeleton con efecto shimmer en lugar de un spinner.
             return _buildLoadingSkeleton(context);
           }
 
@@ -136,7 +132,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
                               _buildSedesSection(context, sedes, empleados, asistenciasPorSedeHoy),
                               const SizedBox(height: 32),
                               _buildInsightCards(context, sedes, empleados, asistencias),
-                              const SizedBox(height: 32), // Más espacio al final
+                              const SizedBox(height: 32),
                             ],
                           ),
                         ),
@@ -151,8 +147,6 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
       ),
     );
   }
-
-  // --- WIDGETS DE ESTADO Y ENCABEZADO (MEJORADOS) ---
 
   Widget _buildLoadingSkeleton(BuildContext context) {
     final theme = Theme.of(context);
@@ -178,7 +172,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
           SliverPadding(
             padding: const EdgeInsets.all(20),
             sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 1.1, crossAxisSpacing: 16, mainAxisSpacing: 16),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 1.0, crossAxisSpacing: 16, mainAxisSpacing: 16), // <-- AspectRatio ajustado
               delegate: SliverChildBuilderDelegate((context, index) => Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28))), childCount: 4),
             ),
           ),
@@ -252,8 +246,6 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     if (hour < 18) return 'Buenas tardes';
     return 'Buenas noches';
   }
-
-  // --- WIDGETS DE CONTENIDO PRINCIPAL (RENOVADOS) ---
   
   Widget _buildStatsGrid(BuildContext context, {
     required int sedesActivas, required int totalSedes,
@@ -264,7 +256,9 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     final theme = Theme.of(context);
     final isSmallScreen = constraints.maxWidth < 600;
     final crossAxisCount = isSmallScreen ? 2 : 4;
-    final childAspectRatio = isSmallScreen ? 0.9 : 1.25;
+    // <-- CAMBIO CLAVE: Cambiamos el aspect ratio a 1.0 para hacer las tarjetas cuadradas
+    // y menos altas, lo que da más espacio al contenido y evita el overflow.
+    final childAspectRatio = isSmallScreen ? 1.0 : 1.25;
 
     final stats = [
       _StatCardData(title: 'Sedes Activas', value: sedesActivas.toString(), total: totalSedes.toString(), icon: Icons.location_city_rounded, color: theme.colorScheme.primary, onColor: theme.colorScheme.onPrimary),
@@ -279,6 +273,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     );
   }
 
+  // <-- CAMBIO CLAVE: REFACTORIZACIÓN COMPLETA DE LA TARJETA PARA SER RESPONSIVA
   Widget _buildModernStatCard(BuildContext context, _StatCardData data) {
     final theme = Theme.of(context);
     return Container(
@@ -289,38 +284,69 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
           begin: Alignment.topLeft, end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(28),
-        boxShadow: [BoxShadow(color: data.color.withAlpha((0.3 * 255).round()), blurRadius: 20, offset: const Offset(0, 10))],
+        boxShadow: [BoxShadow(color: data.color.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))],
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: data.onColor.withAlpha((0.15 * 255).round()), borderRadius: BorderRadius.circular(18)),
-            child: Icon(data.icon, color: data.onColor, size: 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween, // Distribuye el espacio verticalmente
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: data.onColor.withOpacity(0.15), borderRadius: BorderRadius.circular(16)),
+                child: Icon(data.icon, color: data.onColor, size: 24),
+              ),
+              if (data.total != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(color: data.onColor.withOpacity(0.15), borderRadius: BorderRadius.circular(100)),
+                  child: Text('de ${data.total}', style: theme.textTheme.labelMedium?.copyWith(color: data.onColor)),
+                ),
+            ],
           ),
-          if (data.total != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(color: data.onColor.withAlpha((0.15 * 255).round()), borderRadius: BorderRadius.circular(100)),
-              child: Text('de ${data.total}', style: theme.textTheme.labelMedium?.copyWith(color: data.onColor)),
+          
+          // <-- SOLUCIÓN DEFINITIVA: Un FittedBox que envuelve todo el contenido inferior.
+          // Esto escala todo el bloque de texto (número, título, descripción) para que
+          // quepa perfectamente en el espacio restante, eliminando cualquier overflow.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  data.value,
+                  style: theme.textTheme.displayMedium?.copyWith(
+                    color: data.onColor,
+                    fontWeight: FontWeight.bold,
+                    height: 1.0, // Altura de línea compacta para ganar espacio
+                  ),
+                ),
+                Text(
+                  data.title,
+                  // Usamos un estilo un poco más compacto para el título.
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: data.onColor,
+                    fontWeight: FontWeight.w500
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (data.description != null)
+                  Text(
+                    data.description!,
+                    style: theme.textTheme.bodySmall?.copyWith(color: data.onColor.withOpacity(0.7)),
+                  ),
+              ],
             ),
-        ]),
-        const Spacer(),
-        SizedBox(
-          height: 44,
-          child: FittedBox(
-            fit: BoxFit.contain,
-            child: Text(data.value, style: theme.textTheme.displayMedium?.copyWith(color: data.onColor, fontWeight: FontWeight.bold, height: 1.0)),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(data.title, style: theme.textTheme.titleMedium?.copyWith(color: data.onColor, fontWeight: FontWeight.w500)),
-        if (data.description != null)
-          Text(data.description!, style: theme.textTheme.bodyMedium?.copyWith(color: data.onColor.withAlpha((0.7 * 255).round()))),
-      ]),
+        ],
+      ),
     );
   }
-
+  
   Widget _buildAsistenciasChart(BuildContext context, Map<String, int> asistenciasPorSede, List<Sede> sedes) {
     final theme = Theme.of(context);
     final sedesConAsistencias = sedes.where((sede) => (asistenciasPorSede[sede.id] ?? 0) > 0).toList()
@@ -340,13 +366,12 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     );
   }
   
-  /// SOLUCIÓN AL OVERFLOW DEL GRÁFICO
   Widget _buildChartContent(BuildContext context, List<Sede> sedes, Map<String, int> asistenciasPorSede) {
     final theme = Theme.of(context);
     final maxAsistencias = sedes.map((s) => asistenciasPorSede[s.id] ?? 0).fold(1, (p, c) => c > p ? c : p);
   
     return SizedBox(
-      height: 250, // Aumentamos la altura para dar más espacio
+      height: 250,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
@@ -369,7 +394,6 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      // Valor numérico de la asistencia
                       if (asistencias > 0) ...[
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -378,10 +402,9 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
                         ),
                         const SizedBox(height: 8),
                       ],
-                      // Barra principal
                       Container(
                         width: 40,
-                        height: animatedHeight.clamp(4.0, 150.0), // Altura animada y limitada
+                        height: animatedHeight.clamp(4.0, 150.0),
                         decoration: BoxDecoration(
                           color: theme.colorScheme.primary.withAlpha(150),
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
@@ -389,10 +412,10 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
                         ),
                       ),
                       const SizedBox(height: 12),
-                      // SOLUCIÓN: Usamos Flexible para que el texto se adapte sin causar overflow.
+                      // <-- CAMBIO CLAVE: Usamos Flexible para que el texto se adapte sin causar overflow.
                       Flexible(
                         child: Text(
-                          _getShortSedeName(sede.nombre),
+                          sede.nombre,
                           textAlign: TextAlign.center,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -409,8 +432,6 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
       ),
     );
   }
-
-  String _getShortSedeName(String nombre) => nombre.replaceAll(' ', '\n');
 
   Widget _buildSedesSection(BuildContext context, List<Sede> sedes, List<Empleado> empleados, Map<String, int> asistenciasPorSedeHoy) {
     final theme = Theme.of(context);
@@ -436,12 +457,13 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     );
   }
 
+  // <-- CAMBIO CLAVE: Tarjeta más compacta
   Widget _buildSedeCard(BuildContext context, Sede sede, int empleados, int asistencias) {
     final theme = Theme.of(context);
     final tasaAsistencia = empleados > 0 ? (asistencias / empleados * 100) : 0.0;
     
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), // Padding reducido
       decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: BorderRadius.circular(20)),
       child: Row(children: [
         Container(
@@ -450,10 +472,10 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
           child: Icon(sede.activa ? Icons.business_rounded : Icons.business_outlined, color: sede.activa ? theme.colorScheme.onPrimaryContainer : theme.colorScheme.onErrorContainer),
         ),
         const SizedBox(width: 16),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
           Text(sede.nombre, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 8),
-          Wrap(spacing: 16, runSpacing: 4, children: [
+          const SizedBox(height: 6), // Espacio reducido
+          Wrap(spacing: 12, runSpacing: 4, children: [ // Espaciado del Wrap reducido
             _buildStatChip(context, Icons.people_outline_rounded, '$empleados emp.'),
             _buildStatChip(context, Icons.check_circle_outline_rounded, '$asistencias asist.'),
             Row(mainAxisSize: MainAxisSize.min, children: [
@@ -505,14 +527,12 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     );
   }
   
-  // --- WIDGETS AUXILIARES REUTILIZABLES ---
-  
   Widget _buildSectionHeader(BuildContext context, {required IconData icon, required Color color, required String title, required String subtitle, VoidCallback? onSeeMore}) {
     final theme = Theme.of(context);
     return Row(children: [
       Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: color.withAlpha((0.15 * 255).round()), borderRadius: BorderRadius.circular(16)),
+        decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(16)),
         child: Icon(icon, color: color, size: 28),
       ),
       const SizedBox(width: 16),
@@ -527,11 +547,11 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
 
   Widget _buildEmptyState(BuildContext context, {required IconData icon, required String text}) {
     final theme = Theme.of(context);
-    return Container(
+    return SizedBox( // Cambiado a SizedBox para no forzar una altura fija siempre
       height: 150,
       child: Center(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 48, color: theme.colorScheme.onSurfaceVariant.withAlpha(150)),
+          Icon(icon, size: 48, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6)),
           const SizedBox(height: 16),
           Text(text, style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
         ]),
@@ -548,7 +568,6 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     ]);
   }
 
-  // --- LÓGICA DE INSIGHTS (MEJORADA) ---
   List<_InsightData> _generateInsights(BuildContext context, List<Sede> sedes, List<Empleado> empleados, List<Asistencia> asistencias) {
     final theme = Theme.of(context);
     final insights = <_InsightData>[];
@@ -578,7 +597,6 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
   }
 }
 
-// --- CLASES DE DATOS AUXILIARES ---
 class _StatCardData {
   final String title, value; final String? total, description; final IconData icon; final Color color, onColor;
   _StatCardData({required this.title, required this.value, this.total, this.description, required this.icon, required this.color, required this.onColor});
