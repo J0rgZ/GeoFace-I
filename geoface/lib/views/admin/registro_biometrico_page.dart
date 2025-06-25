@@ -1,7 +1,7 @@
+// lib/screens/registro_biometrico_screen.dart
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:lottie/lottie.dart';
 import 'dart:io';
 import '/../controllers/biometrico_controller.dart';
@@ -19,18 +19,39 @@ class RegistroBiometricoScreen extends StatefulWidget {
   State<RegistroBiometricoScreen> createState() => _RegistroBiometricoScreenState();
 }
 
-class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen> with WidgetsBindingObserver {
+class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen> 
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   late BiometricoController _controller;
-  bool _isLoading = false;
-  bool _hasExistingBiometric = false;
-  String? _biometricoId;
-  String? _biometricoUrl;
-  bool _showPreview = true;
-  bool _isCameraActive = false;
+  late AnimationController _pulseController;
+  late AnimationController _slideController;
+  late Animation<double> _pulseAnimation;
+  late Animation<Offset> _slideAnimation;
   
-  // Para seleccionar imágenes de la galería
-  final ImagePicker _picker = ImagePicker();
-  File? _selectedImageFile;
+  bool _isLoading = true;
+  bool _isProcessing = false;
+
+  List<String> _existingBiometricUrls = [];
+  List<File> _capturedImages = [];
+  int _captureStep = 0;
+  bool _isCaptureMode = false;
+
+  final List<String> _capturePrompts = [
+    "Mira directamente a la cámara",
+    "Gira tu rostro hacia la izquierda",
+    "Ahora gira hacia la derecha"
+  ];
+  
+  final List<String> _captureSubtitles = [
+    "Mantén tu rostro centrado en el marco",
+    "Perfil izquierdo, mantén la posición",
+    "Perfil derecho, último paso"
+  ];
+  
+  final List<IconData> _captureIcons = [
+    Icons.face_retouching_natural,
+    Icons.arrow_back_rounded,
+    Icons.arrow_forward_rounded
+  ];
 
   @override
   void initState() {
@@ -38,386 +59,308 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen> wit
     WidgetsBinding.instance.addObserver(this);
     _controller = Provider.of<BiometricoController>(context, listen: false);
     
-    // Inicializar después del build inicial
+    _pulseController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+    
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    
+    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut)
+    );
+    
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(1.0, 0.0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _slideController, curve: Curves.elasticOut));
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initController();
-      
-      // Verificar biométricos existentes
-      _checkExistingBiometric();
+      _checkExistingBiometrics();
     });
   }
 
   @override
   void dispose() {
-    // Asegurar que la cámara se detenga de manera limpia
-    _disposeCamera();
+    _controller.stopCamera();
+    _pulseController.dispose();
+    _slideController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
-  }
-  
-  // Método para disponer de la cámara correctamente
-  Future<void> _disposeCamera() async {
-    try {
-      if (_isCameraActive) {
-        await _controller.stopCamera();
-        _isCameraActive = false;
-      }
-    } catch (e) {
-      debugPrint('Error al disponer de la cámara: ${e.toString()}');
-    }
-  }
-  
-  @override
-  void didUpdateWidget(RegistroBiometricoScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    
-    // Si cambió el empleado, actualizar datos
-    if (oldWidget.empleado.id != widget.empleado.id) {
-      // Reiniciar estado
-      setState(() {
-        _hasExistingBiometric = false;
-        _biometricoId = null;
-        _biometricoUrl = null;
-        _selectedImageFile = null;
-      });
-      
-      // Verificar biométricos para el nuevo empleado
-      _checkExistingBiometric();
-    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Manejar cambios en el ciclo de vida de la app
-    if (state == AppLifecycleState.resumed) {
-      if (_showPreview && !_isCameraActive) {
-        _initController();
-      }
-    } else if (state == AppLifecycleState.inactive ||
-               state == AppLifecycleState.paused ||
-               state == AppLifecycleState.detached) {
-      _disposeCamera();
+    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+      _controller.stopCamera();
+    } else if (state == AppLifecycleState.resumed && _isCaptureMode && _capturedImages.length < 3) {
+      _initCamera();
     }
   }
 
-  // Inicializar cámara con mejor manejo de errores
-  Future<void> _initController() async {
+  // --- LÓGICA DE NEGOCIO ---
+
+  Future<void> _initCamera() async {
     try {
-      if (_isCameraActive) return; // Evitar inicialización múltiple
-      
+      if (_controller.isCameraInitialized) return;
       setState(() => _isLoading = true);
       await _controller.initCamera();
-      _isCameraActive = true;
     } catch (e) {
-      debugPrint('Error al inicializar la cámara: ${e.toString()}');
-      _showErrorDialog('Error al inicializar', 
-        'No se pudo inicializar la cámara. Por favor, intenta de nuevo.');
-      _isCameraActive = false;
+      _showErrorDialog('Error de Cámara', 'No se pudo iniciar la cámara. Asegúrate de tener los permisos necesarios.');
+      setState(() => _isCaptureMode = false);
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // Verificar si el empleado ya tiene un biométrico registrado
-  Future<void> _checkExistingBiometric() async {
+  Future<void> _checkExistingBiometrics() async {
+    setState(() => _isLoading = true);
     try {
-      setState(() => _isLoading = true);
-      
-      final biometrico = await _controller.getBiometricoByEmpleadoId(widget.empleado.id);
-      
+      final urls = await _controller.getBiometricoUrlsByEmpleadoId(widget.empleado.id);
       if (mounted) {
-        setState(() {
-          _hasExistingBiometric = biometrico != null;
-          _biometricoId = biometrico?.id;
-          _biometricoUrl = biometrico?.datoFacial;
-        });
+        setState(() => _existingBiometricUrls = urls);
       }
-      
     } catch (e) {
-      debugPrint('Error al verificar biométrico: ${e.toString()}');
-      if (mounted) {
-        setState(() {
-          _hasExistingBiometric = false;
-          _biometricoId = null;
-          _biometricoUrl = null;
-        });
-      }
+      debugPrint("Error verificando biométricos: $e");
+      _showErrorDialog('Error de Conexión', 'No se pudieron cargar los datos biométricos existentes.');
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // Seleccionar imagen de la galería con mejor manejo de cámara
-  Future<void> _pickImage() async {
+  void _startCaptureProcess() {
+    setState(() {
+      _isCaptureMode = true;
+      _capturedImages.clear();
+      _captureStep = 0;
+    });
+    _slideController.forward();
+    _initCamera();
+  }
+
+  Future<void> _capturePhoto() async {
+    if (!_controller.isCameraInitialized || _isProcessing) return;
+
+    setState(() => _isProcessing = true);
     try {
-      setState(() => _isLoading = true);
-      
-      // Detener la cámara antes de seleccionar imagen
-      await _disposeCamera();
-      
-      // Seleccionar imagen de la galería
-      final XFile? pickedFile = await _picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 80,
+      final imageFile = await _controller.takePicture();
+      if (imageFile != null) {
+        setState(() {
+          _capturedImages.add(imageFile);
+          if (_captureStep < 2) {
+            _captureStep++;
+            _slideController.reset();
+            _slideController.forward();
+          } else {
+            _controller.stopCamera();
+          }
+        });
+      }
+    } catch (e) {
+       _showErrorDialog('Error de Captura', 'No se pudo tomar la foto. Intenta de nuevo.');
+    } finally {
+      if(mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  Future<void> _saveBiometrics() async {
+    if (_capturedImages.length != 3) return;
+
+    setState(() => _isProcessing = true);
+    try {
+      bool success = await _controller.registerOrUpdateBiometricoWithMultipleFiles(
+        widget.empleado.id, 
+        _capturedImages
       );
-      
-      if (pickedFile != null && mounted) {
-        setState(() {
-          _selectedImageFile = File(pickedFile.path);
-          _showPreview = false;
-        });
-      } else if (_showPreview && mounted) {
-        // Solo reiniciar la cámara si estamos en modo previsualización
-        await _initController();
-      }
-    } catch (e) {
-      debugPrint('Error al seleccionar imagen: ${e.toString()}');
-      _showErrorDialog('Error', 'No se pudo seleccionar la imagen. Intenta de nuevo.');
-      // Reintentar iniciar cámara si estábamos en modo previsualización
-      if (_showPreview && mounted) {
-        await _initController();
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
 
-  // Capturar y guardar biométrico con mejor manejo de errores
-  Future<void> _captureAndSaveBiometric() async {
-    try {
-      setState(() => _isLoading = true);
-      
-      bool result = false;
-      
-      if (_selectedImageFile != null) {
-        // Usar imagen seleccionada de la galería
-        if (_hasExistingBiometric && _biometricoId != null) {
-          // Actualizar con imagen de galería
-          result = await _controller.updateBiometricoWithFile(
-            _biometricoId!, 
-            widget.empleado.id, 
-            _selectedImageFile!
-          );
-        } else {
-          // Crear nuevo con imagen de galería
-          result = await _controller.registerBiometricoWithFile(
-            widget.empleado.id, 
-            _selectedImageFile!
-          );
-        }
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text("Registro biométrico guardado con éxito"),
+              ],
+            ),
+            backgroundColor: Colors.green.shade600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+        setState(() {
+          _isCaptureMode = false;
+          _capturedImages.clear();
+        });
+        _slideController.reset();
+        await _checkExistingBiometrics();
       } else {
-        // Asegurar que la cámara esté inicializada
-        if (!_controller.isCameraInitialized) {
-          _showErrorDialog('Error', 'La cámara no está inicializada. Intenta de nuevo.');
-          return;
-        }
-        
-        // Usar la cámara
-        if (_hasExistingBiometric && _biometricoId != null) {
-          // Actualizar biométrico existente
-          result = await _controller.updateBiometrico(_biometricoId!, widget.empleado.id);
-        } else {
-          // Crear nuevo biométrico
-          result = await _controller.registerBiometrico(widget.empleado.id);
-        }
+        throw Exception(_controller.errorMessage ?? "Error desconocido al guardar.");
       }
-      
-      if (result && mounted) {
-        // Si fue exitoso, mostrar mensaje y actualizar estado
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Biométrico registrado correctamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        
-        // Limpiar imagen seleccionada
-        setState(() {
-          _selectedImageFile = null;
-          _showPreview = true;
-        });
-        
-        // Reiniciar la cámara si estábamos en preview
-        if (_showPreview) {
-          await _initController();
-        }
-        
-        // Refrescar para obtener el ID y URL del biométrico nuevo
-        await _checkExistingBiometric();
-      } else if (mounted) {
-        // Si hubo error, mostrar mensaje de error
-        _showErrorDialog('Error', _controller.errorMessage ?? 'No se pudo guardar el biométrico');
-      }
-      
     } catch (e) {
-      debugPrint('Error al procesar imagen: ${e.toString()}');
-      _showErrorDialog('Error', 'Error al procesar imagen. Intenta de nuevo.');
+       _showErrorDialog('Error al Guardar', e.toString());
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isProcessing = false);
     }
   }
 
-  // Eliminar biométrico con mejor manejo de errores
-  Future<void> _deleteBiometric() async {
-    if (_biometricoId == null) return;
-    
+  Future<void> _deleteBiometrics() async {
+    setState(() => _isProcessing = true);
     try {
-      setState(() => _isLoading = true);
+      bool success = await _controller.deleteBiometricoByEmpleadoId(widget.empleado.id);
       
-      final result = await _controller.deleteBiometrico(_biometricoId!, widget.empleado.id);
-      
-      if (result && mounted) {
+      if(success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Biométrico eliminado correctamente'),
-            backgroundColor: Colors.orange,
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.delete_outline, color: Colors.white),
+                SizedBox(width: 12),
+                Text("Registro biométrico eliminado"),
+              ],
+            ),
+            backgroundColor: Colors.orange.shade600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
-        
-        // Actualizar estado después de eliminación
         setState(() {
-          _hasExistingBiometric = false;
-          _biometricoId = null;
-          _biometricoUrl = null;
+          _existingBiometricUrls.clear();
+          _isCaptureMode = false;
         });
-      } else if (mounted) {
-        _showErrorDialog('Error', _controller.errorMessage ?? 'No se pudo eliminar el biométrico');
+      } else {
+        throw Exception(_controller.errorMessage ?? "No se pudo eliminar el registro.");
       }
-      
     } catch (e) {
-      debugPrint('Error al eliminar biométrico: ${e.toString()}');
-      _showErrorDialog('Error', 'Error al eliminar biométrico. Intenta de nuevo.');
+      _showErrorDialog('Error al Eliminar', e.toString());
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isProcessing = false);
     }
   }
-
-  // Alternar entre cámara y biométrico existente con mejor manejo
-  Future<void> _togglePreview() async {
-    if (_hasExistingBiometric && _biometricoUrl != null) {
-      // Primero detener la cámara si está activa antes de cambiar estado
-      if (_showPreview) {
-        await _disposeCamera();
-      }
-      
-      setState(() {
-        _showPreview = !_showPreview;
-        _selectedImageFile = null;
-      });
-      
-      // Iniciar la cámara si cambiamos a modo preview
-      if (_showPreview) {
-        await _initController();
-      }
-    }
+  
+  void _resetCapture() {
+    setState(() {
+      _capturedImages.clear();
+      _captureStep = 0;
+    });
+    _slideController.reset();
+    _slideController.forward();
+    _initCamera();
   }
 
-  // Mostrar diálogo de error
+  // --- WIDGETS AUXILIARES DE UI ---
+
   void _showErrorDialog(String title, String message) {
     if (!mounted) return;
-    
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error),
+            const SizedBox(width: 8),
+            Text(title),
+          ],
+        ),
         content: Text(message),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+          FilledButton(
+            child: const Text('Entendido'),
+            onPressed: () => Navigator.of(ctx).pop(),
           ),
         ],
       ),
     );
   }
 
-  // Mostrar diálogo de confirmación para eliminar
   void _showDeleteConfirmDialog() {
+    if (_existingBiometricUrls.isEmpty) return;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Eliminar biométrico'),
-        content: const Text('¿Estás seguro de que deseas eliminar el registro biométrico?'),
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Confirmar Eliminación'),
+          ],
+        ),
+        content: const Text(
+          '¿Estás seguro de que deseas eliminar permanentemente este registro biométrico? Esta acción no se puede deshacer.',
+          style: TextStyle(height: 1.4),
+        ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
+          OutlinedButton(
             child: const Text('Cancelar'),
+            onPressed: () => Navigator.of(ctx).pop(),
           ),
-          TextButton(
+          const SizedBox(width: 8),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
             onPressed: () {
-              Navigator.pop(context);
-              _deleteBiometric();
+              Navigator.of(ctx).pop();
+              _deleteBiometrics();
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Eliminar'),
           ),
         ],
       ),
     );
   }
-
+  
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return WillPopScope(
-      // Asegurar limpieza al salir
       onWillPop: () async {
-        await _disposeCamera();
+        if (_isCaptureMode) {
+          _controller.stopCamera();
+          setState(() => _isCaptureMode = false);
+          _slideController.reset();
+          return false;
+        }
         return true;
       },
       child: Scaffold(
+        backgroundColor: colorScheme.surface,
         appBar: AppBar(
           title: const Text('Registro Biométrico'),
           centerTitle: true,
-          backgroundColor: Theme.of(context).primaryColor,
-          elevation: 2,
-          actions: [
-            if (_hasExistingBiometric && _biometricoUrl != null)
-              IconButton(
-                icon: Icon(_showPreview ? Icons.photo : Icons.camera_alt),
-                tooltip: _showPreview ? 'Ver biométrico actual' : 'Usar cámara',
-                onPressed: _togglePreview,
-              ),
-          ],
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(
+              _isCaptureMode ? Icons.close_rounded : Icons.arrow_back_rounded,
+              color: colorScheme.onSurface,
+            ),
+            onPressed: () {
+              if (_isCaptureMode) {
+                _controller.stopCamera();
+                setState(() => _isCaptureMode = false);
+                _slideController.reset();
+              } else {
+                Navigator.of(context).pop();
+              }
+            },
+          ),
         ),
         body: SafeArea(
           child: Stack(
             children: [
-              Column(
-                children: [
-                  _buildEmployeeInfoBar(),
-                  Expanded(
-                    child: _buildMediaSection(),
-                  ),
-                  _buildStatusBar(),
-                  _buildActionButtons(),
-                ],
-              ),
-              // Capa de carga con Lottie
-              if (_isLoading)
-                Container(
-                  color: Colors.black54,
-                  child: Center(
-                    child: SizedBox(
-                      width: 150,
-                      height: 150,
-                      child: Lottie.asset(
-                        'assets/animations/loading.json',
-                        animate: true,
-                        repeat: true,
-                      ),
-                    ),
-                  ),
-                ),
+              _isLoading
+                  ? _buildLoadingIndicator()
+                  : _isCaptureMode
+                      ? _buildCaptureView(theme)
+                      : _buildInitialView(theme),
+              
+              if (_isProcessing) _buildProcessingOverlay(),
             ],
           ),
         ),
@@ -425,407 +368,608 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen> wit
     );
   }
 
-  // Información del empleado en la parte superior
-  Widget _buildEmployeeInfoBar() {
+  Widget _buildLoadingIndicator() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Lottie.asset(
+            'assets/animations/loading.json',
+            width: 120,
+            height: 120,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Cargando...',
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProcessingOverlay() {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).primaryColor.withOpacity(0.1),
-        border: Border(
-          bottom: BorderSide(
-            color: Theme.of(context).primaryColor.withOpacity(0.2),
-            width: 1,
+      color: Colors.black.withOpacity(0.6),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Lottie.asset(
+                'assets/animations/loading.json',
+                width: 80,
+                height: 80,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Procesando...',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ],
           ),
         ),
       ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: Theme.of(context).primaryColor.withOpacity(0.2),
-            child: Text(
-              widget.empleado.nombreCompleto.isNotEmpty 
-                  ? widget.empleado.nombreCompleto[0].toUpperCase() 
-                  : '?',
-              style: TextStyle(
-                color: Theme.of(context).primaryColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.empleado.nombreCompleto,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'ID: ${widget.empleado.id}',
-                  style: TextStyle(
-                    color: Colors.grey[700],
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 
-  // Sección principal (cámara o imagen) optimizada
-  Widget _buildMediaSection() {
-    // Si tenemos una imagen seleccionada, mostrarla
-    if (_selectedImageFile != null) {
-      return Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            color: Colors.black,
-            child: Image.file(
-              _selectedImageFile!,
-              fit: BoxFit.contain,
-            ),
-          ),
-          Positioned(
-            top: 16,
-            right: 16,
-            child: CircleAvatar(
-              backgroundColor: Colors.black54,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white),
-                onPressed: () async {
-                  setState(() {
-                    _selectedImageFile = null;
-                    _showPreview = true;
-                  });
-                  await _initController(); // Reiniciar la cámara
-                },
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 20,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text(
-                'Imagen seleccionada de la galería',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-    
-    // Si no estamos mostrando la previsualización pero tenemos biométrico, mostrar la imagen actual
-    if (!_showPreview && _biometricoUrl != null) {
-      return Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            color: Colors.black,
-            child: Image.network(
-              _biometricoUrl!,
-              fit: BoxFit.contain,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Center(
-                  child: CircularProgressIndicator(
-                    value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                        : null,
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                debugPrint('Error cargando imagen: $error');
-                return Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.error, color: Colors.red, size: 48),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Error al cargar imagen',
-                        style: TextStyle(color: Colors.red[300]),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-          Positioned(
-            bottom: 20,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text(
-                'Biométrico registrado actual',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-    
-    // Por defecto, mostrar la cámara con mejor manejo de errores
-    return Consumer<BiometricoController>(
-      builder: (context, controller, _) {
-        if (!controller.isCameraInitialized) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 100,
-                  height: 100,
-                  child: Lottie.asset(
-                    'assets/animations/loading.json',
-                    animate: true,
-                    repeat: true,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text('Inicializando cámara...'),
-              ],
-            ),
-          );
-        }
-        
-        return Stack(
-          alignment: Alignment.center,
-          children: [
-            // Vista previa de la cámara
-            Container(
-              width: double.infinity,
-              height: double.infinity,
-              color: Colors.black,
-              child: controller.cameraController != null && controller.cameraController!.value.isInitialized
-                ? ClipRRect(
-                    child: AspectRatio(
-                      aspectRatio: controller.cameraController?.value.aspectRatio ?? 1.0,
-                      child: CameraPreview(controller.cameraController!),
-                    ),
-                  )
-                : Container(
-                    color: Colors.black,
-                    child: const Center(
-                      child: Text(
-                        'Cámara no disponible',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                  ),
-            ),
-            
-            // Marco guía para la cara
-            Container(
-              width: 240,
-              height: 290,
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.8),
-                  width: 2,
-                ),
-                borderRadius: BorderRadius.circular(140),
-              ),
-            ),
-            
-            // Texto de instrucción
-            Positioned(
-              bottom: 20,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text(
-                  'Coloca tu rostro dentro del óvalo',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // Barra de estado
-  Widget _buildStatusBar() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: _hasExistingBiometric 
-                  ? Colors.green.withOpacity(0.2) 
-                  : Colors.blue.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Icon(
-              _hasExistingBiometric ? Icons.check_circle : Icons.face,
-              color: _hasExistingBiometric ? Colors.green : Colors.blue,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _hasExistingBiometric
-                      ? 'Biométrico registrado'
-                      : 'No hay biométrico registrado',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: _hasExistingBiometric ? Colors.green : Colors.blue,
-                    fontSize: 14,
-                  ),
-                ),
-                if (_biometricoId != null)
-                  Text(
-                    'ID: ${_biometricoId!.length > 8 ? _biometricoId!.substring(0, 8) + '...' : _biometricoId}',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 12,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          if (_selectedImageFile == null) // Solo mostrar cuando no hay imagen seleccionada
-            Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: IconButton(
-                icon: const Icon(Icons.photo_library),
-                color: Theme.of(context).primaryColor,
-                tooltip: 'Seleccionar de galería',
-                onPressed: _pickImage,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // Botones de acción
-  Widget _buildActionButtons() {
-    return Container(
-      color: Colors.grey.shade50,
-      padding: const EdgeInsets.all(16),
+  // --- VISTA INICIAL ---
+  Widget _buildInitialView(ThemeData theme) {
+    bool hasBiometrics = _existingBiometricUrls.isNotEmpty;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
       child: Column(
         children: [
-          // Botón principal: Registrar o Actualizar
-          SizedBox(
-            width: double.infinity,
-            height: 54,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _captureAndSaveBiometric, // Deshabilitar durante carga
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _hasExistingBiometric ? Colors.blue : Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 2,
+          const SizedBox(height: 20),
+          
+          // Avatar y estado
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: hasBiometrics 
+                  ? [theme.colorScheme.primary, theme.colorScheme.secondary]
+                  : [theme.colorScheme.outline.withOpacity(0.3), theme.colorScheme.outline.withOpacity(0.1)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    _hasExistingBiometric ? Icons.update : Icons.add_a_photo,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    _hasExistingBiometric ? 'ACTUALIZAR BIOMÉTRICO' : 'REGISTRAR BIOMÉTRICO',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
+              boxShadow: [
+                BoxShadow(
+                  color: (hasBiometrics ? theme.colorScheme.primary : theme.colorScheme.outline).withOpacity(0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Icon(
+              hasBiometrics ? Icons.verified_user_rounded : Icons.account_circle_outlined,
+              size: 60,
+              color: hasBiometrics ? Colors.white : theme.colorScheme.onSurface.withOpacity(0.5),
+            ),
+          ),
+          
+          const SizedBox(height: 32),
+          
+          // Información del empleado
+          Text(
+            widget.empleado.nombreCompleto,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          
+          const SizedBox(height: 8),
+          
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              "ID: ${widget.empleado.id}",
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
           
-          // Si hay biométrico, mostrar botón eliminar
-          if (_hasExistingBiometric)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: OutlinedButton(
-                  onPressed: _isLoading ? null : _showDeleteConfirmDialog, // Deshabilitar durante carga
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+          const SizedBox(height: 40),
+          
+          // Estado del registro
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: theme.colorScheme.outline.withOpacity(0.2),
+              ),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  hasBiometrics ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                  size: 48,
+                  color: hasBiometrics ? Colors.green.shade600 : theme.colorScheme.primary,
+                ),
+                
+                const SizedBox(height: 16),
+                
+                Text(
+                  hasBiometrics 
+                    ? "Registro Completado"
+                    : "Sin Registro Biométrico",
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: hasBiometrics ? Colors.green.shade700 : theme.colorScheme.onSurface,
                   ),
-                  child: Row(
+                ),
+                
+                const SizedBox(height: 8),
+                
+                Text(
+                  hasBiometrics
+                    ? "Se registraron ${_existingBiometricUrls.length} imágenes biométricas"
+                    : "Este empleado necesita completar su registro biométrico",
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          if (hasBiometrics) ...[
+            const SizedBox(height: 32),
+            
+            // Vista previa de imágenes
+            Text(
+              "Vista Previa",
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            SizedBox(
+              height: 100,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: _existingBiometricUrls.length,
+                itemBuilder: (context, index) {
+                  return Container(
+                    margin: const EdgeInsets.only(right: 12),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: AspectRatio(
+                        aspectRatio: 0.8,
+                        child: Image.network(
+                          _existingBiometricUrls[index],
+                          fit: BoxFit.cover,
+                          errorBuilder: (c, o, s) => Container(
+                            color: theme.colorScheme.errorContainer,
+                            child: Icon(
+                              Icons.broken_image_rounded,
+                              color: theme.colorScheme.onErrorContainer,
+                            ),
+                          ),
+                          loadingBuilder: (c, child, progress) => progress == null
+                              ? child
+                              : Container(
+                                  color: theme.colorScheme.surfaceVariant,
+                                  child: const Center(
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+          
+          const SizedBox(height: 48),
+          
+          // Botones de acción
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              icon: Icon(hasBiometrics ? Icons.refresh_rounded : Icons.camera_alt_rounded),
+              label: Text(
+                hasBiometrics ? "ACTUALIZAR REGISTRO" : "INICIAR REGISTRO",
+                style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              ),
+              onPressed: _startCaptureProcess,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                backgroundColor: theme.colorScheme.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+          ),
+          
+          if (hasBiometrics) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: Icon(Icons.delete_outline_rounded, color: theme.colorScheme.error),
+                label: Text(
+                  "Eliminar Registro",
+                  style: TextStyle(
+                    color: theme.colorScheme.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onPressed: _showDeleteConfirmDialog,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  side: BorderSide(color: theme.colorScheme.error.withOpacity(0.5)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+            ),
+          ],
+          
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  // --- VISTA DE CAPTURA ---
+  Widget _buildCaptureView(ThemeData theme) {
+    bool isFinished = _capturedImages.length == 3;
+    return Column(
+      children: [
+        // Header de instrucciones
+        SlideTransition(
+          position: _slideAnimation,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  theme.colorScheme.primary.withOpacity(0.1),
+                  theme.colorScheme.secondary.withOpacity(0.05),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Column(
+              children: [
+                if (!isFinished) ...[
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.delete_forever, size: 24),
-                      SizedBox(width: 12),
-                      Text(
-                        'ELIMINAR BIOMÉTRICO',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          _captureIcons[_captureStep],
+                          color: theme.colorScheme.primary,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Paso ${_captureStep + 1} de 3",
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              _capturePrompts[_captureStep],
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                            Text(
+                              _captureSubtitles[_captureStep],
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
+                ] else ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check_circle_rounded,
+                          color: Colors.green,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "¡Captura Completa!",
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade700,
+                              ),
+                            ),
+                            Text(
+                              "Revisa las imágenes y guarda tu registro",
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                
+                const SizedBox(height: 20),
+                
+                // Indicador de progreso mejorado
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(3, (index) {
+                    bool isCaptured = index < _capturedImages.length;
+                    bool isCurrent = index == _captureStep && !isFinished;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 400),
+                      width: isCurrent ? 60 : 50,
+                      height: 6,
+                      margin: const EdgeInsets.symmetric(horizontal: 6),
+                      decoration: BoxDecoration(
+                        gradient: isCaptured
+                            ? LinearGradient(
+                                colors: [theme.colorScheme.primary, theme.colorScheme.secondary],
+                              )
+                            : null,
+                        color: isCaptured 
+                            ? null 
+                            : theme.colorScheme.outline.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(3),
+                        boxShadow: isCaptured ? [
+                          BoxShadow(
+                            color: theme.colorScheme.primary.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ] : null,
+                      ),
+                    );
+                  }),
                 ),
-              ),
+              ],
             ),
-        ],
-      ),
+          ),
+        ),
+        
+        // Vista de cámara
+        Expanded(
+          child: Container(
+            color: Colors.black,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                if (_controller.isCameraInitialized && !isFinished)
+                  CameraPreview(_controller.cameraController!),
+                
+                if (!isFinished) ...[
+                  // Marco de guía con animación
+                  AnimatedBuilder(
+                    animation: _pulseAnimation,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _pulseAnimation.value,
+                        child: Container(
+                          width: 280,
+                          height: 350,
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.8),
+                              width: 3,
+                            ),
+                            borderRadius: BorderRadius.circular(180),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.white.withOpacity(0.2),
+                                blurRadius: 20,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  
+                  // Puntos de referencia
+                  Positioned(
+                    top: 120,
+                    child: Container(
+                      width: 4,
+                      height: 4,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                ],
+                
+                if (isFinished)
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: _capturedImages.asMap().entries.map((entry) {
+                        int idx = entry.key;
+                        File file = entry.value;
+                        return Hero(
+                          tag: 'captured_image_$idx',
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.3),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: Image.file(
+                                file,
+                                width: 90,
+                                height: 120,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        
+        // Controles inferiores
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: isFinished
+              ? Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.replay_rounded),
+                        label: const Text("REINTENTAR"),
+                        onPressed: _resetCapture,
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          side: BorderSide(color: theme.colorScheme.outline.withOpacity(0.5)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: FilledButton.icon(
+                        icon: const Icon(Icons.save_alt_rounded),
+                        label: const Text("GUARDAR"),
+                        onPressed: _saveBiometrics,
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          backgroundColor: Colors.green.shade600,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Center(
+                  child: AnimatedBuilder(
+                    animation: _pulseAnimation,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _pulseAnimation.value,
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [
+                                theme.colorScheme.primary,
+                                theme.colorScheme.secondary,
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: theme.colorScheme.primary.withOpacity(0.4),
+                                blurRadius: 20,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: _capturePhoto,
+                              borderRadius: BorderRadius.circular(40),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.camera_alt_rounded,
+                                  size: 40,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+        ),
+      ],
     );
   }
 }

@@ -14,28 +14,30 @@ class PermissionsHandlerScreen extends StatefulWidget {
   State<PermissionsHandlerScreen> createState() => _PermissionsHandlerScreenState();
 }
 
-class _PermissionsHandlerScreenState extends State<PermissionsHandlerScreen> with TickerProviderStateMixin {
-  final List<PermissionInfo> _permissions = [
+class _PermissionsHandlerScreenState extends State<PermissionsHandlerScreen> 
+    with TickerProviderStateMixin {
+  
+  static const List<PermissionInfo> _permissions = [
     PermissionInfo(
       permission: Permission.camera,
       title: 'Cámara',
-      description: 'Usamos la cámara para el reconocimiento facial al registrar tu asistencia.',
+      description: 'Para reconocimiento facial',
       icon: Icons.camera_alt_rounded,
       lottieAsset: 'assets/animations/camera_animation.json',
     ),
     PermissionInfo(
       permission: Permission.location,
       title: 'Ubicación',
-      description: 'Verificamos tu ubicación para validar que estés en las instalaciones de la empresa.',
+      description: 'Para validar tu presencia',
       icon: Icons.location_on_rounded,
       lottieAsset: 'assets/animations/location_animation.json',
     ),
   ];
 
-  late PageController _pageController;
-  late AnimationController _progressAnimationController;
-  late Animation<double> _progressAnimation;
-
+  late final PageController _pageController;
+  late final AnimationController _progressController;
+  late final AnimationController _buttonController;
+  
   int _currentPage = 0;
   bool _isLoading = false;
   bool _showSummary = false;
@@ -45,517 +47,403 @@ class _PermissionsHandlerScreenState extends State<PermissionsHandlerScreen> wit
   void initState() {
     super.initState();
     _pageController = PageController();
-    _progressAnimationController = AnimationController(
+    _progressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 400),
     );
-    _progressAnimation = Tween<double>(
-      begin: 0,
-      end: 1,
-    ).animate(CurvedAnimation(
-      parent: _progressAnimationController,
-      curve: Curves.easeInOut,
-    ));
-
-    _updateProgressValue();
+    _buttonController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    
     _checkPermissions();
   }
 
   @override
   void dispose() {
     _pageController.dispose();
-    _progressAnimationController.dispose();
+    _progressController.dispose();
+    _buttonController.dispose();
     super.dispose();
   }
 
-  void _updateProgressValue() {
-    final newValue = (_currentPage + 1) / _permissions.length;
-    _progressAnimationController.animateTo(newValue);
-  }
-
   Future<void> _checkPermissions() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    Map<Permission, PermissionStatus> statuses = {};
-
-    for (var permissionInfo in _permissions) {
-      final status = await permissionInfo.permission.status;
-      statuses[permissionInfo.permission] = status;
+    final Map<Permission, PermissionStatus> statuses = {};
+    
+    for (final permissionInfo in _permissions) {
+      statuses[permissionInfo.permission] = await permissionInfo.permission.status;
     }
 
-    setState(() {
-      _permissionStatus = statuses;
-      _isLoading = false;
-    });
-
-    _checkAllPermissionsGranted();
+    if (mounted) {
+      setState(() => _permissionStatus = statuses);
+      
+      if (_permissions.every((p) => _permissionStatus[p.permission]?.isGranted ?? false)) {
+        setState(() => _showSummary = true);
+      }
+    }
   }
 
   Future<void> _requestCurrentPermission() async {
     if (_isLoading) return;
 
-    final permissionInfo = _permissions[_currentPage];
+    _buttonController.forward();
+    setState(() => _isLoading = true);
 
-    setState(() {
-      _isLoading = true;
-    });
+    final permission = _permissions[_currentPage];
+    final status = await permission.permission.request();
 
-    final status = await permissionInfo.permission.request();
+    if (mounted) {
+      setState(() {
+        _permissionStatus[permission.permission] = status;
+        _isLoading = false;
+      });
 
-    setState(() {
-      _permissionStatus[permissionInfo.permission] = status;
-      _isLoading = false;
-    });
+      _buttonController.reverse();
 
-    if (status.isGranted) {
-      // Un pequeño delay para que el usuario vea el cambio de estado antes de pasar a la siguiente página.
-      await Future.delayed(const Duration(milliseconds: 500));
-      _goToNextPage();
+      if (status.isGranted) {
+        await Future.delayed(const Duration(milliseconds: 300));
+        _nextStep();
+      }
     }
   }
 
-  void _goToNextPage() {
+  void _nextStep() {
     if (_currentPage < _permissions.length - 1) {
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
       );
+      setState(() => _currentPage++);
+      _progressController.animateTo((_currentPage + 1) / _permissions.length);
     } else {
-      setState(() {
-        _showSummary = true;
-      });
-    }
-  }
-
-  void _checkAllPermissionsGranted() {
-    bool allGranted = _permissions.every((p) => _permissionStatus[p.permission]?.isGranted ?? false);
-
-    if (allGranted) {
-      // Si todos los permisos ya estaban concedidos desde el inicio,
-      // mostramos directamente el resumen.
-      setState(() {
-        _showSummary = true;
-      });
+      setState(() => _showSummary = true);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
-
+    
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
-        child: _showSummary
-            ? _buildPermissionsSummary(theme, isDarkMode)
-            : _buildPermissionsFlow(theme, isDarkMode),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 400),
+          child: _showSummary 
+              ? _buildSummary(theme)
+              : _buildPermissionsFlow(theme),
+        ),
       ),
     );
   }
 
-  Widget _buildPermissionsFlow(ThemeData theme, bool isDarkMode) {
+  Widget _buildPermissionsFlow(ThemeData theme) {
     return Column(
       children: [
-        // Progress bar y Logo
+        // Header compacto
         Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Progress Bar
-              Row(
-                children: [
-                  Expanded(
-                    child: AnimatedBuilder(
-                      animation: _progressAnimation,
-                      builder: (context, child) {
-                        return ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: LinearProgressIndicator(
-                            value: _progressAnimation.value,
-                            backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                            color: theme.primaryColor,
-                            minHeight: 8,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              // Logo y texto superior
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(
-                  Icons.security_rounded,
-                  size: 32,
-                  color: theme.primaryColor,
+              AnimatedBuilder(
+                animation: _progressController,
+                builder: (context, child) => LinearProgressIndicator(
+                  value: (_currentPage + 1) / _permissions.length,
+                  backgroundColor: Colors.grey.withOpacity(0.2),
+                  valueColor: AlwaysStoppedAnimation(theme.primaryColor),
+                  minHeight: 4,
                 ),
               ),
-              const SizedBox(height: 12),
-              const Text(
+              const SizedBox(height: 20),
+              Text(
                 'Configuración de permisos',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
         ),
         
-        // PageView for permissions
+        // PageView optimizado
         Expanded(
           child: PageView.builder(
             controller: _pageController,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _permissions.length,
-            onPageChanged: (int page) {
-              setState(() {
-                _currentPage = page;
-                _updateProgressValue();
-              });
-            },
-            itemBuilder: (context, index) {
-              final permissionInfo = _permissions[index];
-              final status = _permissionStatus[permissionInfo.permission];
-              final isGranted = status?.isGranted ?? false;
-
-              return _buildPermissionPage(
-                context,
-                permissionInfo,
-                isGranted,
-                isDarkMode,
-                index == _permissions.length - 1,
-              );
-            },
+            itemBuilder: (context, index) => _buildPermissionPage(
+              _permissions[index],
+              _permissionStatus[_permissions[index].permission]?.isGranted ?? false,
+              theme,
+            ),
           ),
         ),
       ],
     );
   }
-  
-  // =======================================================================
-  // ==================== WIDGET DE PÁGINA REFACTORIZADO ===================
-  // =======================================================================
-  Widget _buildPermissionPage(
-    BuildContext context,
-    PermissionInfo info,
-    bool isGranted,
-    bool isDarkMode,
-    bool isLastPermission,
-  ) {
-    final theme = Theme.of(context);
 
-    // Se utiliza Column + Expanded para crear un layout flexible que no necesita scroll.
+  Widget _buildPermissionPage(PermissionInfo info, bool isGranted, ThemeData theme) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
         children: [
-          // SECCIÓN DE CONTENIDO: Ocupa todo el espacio disponible empujando los botones hacia abajo.
+          // Lottie Animation - Elemento principal
           Expanded(
+            flex: 6,
+            child: Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: _isLoading
+                    ? SizedBox(
+                        key: const ValueKey('loading'),
+                        width: 180,
+                        height: 180,
+                        child: Lottie.asset(
+                          'assets/animations/loading.json',
+                          fit: BoxFit.contain,
+                        ),
+                      )
+                    : isGranted
+                        ? Container(
+                            key: const ValueKey('success'),
+                            width: 180,
+                            height: 180,
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.check_circle_outline,
+                              color: Colors.green,
+                              size: 90,
+                            ),
+                          )
+                        : SizedBox(
+                            key: ValueKey(info.lottieAsset),
+                            width: 300,
+                            height: 300,
+                            child: Lottie.asset(
+                              info.lottieAsset,
+                              fit: BoxFit.contain,
+                              repeat: true,
+                            ),
+                          ),
+              ),
+            ),
+          ),
+          
+          // Contenido de texto minimalista
+          Expanded(
+            flex: 1,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Contenedor de la animación para darle un espacio predominante.
-                Expanded(
-                  flex: 3, // Le da más peso a la animación.
-                  child: Center(
-                    child: _isLoading
-                        ? Lottie.asset(
-                            'assets/animations/loading.json', // Asegúrate de tener esta animación
-                            width: 150,
-                            height: 150,
-                          )
-                        : isGranted
-                            ? Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.green.withOpacity(0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                padding: const EdgeInsets.all(40),
-                                child: const Icon(
-                                  Icons.check_circle_outline,
-                                  color: Colors.green,
-                                  size: 100,
-                                ),
-                              )
-                            : Lottie.asset(
-                                info.lottieAsset,
-                                // El tamaño se adapta al espacio disponible.
-                                fit: BoxFit.contain,
-                              ),
+                Text(
+                  info.title,
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
+                  textAlign: TextAlign.center,
                 ),
-                // Contenedor de texto.
-                Expanded(
-                  flex: 2, // Le da espacio al texto pero menos que a la animación.
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      Text(
-                        info.title,
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        info.description,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
-                          height: 1.5,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+                const SizedBox(height: 8),
+                Text(
+                  info.description,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: Colors.grey[600],
                   ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
           ),
           
-          // SECCIÓN DE BOTONES: Se ancla en la parte inferior.
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Badge de estado "Permiso Concedido"
-              AnimatedOpacity(
-                opacity: isGranted ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(30),
+          // Botones en la parte inferior
+          Expanded(
+            flex: 2,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                // Badge de estado
+                AnimatedOpacity(
+                  opacity: isGranted ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.check, color: Colors.green, size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Concedido',
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.check_rounded, color: Colors.green, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'Permiso concedido',
-                        style: TextStyle(
-                          color: Colors.green,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 14,
+                ),
+
+                // Botón principal
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: AnimatedBuilder(
+                    animation: _buttonController,
+                    builder: (context, child) => Transform.scale(
+                      scale: 1.0 - (_buttonController.value * 0.05),
+                      child: ElevatedButton(
+                        onPressed: isGranted
+                            ? (_currentPage == _permissions.length - 1
+                                ? () => setState(() => _showSummary = true)
+                                : _nextStep)
+                            : _requestCurrentPermission,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isGranted ? Colors.green : theme.primaryColor,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: Text(
+                          isGranted
+                              ? (_currentPage == _permissions.length - 1 ? 'FINALIZAR' : 'CONTINUAR')
+                              : 'CONCEDER PERMISO',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-
-              // Botón principal
-              ElevatedButton(
-                onPressed: isGranted
-                    ? (isLastPermission
-                        ? () => setState(() => _showSummary = true)
-                        : _goToNextPage)
-                    : _requestCurrentPermission,
-                style: ElevatedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  backgroundColor: isGranted ? Colors.green : theme.primaryColor,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: Text(
-                  isGranted
-                      ? (isLastPermission ? 'VER RESUMEN' : 'CONTINUAR')
-                      : 'CONCEDER PERMISO',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 12),
-              
-              // Texto informativo
-              Text(
-                'Este permiso es obligatorio para el funcionamiento de la app.',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                  color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
+                
+                const SizedBox(height: 32),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPermissionsSummary(ThemeData theme, bool isDarkMode) {
+  Widget _buildSummary(ThemeData theme) {
     return Padding(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.all(32),
       child: Column(
         children: [
-          // Encabezado
-          Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check_circle_outline,
-                  color: Colors.green,
-                  size: 48,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                '¡Todo listo!',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Has configurado todos los permisos necesarios. La aplicación está lista para usarse.',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 40),
-          
-          // Lista de permisos
+          // Header de éxito
           Expanded(
-            child: ListView.separated(
-              itemCount: _permissions.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 16),
-              itemBuilder: (context, index) {
-                final permission = _permissions[index];
-                final status = _permissionStatus[permission.permission];
-                final isGranted = status?.isGranted ?? false;
-                
-                return _buildPermissionListItem(permission, isGranted, theme, isDarkMode);
-              },
+            flex: 3,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_circle_outline,
+                    color: Colors.green,
+                    size: 50,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  '¡Todo listo!',
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Permisos configurados correctamente',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: Colors.grey[600],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           ),
           
-          const SizedBox(height: 24),
+          // Lista compacta de permisos
+          Expanded(
+            flex: 2,
+            child: Column(
+              children: _permissions.map((permission) {
+                final isGranted = _permissionStatus[permission.permission]?.isGranted ?? false;
+                
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: theme.cardColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        permission.icon,
+                        color: isGranted ? Colors.green : theme.primaryColor,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          permission.title,
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                      Icon(
+                        Icons.check_circle,
+                        color: Colors.green,
+                        size: 18,
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
           
-          // Botón de continuar
+          // Botón final
           SizedBox(
             width: double.infinity,
+            height: 56,
             child: ElevatedButton(
               onPressed: widget.onPermissionsGranted,
               style: ElevatedButton.styleFrom(
-                foregroundColor: Colors.white,
                 backgroundColor: theme.primaryColor,
+                foregroundColor: Colors.white,
                 elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
               child: const Text(
                 'COMENZAR',
                 style: TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
                 ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildPermissionListItem(
-    PermissionInfo info, 
-    bool isGranted, 
-    ThemeData theme,
-    bool isDarkMode,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(color: isDarkMode ? Colors.grey[800]! : Colors.grey[200]!)
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: isGranted
-                  ? Colors.green.withOpacity(0.1)
-                  : theme.primaryColor.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              info.icon,
-              color: isGranted ? Colors.green : theme.primaryColor,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  info.title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: isGranted
-                  ? Colors.green.withOpacity(0.1)
-                  : Colors.red.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              isGranted ? 'Concedido' : 'Requerido',
-              style: TextStyle(
-                fontSize: 12,
-                color: isGranted ? Colors.green : Colors.red,
-                fontWeight: FontWeight.w500,
               ),
             ),
           ),
@@ -572,11 +460,11 @@ class PermissionInfo {
   final IconData icon;
   final String lottieAsset;
 
-  PermissionInfo({
+  const PermissionInfo({
     required this.permission,
     required this.title,
     required this.description,
     required this.icon,
-    this.lottieAsset = '',
+    required this.lottieAsset,
   });
 }

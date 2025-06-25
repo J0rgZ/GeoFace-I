@@ -3,368 +3,231 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
-import '../models/biometrico.dart';
+
+// No necesitamos el modelo Biometrico aquí si manejamos los datos directamente.
+// Si lo usas en otro lugar, puedes mantenerlo.
 
 class BiometricoController extends ChangeNotifier {
-  // Firebase
+  // --- DEPENDENCIAS ---
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   
-  // Cámara
+  // --- ESTADO DE LA CÁMARA ---
   CameraController? cameraController;
   bool _isCameraInitialized = false;
   
-  // Estado
+  // --- ESTADO GENERAL ---
   String? _errorMessage;
   bool _isProcessing = false;
   
-  // Getters
+  // --- GETTERS PÚBLICOS ---
   bool get isCameraInitialized => _isCameraInitialized;
   String? get errorMessage => _errorMessage;
   bool get isProcessing => _isProcessing;
-  
-  // Inicializar la cámara
+
+  BiometricoController() {
+    // Constructor
+  }
+
+  // --- MÉTODOS DE LA CÁMARA ---
+
   Future<void> initCamera() async {
-    _errorMessage = null;
+    if (_isCameraInitialized) return; // Evitar reinicialización
     
+    _errorMessage = null;
     try {
-      // Detener la cámara si ya estaba inicializada
-      await stopCamera();
-      
-      // Obtener cámaras disponibles
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
-        _errorMessage = 'No se encontraron cámaras disponibles';
-        notifyListeners();
-        return;
+        throw Exception('No se encontraron cámaras disponibles.');
       }
       
-      // Usar cámara frontal si está disponible
-      final CameraDescription camera = cameras.firstWhere(
-        (camera) => camera.lensDirection == CameraLensDirection.front,
+      final frontCamera = cameras.firstWhere(
+        (c) => c.lensDirection == CameraLensDirection.front,
         orElse: () => cameras.first,
       );
       
-      // Inicializar controlador de cámara
       cameraController = CameraController(
-        camera,
-        ResolutionPreset.medium,
+        frontCamera,
+        ResolutionPreset.high, // Usar alta resolución para mejor calidad de reconocimiento
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
       
-      // Iniciar cámara
       await cameraController!.initialize();
-      
       _isCameraInitialized = true;
-      notifyListeners();
     } catch (e) {
       _errorMessage = 'Error al inicializar la cámara: ${e.toString()}';
       _isCameraInitialized = false;
+    } finally {
       notifyListeners();
     }
   }
   
-  // Detener la cámara
   Future<void> stopCamera() async {
-    if (cameraController == null || !cameraController!.value.isInitialized) {
-      return;
-    }
-    
-    try {
+    if (cameraController != null && cameraController!.value.isInitialized) {
       await cameraController!.dispose();
       cameraController = null;
       _isCameraInitialized = false;
-    } catch (e) {
-      debugPrint('Error al detener la cámara: ${e.toString()}');
+      notifyListeners();
     }
   }
   
-  // Capturar foto
-  Future<String?> capturePhoto() async {
-    _errorMessage = null;
-    
-    if (cameraController == null || !cameraController!.value.isInitialized) {
-      _errorMessage = 'La cámara no está inicializada';
+  Future<File?> takePicture() async {
+    if (!_isCameraInitialized || cameraController == null) {
+      _errorMessage = 'La cámara no está lista.';
       notifyListeners();
       return null;
     }
     
     try {
-      _isProcessing = true;
-      notifyListeners();
-      
-      // Tomar la foto
-      final XFile imageFile = await cameraController!.takePicture();
-      
-      // Guardar la imagen en almacenamiento temporal
-      final tempDir = await getTemporaryDirectory();
-      final String imagePath = '${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
-      await File(imageFile.path).copy(imagePath);
-      
-      _isProcessing = false;
-      notifyListeners();
-      
-      return imagePath;
+      final XFile imageXFile = await cameraController!.takePicture();
+      return File(imageXFile.path);
     } catch (e) {
-      _errorMessage = 'Error al capturar imagen: ${e.toString()}';
-      _isProcessing = false;
+      _errorMessage = 'Error al capturar la foto: ${e.toString()}';
       notifyListeners();
       return null;
     }
   }
-  
-  // Eliminar registros biométricos existentes de un empleado
-  Future<void> _eliminarBiometricosExistentes(String empleadoId) async {
+
+  // --- MÉTODOS DE FIREBASE (CRUD PARA MÚLTIPLES IMÁGENES) ---
+
+  /// Obtiene las URLs de las imágenes biométricas de un empleado.
+  /// Devuelve una lista vacía si no hay registro.
+  Future<List<String>> getBiometricoUrlsByEmpleadoId(String empleadoId) async {
     try {
-      // Buscar todos los biométricos del empleado
-      final querySnapshot = await _firestore
-          .collection('biometricos')
-          .where('empleadoId', isEqualTo: empleadoId)
-          .get();
+      final doc = await _findBiometricDocument(empleadoId);
+      if (doc == null || !doc.exists) {
+        return [];
+      }
       
-      // Eliminar cada biométrico encontrado
-      for (var doc in querySnapshot.docs) {
-        final biometricoId = doc.id;
-        
-        // Eliminar archivo de Storage
+      final data = doc.data() as Map<String, dynamic>;
+      final urls = List<String>.from(data['datosFaciales'] ?? []);
+      return urls;
+
+    } catch (e) {
+      _errorMessage = 'Error al obtener datos biométricos: $e';
+      notifyListeners();
+      return [];
+    }
+  }
+
+  /// Registra o actualiza el biométrico de un empleado con un conjunto de imágenes.
+  /// Sube los archivos a Storage y guarda/actualiza el documento en Firestore.
+  Future<bool> registerOrUpdateBiometricoWithMultipleFiles(String empleadoId, List<File> images) async {
+    if (images.length != 3) {
+      _errorMessage = "Se requieren exactamente 3 imágenes.";
+      notifyListeners();
+      return false;
+    }
+
+    _setProcessing(true);
+    
+    try {
+      // 1. Antes de subir las nuevas, elimina las imágenes y el documento antiguos.
+      await deleteBiometricoByEmpleadoId(empleadoId, fromUpdate: true);
+
+      // 2. Sube las nuevas imágenes a Firebase Storage
+      final List<String> newImageUrls = [];
+      for (int i = 0; i < images.length; i++) {
+        final file = images[i];
+        final String fileName = '${const Uuid().v4()}.jpg';
+        final Reference ref = _storage.ref().child('biometricos/$empleadoId/$fileName');
+        await ref.putFile(file);
+        final downloadUrl = await ref.getDownloadURL();
+        newImageUrls.add(downloadUrl);
+      }
+
+      // 3. Crea o actualiza el documento en Firestore
+      // Usamos el ID del empleado como ID del documento para asegurar que solo haya uno.
+      await _firestore.collection('biometricos').doc(empleadoId).set({
+        'empleadoId': empleadoId,
+        'datosFaciales': newImageUrls,
+        'fechaRegistro': FieldValue.serverTimestamp(),
+        'fechaModificacion': FieldValue.serverTimestamp(),
+      });
+
+      // 4. (Opcional) Actualizar un flag en el documento del empleado
+      await _firestore.collection('empleados').doc(empleadoId).update({
+        'hayDatosBiometricos': true,
+        'fechaModificacion': FieldValue.serverTimestamp(),
+      });
+
+      _setProcessing(false);
+      return true;
+
+    } catch (e) {
+      _errorMessage = 'Error al guardar el registro: ${e.toString()}';
+      _setProcessing(false);
+      return false;
+    }
+  }
+  
+  /// Elimina el registro biométrico completo de un empleado.
+  Future<bool> deleteBiometricoByEmpleadoId(String empleadoId, {bool fromUpdate = false}) async {
+    // 'fromUpdate' evita notificar a la UI cuando es una operación interna.
+    if (!fromUpdate) _setProcessing(true);
+
+    try {
+      final doc = await _findBiometricDocument(empleadoId);
+      if (doc == null || !doc.exists) {
+        if (!fromUpdate) _setProcessing(false);
+        return true; // No había nada que borrar, operación exitosa.
+      }
+
+      final data = doc.data() as Map<String, dynamic>;
+      final urls = List<String>.from(data['datosFaciales'] ?? []);
+
+      // 1. Eliminar imágenes de Firebase Storage
+      for (final url in urls) {
         try {
-          final String storageRef = 'biometricos/$empleadoId/$biometricoId.jpg';
-          await _storage.ref().child(storageRef).delete();
+          // No uses el ID, usa la URL completa que es más robusta
+          final ref = _storage.refFromURL(url);
+          await ref.delete();
         } catch (e) {
-          debugPrint('Error al eliminar archivo: $e');
-          // Continuar con el proceso aunque falle la eliminación del archivo
+          debugPrint("No se pudo borrar la imagen $url: $e. Puede que ya no exista.");
         }
-        
-        // Eliminar documento de Firestore
-        await _firestore.collection('biometricos').doc(biometricoId).delete();
       }
-    } catch (e) {
-      debugPrint('Error al eliminar biométricos existentes: $e');
-      // No lanzamos excepción para continuar con el proceso
-    }
-  }
-  
-  // Registrar biométrico (guardar foto en Firebase)
-  Future<bool> registerBiometrico(String empleadoId) async {
-    _errorMessage = null;
-    _isProcessing = true;
-    notifyListeners();
-    
-    try {
-      // Primero eliminar cualquier biométrico existente para evitar duplicados
-      await _eliminarBiometricosExistentes(empleadoId);
+
+      // 2. Eliminar el documento de Firestore
+      await doc.reference.delete();
       
-      // Capturar rostro
-      final imagePath = await capturePhoto();
-      
-      if (imagePath == null) {
-        _errorMessage = 'No se pudo capturar la imagen';
-        _isProcessing = false;
-        notifyListeners();
-        return false;
-      }
-      
-      // Generar ID único
-      final String biometricoId = const Uuid().v4();
-      
-      // Subir la imagen a Firebase Storage
-      final String storageRef = 'biometricos/$empleadoId/$biometricoId.jpg';
-      final Reference ref = _storage.ref().child(storageRef);
-      
-      // Subir archivo
-      await ref.putFile(File(imagePath));
-      
-      // Obtener URL de descarga
-      final String downloadUrl = await ref.getDownloadURL();
-      
-      // Crear objeto biométrico - guardando fechas como strings
-      final biometrico = Biometrico(
-        id: biometricoId,
-        empleadoId: empleadoId,
-        datoFacial: downloadUrl,
-        fechaRegistro: DateTime.now().toIso8601String(),
-      );
-      
-      // Guardar en Firestore
-      await _firestore.collection('biometricos').doc(biometricoId).set(biometrico.toMap());
-      
-      // Actualizar estado del empleado - fecha como string
+      // 3. (Opcional) Actualizar flag en el empleado
       await _firestore.collection('empleados').doc(empleadoId).update({
-        'hayDatosBiometricos': true,
-        'fechaModificacion': DateTime.now().toIso8601String(),
+        'hayDatosBiometricos': false,
+        'fechaModificacion': FieldValue.serverTimestamp(),
       });
-      
-      _isProcessing = false;
-      notifyListeners();
+
+      if (!fromUpdate) _setProcessing(false);
       return true;
+
     } catch (e) {
-      _errorMessage = 'Error al guardar biométrico: ${e.toString()}';
-      _isProcessing = false;
-      notifyListeners();
-      return false;
-    }
-  }
-  
-  // Actualizar biométrico (primero elimina el anterior)
-  Future<bool> updateBiometrico(String biometricoId, String empleadoId) async {
-    _errorMessage = null;
-    _isProcessing = true;
-    notifyListeners();
-    
-    try {
-      // Primero eliminar el biométrico actual
-      await deleteBiometrico(biometricoId, empleadoId);
-      
-      // Luego registrar uno nuevo
-      return await registerBiometrico(empleadoId);
-    } catch (e) {
-      _errorMessage = 'Error al actualizar biométrico: ${e.toString()}';
-      _isProcessing = false;
-      notifyListeners();
+      _errorMessage = 'Error al eliminar el registro: ${e.toString()}';
+      if (!fromUpdate) _setProcessing(false);
       return false;
     }
   }
 
-  // Registrar biométrico con imagen de archivo (galería)
-  Future<bool> registerBiometricoWithFile(String empleadoId, File imageFile) async {
-    _errorMessage = null;
-    _isProcessing = true;
-    notifyListeners();
-    
-    try {
-      // Primero eliminar cualquier biométrico existente para evitar duplicados
-      await _eliminarBiometricosExistentes(empleadoId);
-      
-      // Generar ID único
-      final String biometricoId = const Uuid().v4();
-      
-      // Subir la imagen a Firebase Storage
-      final String storageRef = 'biometricos/$empleadoId/$biometricoId.jpg';
-      final Reference ref = _storage.ref().child(storageRef);
-      
-      // Subir archivo
-      await ref.putFile(imageFile);
-      
-      // Obtener URL de descarga
-      final String downloadUrl = await ref.getDownloadURL();
-      
-      // Crear objeto biométrico
-      final biometrico = Biometrico(
-        id: biometricoId,
-        empleadoId: empleadoId,
-        datoFacial: downloadUrl,
-        fechaRegistro: DateTime.now().toIso8601String(),
-      );
-      
-      // Guardar en Firestore
-      await _firestore.collection('biometricos').doc(biometricoId).set(biometrico.toMap());
-      
-      // Actualizar estado del empleado
-      await _firestore.collection('empleados').doc(empleadoId).update({
-        'hayDatosBiometricos': true,
-        'fechaModificacion': DateTime.now().toIso8601String(),
-      });
-      
-      _isProcessing = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _errorMessage = 'Error al guardar biométrico: ${e.toString()}';
-      _isProcessing = false;
-      notifyListeners();
-      return false;
+  // --- MÉTODOS PRIVADOS AUXILIARES ---
+
+  /// Busca el documento biométrico de un empleado.
+  Future<DocumentSnapshot?> _findBiometricDocument(String empleadoId) async {
+    // Como ahora el ID del documento es el ID del empleado, la búsqueda es directa y más rápida.
+    final docRef = _firestore.collection('biometricos').doc(empleadoId);
+    final doc = await docRef.get();
+    return doc.exists ? doc : null;
+  }
+  
+  /// Helper para gestionar el estado de procesamiento y notificar a los listeners.
+  void _setProcessing(bool value) {
+    _isProcessing = value;
+    if (!_isProcessing) {
+      _errorMessage = null; // Limpiar errores al finalizar una operación
     }
+    notifyListeners();
   }
 
-  // Actualizar biométrico con imagen de archivo (galería)
-  Future<bool> updateBiometricoWithFile(String biometricoId, String empleadoId, File imageFile) async {
-    _errorMessage = null;
-    _isProcessing = true;
-    notifyListeners();
-    
-    try {
-      // Primero eliminar el biométrico actual
-      await deleteBiometrico(biometricoId, empleadoId);
-      
-      // Luego registrar uno nuevo con el archivo seleccionado
-      return await registerBiometricoWithFile(empleadoId, imageFile);
-    } catch (e) {
-      _errorMessage = 'Error al actualizar biométrico: ${e.toString()}';
-      _isProcessing = false;
-      notifyListeners();
-      return false;
-    }
-  }
-  
-  // Eliminar biométrico
-  Future<bool> deleteBiometrico(String biometricoId, String empleadoId) async {
-    _errorMessage = null;
-    _isProcessing = true;
-    notifyListeners();
-    
-    try {
-      // Eliminar archivo de Storage
-      try {
-        final String storageRef = 'biometricos/$empleadoId/$biometricoId.jpg';
-        await _storage.ref().child(storageRef).delete();
-      } catch (e) {
-        // Continuar incluso si falló la eliminación del archivo
-        debugPrint('Error al eliminar archivo: $e');
-      }
-      
-      // Eliminar documento de Firestore
-      await _firestore.collection('biometricos').doc(biometricoId).delete();
-      
-      // Verificar si quedan otros biométricos para este empleado
-      final querySnapshot = await _firestore
-          .collection('biometricos')
-          .where('empleadoId', isEqualTo: empleadoId)
-          .get();
-      
-      // Si no quedan biométricos, actualizar empleado
-      if (querySnapshot.docs.isEmpty) {
-        await _firestore.collection('empleados').doc(empleadoId).update({
-          'hayDatosBiometricos': false,
-          'fechaModificacion': DateTime.now().toIso8601String(), // Fecha como string
-        });
-      }
-      
-      _isProcessing = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _errorMessage = 'Error al eliminar biométrico: ${e.toString()}';
-      _isProcessing = false;
-      notifyListeners();
-      return false;
-    }
-  }
-  
-  // Obtener biométrico por ID de empleado
-  Future<Biometrico?> getBiometricoByEmpleadoId(String empleadoId) async {
-    try {
-      final querySnapshot = await _firestore
-          .collection('biometricos')
-          .where('empleadoId', isEqualTo: empleadoId)
-          .limit(1)
-          .get();
-      
-      if (querySnapshot.docs.isEmpty) {
-        return null;
-      }
-      
-      return Biometrico.fromMap(querySnapshot.docs.first.data());
-    } catch (e) {
-      _errorMessage = 'Error al obtener biométrico: ${e.toString()}';
-      notifyListeners();
-      return null;
-    }
-  }
-  
-  // Liberar recursos
+  // --- LIMPIEZA ---
   @override
   void dispose() {
     stopCamera();
