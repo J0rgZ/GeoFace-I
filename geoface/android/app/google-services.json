@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:526096861971:android:dab6c4ab8b6594283ce8e6",
+        "android_client_info": {
+          "package_name": "com.caeltek.geoface"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC6DfoTMGDqpt4OXwXlV0aXCobuP9GaKFE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:526096861971:android:bb83ef8e21cd764b3ce8e6",
         "android_client_info": {
           "package_name": "com.example.geoface"

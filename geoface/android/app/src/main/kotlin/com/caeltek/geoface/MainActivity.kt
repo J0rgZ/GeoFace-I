@@ -1,4 +1,4 @@
-package com.example.geoface
+package com.caeltek.geoface
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 
