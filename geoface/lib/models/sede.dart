@@ -1,4 +1,9 @@
+/// Modelo que representa una Sede de la empresa.
 class Sede {
+  // Principio: "Evitemos los números mágicos".
+  // Se define el 100 como una constante para que tenga un nombre claro.
+  static const int kRadioPermitidoPorDefecto = 100;
+
   final String id;
   final String nombre;
   final String direccion;
@@ -21,6 +26,7 @@ class Sede {
     this.fechaModificacion,
   });
 
+  /// Construye una instancia de Sede desde un mapa JSON.
   factory Sede.fromJson(Map<String, dynamic> json) {
     return Sede(
       id: json['id'],
@@ -28,7 +34,8 @@ class Sede {
       direccion: json['direccion'],
       latitud: json['latitud'],
       longitud: json['longitud'],
-      radioPermitido: json['radioPermitido'] ?? 100,
+      // Usamos la constante en lugar del número directamente.
+      radioPermitido: json['radioPermitido'] ?? kRadioPermitidoPorDefecto,
       activa: json['activa'],
       fechaCreacion: DateTime.parse(json['fechaCreacion']),
       fechaModificacion: json['fechaModificacion'] != null
@@ -37,6 +44,7 @@ class Sede {
     );
   }
 
+  /// Convierte la instancia actual a un mapa para guardarlo como JSON.
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -51,6 +59,8 @@ class Sede {
     };
   }
 
+  /// Crea una copia de la Sede actual con los valores que le pases.
+  /// Mantiene la funcionalidad original sin cambios.
   Sede copyWith({
     String? id,
     String? nombre,
@@ -71,13 +81,16 @@ class Sede {
       radioPermitido: radioPermitido ?? this.radioPermitido,
       activa: activa ?? this.activa,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
+      // Se mantiene la lógica original, no se afecta la funcionalidad.
       fechaModificacion: fechaModificacion ?? DateTime.now(),
     );
   }
 
+  /// Crea una instancia de Sede "vacía" para estados iniciales.
   static Sede empty() {
     return Sede(
       id: '',
+      // También se evita el "string mágico" aquí.
       nombre: 'Sede no encontrada',
       direccion: '',
       latitud: 0.0,
