@@ -1,18 +1,44 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Representa un único registro de asistencia para un empleado.
+///
+/// Esta clase es inmutable. Para generar una versión modificada del objeto,
+/// se debe utilizar el método [copyWith].
 class Asistencia {
+  /// Nombres de los campos tal como existen en la colección de Firestore.
+  /// Su uso previene errores de tipeo y centraliza la definición de los campos.
+  static const String fieldId = 'id';
+  static const String fieldEmpleadoId = 'empleadoId';
+  static const String fieldSedeId = 'sedeId';
+  static const String fieldFechaHoraEntrada = 'fechaHoraEntrada';
+  static const String fieldFechaHoraSalida = 'fechaHoraSalida';
+  static const String fieldLatitudEntrada = 'latitudEntrada';
+  static const String fieldLongitudEntrada = 'longitudEntrada';
+  static const String fieldLatitudSalida = 'latitudSalida';
+  static const String fieldLongitudSalida = 'longitudSalida';
+  static const String fieldCapturaEntrada = 'capturaEntrada';
+  static const String fieldCapturaSalida = 'capturaSalida';
+
   final String id;
   final String empleadoId;
   final String sedeId;
   final DateTime fechaHoraEntrada;
+
+  /// La hora de salida del empleado. Es nulo si el turno de trabajo aún está activo.
   final DateTime? fechaHoraSalida;
+
   final double latitudEntrada;
   final double longitudEntrada;
   final double? latitudSalida;
   final double? longitudSalida;
+
+  /// URL de la imagen de captura facial al momento de la entrada.
   final String? capturaEntrada;
+
+  /// URL de la imagen de captura facial al momento de la salida.
   final String? capturaSalida;
 
+  /// Constructor principal para una instancia de [Asistencia].
   Asistencia({
     required this.id,
     required this.empleadoId,
@@ -23,78 +49,89 @@ class Asistencia {
     required this.longitudEntrada,
     this.latitudSalida,
     this.longitudSalida,
-    required this.capturaEntrada,
+    this.capturaEntrada,
     this.capturaSalida,
   });
 
-  // --- Getters (sin cambios) ---
+  /// Determina si el registro de asistencia está completo (incluye entrada y salida).
   bool get registroCompleto => fechaHoraSalida != null;
 
+  /// Calcula la duración total del tiempo trabajado.
+  /// Si el turno no ha finalizado, calcula la duración hasta el momento actual.
   Duration get tiempoTrabajado => fechaHoraSalida != null
       ? fechaHoraSalida!.difference(fechaHoraEntrada)
       : DateTime.now().difference(fechaHoraEntrada);
 
-  // --- MÉTODOS DE CONVERSIÓN CORREGIDOS ---
-
-  /// **(CORREGIDO)** Factory para crear una instancia desde un mapa de Firestore.
-  /// Ahora maneja correctamente los Timestamps y los nulos.
-  factory Asistencia.fromMap(Map<String, dynamic> map) {
-    // Helper para convertir Timestamps o Strings a DateTime de forma segura
+  /// Construye una instancia de [Asistencia] a partir de un mapa JSON.
+  ///
+  /// El mapa `json` debe provenir de Firestore.
+  ///
+  /// Lanza [FormatException] si el campo `fechaHoraEntrada` es nulo o
+  /// tiene un formato inválido, ya que es un dato esencial.
+  factory Asistencia.fromJson(Map<String, dynamic> json) {
+    // Función de ayuda para parsear objetos de fecha de forma segura.
     DateTime? parseDate(dynamic date) {
-      if (date == null) return null;
       if (date is Timestamp) return date.toDate();
-      if (date is String) return DateTime.tryParse(date); // Para compatibilidad con datos antiguos
+      if (date is String) return DateTime.tryParse(date); // Para retrocompatibilidad.
       return null;
     }
 
-    final fechaEntrada = parseDate(map['fechaHoraEntrada']);
+    final fechaEntrada = parseDate(json[fieldFechaHoraEntrada]);
+
+    // Principio "Fail Fast": Se detiene la creación si los datos críticos son inválidos.
     if (fechaEntrada == null) {
-      // Si la fecha de entrada es inválida o nula, no se puede crear el objeto.
-      throw FormatException("Fecha de entrada inválida o nula para el documento: ${map['id']}");
+      throw FormatException(
+          "El campo 'fechaHoraEntrada' es inválido en el documento con ID: ${json[fieldId]}");
     }
 
     return Asistencia(
-      id: map['id'] ?? '',
-      empleadoId: map['empleadoId'] ?? '',
-      sedeId: map['sedeId'] ?? '',
+      id: json[fieldId] ?? '',
+      empleadoId: json[fieldEmpleadoId] ?? '',
+      sedeId: json[fieldSedeId] ?? '',
       fechaHoraEntrada: fechaEntrada,
-      fechaHoraSalida: parseDate(map['fechaHoraSalida']),
-      // Casting seguro para números
-      latitudEntrada: (map['latitudEntrada'] as num?)?.toDouble() ?? 0.0,
-      longitudEntrada: (map['longitudEntrada'] as num?)?.toDouble() ?? 0.0,
-      latitudSalida: (map['latitudSalida'] as num?)?.toDouble(),
-      longitudSalida: (map['longitudSalida'] as num?)?.toDouble(),
-      capturaEntrada: map['capturaEntrada'] ?? '',
-      capturaSalida: map['capturaSalida'],
+      fechaHoraSalida: parseDate(json[fieldFechaHoraSalida]),
+      // Casting seguro para datos numéricos. Previene fallos si el campo no existe.
+      latitudEntrada: (json[fieldLatitudEntrada] as num?)?.toDouble() ?? 0.0,
+      longitudEntrada: (json[fieldLongitudEntrada] as num?)?.toDouble() ?? 0.0,
+      latitudSalida: (json[fieldLatitudSalida] as num?)?.toDouble(),
+      longitudSalida: (json[fieldLongitudSalida] as num?)?.toDouble(),
+      capturaEntrada: json[fieldCapturaEntrada],
+      capturaSalida: json[fieldCapturaSalida],
     );
   }
 
-  /// **(CORREGIDO)** Mantiene la compatibilidad con el código que usa `fromJson`.
-  /// Simplemente llama a `fromMap` que tiene la lógica correcta.
-  factory Asistencia.fromJson(Map<String, dynamic> json) {
-    return Asistencia.fromMap(json);
+  /// Factory para retrocompatibilidad. Delega a [Asistencia.fromJson].
+  factory Asistencia.fromMap(Map<String, dynamic> map) {
+    return Asistencia.fromJson(map);
   }
 
-  /// **(MEJORADO)** Convierte la instancia a un mapa para guardar en Firestore.
-  /// Se excluyen las fechas, ya que es mejor práctica usar `FieldValue.serverTimestamp()`
-  /// en el servicio (`FirebaseService`) para garantizar la hora correcta del servidor.
+  /// Convierte la instancia de [Asistencia] a un mapa JSON para ser guardado en Firestore.
+  ///
+  // Nota sobre la serialización:
+  // Los campos de fecha (`fechaHoraEntrada`, `fechaHoraSalida`) son excluidos
+  // intencionalmente de este método.
+  //
+  // Razón: Para garantizar la integridad de los datos, la hora debe ser asignada
+  // por el servidor de Firestore, no por el cliente.
+  //
+  // Responsabilidad del llamador: El servicio que utilice este método
+  // DEBE añadir manualmente el timestamp del servidor al mapa resultante.
+  // Ejemplo: `mapa['fechaHoraEntrada'] = FieldValue.serverTimestamp();`
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
-      'empleadoId': empleadoId,
-      'sedeId': sedeId,
-      'latitudEntrada': latitudEntrada,
-      'longitudEntrada': longitudEntrada,
-      'latitudSalida': latitudSalida,
-      'longitudSalida': longitudSalida,
-      'capturaEntrada': capturaEntrada,
-      'capturaSalida': capturaSalida,
-      // NOTA: fechaHoraEntrada y fechaHoraSalida se deben añadir en FirebaseService
-      // usando FieldValue.serverTimestamp() para máxima precisión.
+      fieldId: id,
+      fieldEmpleadoId: empleadoId,
+      fieldSedeId: sedeId,
+      fieldLatitudEntrada: latitudEntrada,
+      fieldLongitudEntrada: longitudEntrada,
+      fieldLatitudSalida: latitudSalida,
+      fieldLongitudSalida: longitudSalida,
+      fieldCapturaEntrada: capturaEntrada,
+      fieldCapturaSalida: capturaSalida,
     };
   }
 
-  // --- Método copyWith (sin cambios) ---
+  /// Crea una copia de esta instancia, reemplazando los campos proporcionados.
   Asistencia copyWith({
     String? id,
     String? empleadoId,
@@ -119,7 +156,7 @@ class Asistencia {
       latitudSalida: latitudSalida ?? this.latitudSalida,
       longitudSalida: longitudSalida ?? this.longitudSalida,
       capturaEntrada: capturaEntrada ?? this.capturaEntrada,
-      capturaSalida: capturaSalida ?? this.capturaSalida,  
+      capturaSalida: capturaSalida ?? this.capturaSalida,
     );
   }
 }
