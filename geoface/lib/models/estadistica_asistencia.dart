@@ -1,9 +1,29 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Representa un resumen estadístico de la asistencia para una sede y fecha específicas.
+///
+/// La estadística puede ser a nivel de toda la sede o para un empleado individual
+/// si el campo [empleadoId] está presente.
+/// Esta clase es inmutable. Para modificaciones, utilice [copyWith].
 class EstadisticaAsistencia {
+  /// Nombres de los campos tal como existen en la colección de Firestore.
+  /// Su uso previene errores de tipeo y centraliza la definición de los campos.
+  static const String fieldSedeId = 'sedeId';
+  static const String fieldSedeNombre = 'sedeNombre';
+  static const String fieldEmpleadoId = 'empleadoId';
+  static const String fieldFecha = 'fecha';
+  static const String fieldTotalEmpleados = 'totalEmpleados';
+  static const String fieldTotalAsistencias = 'totalAsistencias';
+  static const String fieldTotalAusencias = 'totalAusencias';
+  static const String fieldTotalTardanzas = 'totalTardanzas';
+  static const String fieldPorcentajeAsistencia = 'porcentajeAsistencia';
+
   final String sedeId;
-  final String sedeNombre; // Añadido para mostrar en la UI y reportes
+  final String sedeNombre;
+
+  /// ID del empleado si la estadística es individual. Nulo si es para toda la sede.
   final String? empleadoId;
+
   final DateTime fecha;
   final int totalEmpleados;
   final int totalAsistencias;
@@ -11,6 +31,7 @@ class EstadisticaAsistencia {
   final int totalTardanzas;
   final double porcentajeAsistencia;
 
+  /// Constructor principal para una instancia de [EstadisticaAsistencia].
   EstadisticaAsistencia({
     required this.sedeId,
     required this.sedeNombre,
@@ -23,49 +44,80 @@ class EstadisticaAsistencia {
     required this.porcentajeAsistencia,
   });
 
-  /// Constructor factory para crear una instancia desde un mapa (JSON/Firestore).
-  /// Es robusto contra valores nulos y maneja diferentes tipos de datos.
+  /// Construye una instancia de [EstadisticaAsistencia] a partir de un mapa JSON.
+  ///
+  /// Lanza [FormatException] si los campos críticos `sedeId` o `fecha` son
+  /// nulos o tienen un formato inválido.
   factory EstadisticaAsistencia.fromJson(Map<String, dynamic> json) {
-    // Lógica robusta para parsear la fecha, ya sea un Timestamp de Firestore o un String.
-    DateTime parsedDate;
-    if (json['fecha'] is Timestamp) {
-      parsedDate = (json['fecha'] as Timestamp).toDate();
-    } else if (json['fecha'] is String) {
-      // Usamos tryParse para evitar errores si el formato del string es incorrecto.
-      parsedDate = DateTime.tryParse(json['fecha']) ?? DateTime.now();
-    } else {
-      // Valor por defecto si el campo no existe o es de un tipo inesperado.
-      parsedDate = DateTime.now();
+    // Función de ayuda para parsear objetos de fecha de forma segura.
+    DateTime? parseDate(dynamic date) {
+      if (date is Timestamp) return date.toDate();
+      if (date is String) return DateTime.tryParse(date); // Para retrocompatibilidad.
+      return null;
+    }
+
+    final fecha = parseDate(json[fieldFecha]);
+    final sedeId = json[fieldSedeId] as String?;
+
+    // Principio "Fail Fast": Se valida que los datos esenciales existan.
+    if (sedeId == null || sedeId.isEmpty) {
+      throw FormatException("El campo 'sedeId' es nulo o vacío en los datos de la estadística.");
+    }
+    if (fecha == null) {
+      throw FormatException("El campo 'fecha' es nulo o inválido para la estadística de la sede con ID: $sedeId.");
     }
 
     return EstadisticaAsistencia(
-      // Usamos el operador '??' para dar un valor por defecto si el campo es nulo.
-      sedeId: json['sedeId'] as String? ?? '',
-      sedeNombre: json['sedeNombre'] as String? ?? 'N/A', // Manejo del nuevo campo
-      empleadoId: json['empleadoId'] as String?, // Este puede ser nulo, así que está bien.
-      fecha: parsedDate,
-      totalEmpleados: json['totalEmpleados'] as int? ?? 0,
-      totalAsistencias: json['totalAsistencias'] as int? ?? 0,
-      totalAusencias: json['totalAusencias'] as int? ?? 0,
-      totalTardanzas: json['totalTardanzas'] as int? ?? 0,
-      // Lógica para manejar tanto int como double desde el JSON.
-      porcentajeAsistencia: (json['porcentajeAsistencia'] as num?)?.toDouble() ?? 0.0,
+      sedeId: sedeId,
+      sedeNombre: json[fieldSedeNombre] as String? ?? 'Sede Desconocida',
+      empleadoId: json[fieldEmpleadoId] as String?,
+      fecha: fecha,
+      totalEmpleados: json[fieldTotalEmpleados] as int? ?? 0,
+      totalAsistencias: json[fieldTotalAsistencias] as int? ?? 0,
+      totalAusencias: json[fieldTotalAusencias] as int? ?? 0,
+      totalTardanzas: json[fieldTotalTardanzas] as int? ?? 0,
+      porcentajeAsistencia: (json[fieldPorcentajeAsistencia] as num?)?.toDouble() ?? 0.0,
     );
   }
 
-  /// Convierte la instancia a un mapa, ideal para escribir en Firestore.
+  /// Convierte la instancia a un mapa JSON para ser guardado en Firestore.
   Map<String, dynamic> toJson() {
     return {
-      'sedeId': sedeId,
-      'sedeNombre': sedeNombre,
-      'empleadoId': empleadoId,
-      // Se guarda como Timestamp para facilitar las consultas en Firestore.
-      'fecha': Timestamp.fromDate(fecha),
-      'totalEmpleados': totalEmpleados,
-      'totalAsistencias': totalAsistencias,
-      'totalAusencias': totalAusencias,
-      'totalTardanzas': totalTardanzas,
-      'porcentajeAsistencia': porcentajeAsistencia,
+      fieldSedeId: sedeId,
+      fieldSedeNombre: sedeNombre,
+      fieldEmpleadoId: empleadoId,
+      // Se almacena como Timestamp para optimizar las consultas por rango de fechas.
+      fieldFecha: Timestamp.fromDate(fecha),
+      fieldTotalEmpleados: totalEmpleados,
+      fieldTotalAsistencias: totalAsistencias,
+      fieldTotalAusencias: totalAusencias,
+      fieldTotalTardanzas: totalTardanzas,
+      fieldPorcentajeAsistencia: porcentajeAsistencia,
     };
+  }
+  
+  /// Crea una copia de esta instancia, reemplazando los campos proporcionados.
+  EstadisticaAsistencia copyWith({
+    String? sedeId,
+    String? sedeNombre,
+    String? empleadoId,
+    DateTime? fecha,
+    int? totalEmpleados,
+    int? totalAsistencias,
+    int? totalAusencias,
+    int? totalTardanzas,
+    double? porcentajeAsistencia,
+  }) {
+    return EstadisticaAsistencia(
+      sedeId: sedeId ?? this.sedeId,
+      sedeNombre: sedeNombre ?? this.sedeNombre,
+      empleadoId: empleadoId ?? this.empleadoId,
+      fecha: fecha ?? this.fecha,
+      totalEmpleados: totalEmpleados ?? this.totalEmpleados,
+      totalAsistencias: totalAsistencias ?? this.totalAsistencias,
+      totalAusencias: totalAusencias ?? this.totalAusencias,
+      totalTardanzas: totalTardanzas ?? this.totalTardanzas,
+      porcentajeAsistencia: porcentajeAsistencia ?? this.porcentajeAsistencia,
+    );
   }
 }
