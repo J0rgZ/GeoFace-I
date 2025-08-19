@@ -1,33 +1,38 @@
+/// -----------------------------------------------------------------------------
+/// @Header:      Gestión de Usuarios del Sistema
+/// @Author:      Jorge Luis Briceño Diaz
+/// @Description: Este archivo define el modelo de datos para la clase `Usuario`.
+///              La clase `Usuario` representa a una entidad de usuario en el
+///              sistema, gestionando sus roles, datos de acceso y su
+///              interacción con la base de datos de Firestore. Este modelo
+///              está diseñado para manejar la serialización y deserialización
+///              de datos desde y hacia JSON, facilitando la comunicación con
+///              la base de datos.
+///
+/// @ModelName:   Usuario
+/// @Location:    lib/models/usuario.dart
+/// @StartDate:   15/05/2025
+/// @EndDate:     25/05/2025
+/// -----------------------------------------------------------------------------
+
+/// -----------------------------------------------------------------------------
+/// @Modification: [Numero de modificacion]
+/// @Date:        [Fecha de Modificación]
+/// @Author:      [Nombre de quien modificó]
+/// @Description: [Descripción de los cambios realizados]
+/// -----------------------------------------------------------------------------
+/// 
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Representa a un usuario del sistema, con roles y datos de acceso.
-///
-/// Un usuario puede ser de tipo 'ADMIN' o 'EMPLEADO', lo que determina
-/// los permisos y la información asociada que tendrá en la aplicación.
 class Usuario {
-  /// El identificador único del documento de Firestore.
   final String id;
-
-  /// El nombre con el que el usuario se identifica en el sistema.
   final String nombreUsuario;
-
-  /// La dirección de correo electrónico, usada para el inicio de sesión.
   final String correo;
-
-  /// Define el rol del usuario. Los valores esperados son 'ADMIN' o 'EMPLEADO'.
   final String tipoUsuario;
-
-  /// El ID del empleado asociado, si el [tipoUsuario] es 'EMPLEADO'.
-  /// Es nulo para los administradores.
   final String? empleadoId;
-
-  /// Indica si la cuenta de usuario está habilitada para usar el sistema.
   final bool activo;
-
-  /// La fecha y hora en que la cuenta de usuario fue creada.
   final DateTime fechaCreacion;
-
-  /// La fecha y hora del último inicio de sesión. Puede ser nulo si nunca ha accedido.
   final DateTime? fechaUltimoAcceso;
 
   Usuario({
@@ -47,12 +52,12 @@ class Usuario {
   /// Comprueba si el usuario tiene el rol de 'EMPLEADO'.
   bool get isEmpleado => tipoUsuario == 'EMPLEADO';
 
-  /// Crea una instancia de [Usuario] a partir de un mapa JSON.
+  /// Crea una instancia de [Usuario] a partir de un mapa de datos (JSON).
   ///
-  /// Este método es robusto y maneja la conversión de [Timestamp] de Firestore
-  /// o de un [String] en formato ISO 8601 a [DateTime].
+  /// Este factory method es clave para la deserialización de los datos
+  /// provenientes de Firestore, manejando la conversión de tipos de forma segura.
   factory Usuario.fromJson(Map<String, dynamic> json) {
-    // Función auxiliar para parsear fechas de forma segura.
+    // Función auxiliar para parsear fechas de forma segura desde Firestore.
     DateTime? parsearFecha(dynamic fecha) {
       if (fecha == null) return null;
       if (fecha is Timestamp) return fecha.toDate();
@@ -72,10 +77,7 @@ class Usuario {
     );
   }
 
-  /// Convierte la instancia de [Usuario] en un mapa JSON.
-  ///
-  /// El 'id' generalmente no se incluye en el mapa, ya que es el identificador
-  /// del documento en Firestore.
+  /// Convierte la instancia de [Usuario] en un mapa para ser almacenado.
   Map<String, dynamic> toJson() {
     return {
       'nombreUsuario': nombreUsuario,
@@ -83,7 +85,8 @@ class Usuario {
       'tipoUsuario': tipoUsuario,
       'empleadoId': empleadoId,
       'activo': activo,
-      // Se recomienda usar FieldValue.serverTimestamp() al escribir en Firestore.
+      // Se recomienda usar FieldValue.serverTimestamp() al escribir en Firestore
+      // por primera vez para garantizar la consistencia de la hora del servidor.
       'fechaCreacion': fechaCreacion.toIso8601String(),
       'fechaUltimoAcceso': fechaUltimoAcceso?.toIso8601String(),
     };
