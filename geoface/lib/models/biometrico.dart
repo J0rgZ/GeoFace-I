@@ -1,33 +1,52 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Gestión de Datos Biométricos
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Define el modelo `Biometrico` para almacenar los datos
+//               biométricos faciales de un empleado. Contiene la referencia al
+//               empleado, el dato facial y las fechas de registro. El modelo es
+//               inmutable y maneja la serialización y deserialización de datos
+//               desde y hacia un formato JSON.
+//
+// @NombreModelo: Biometrico
+// @Ubicacion:    lib/models/biometrico.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Representa los datos biométricos faciales de un empleado.
-///
-/// Contiene el identificador, la referencia al empleado, la ruta del dato facial
-/// y las fechas de registro y actualización.
-/// La clase es inmutable; las modificaciones deben hacerse a través de [copyWith].
+// Representa los datos biométricos faciales de un empleado.
+//
+// Contiene el identificador, la referencia al empleado, el dato facial
+// y las fechas de registro y actualización.
+// La clase es inmutable; las modificaciones deben hacerse a través del método [copyWith].
 class Biometrico {
-  /// Nombres de los campos tal como existen en la colección de Firestore.
-  static const String fieldId = 'id';
-  static const String fieldEmpleadoId = 'empleadoId';
-  static const String fieldDatoFacial = 'datoFacial';
-  static const String fieldFechaRegistro = 'fechaRegistro';
-  static const String fieldFechaActualizacion = 'fechaActualizacion';
+  // Nombres de los campos tal como existen en la colección de Firestore.
+  static const String campoId = 'id';
+  static const String campoEmpleadoId = 'empleadoId';
+  static const String campoDatoFacial = 'datoFacial';
+  static const String campoFechaRegistro = 'fechaRegistro';
+  static const String campoFechaActualizacion = 'fechaActualizacion';
 
   final String id;
   final String empleadoId;
   
-  /// Representa la referencia al dato facial.
-  /// En la práctica, puede ser una URL a Firebase Storage o una representación en base64.
+  // Representa la referencia al dato facial.
+  // En la práctica, puede ser una URL o una representación en base64.
   final String datoFacial;
 
-  /// La fecha y hora en que se realizó el registro biométrico.
-  /// Se almacena como [DateTime] para permitir consultas y comparaciones.
+  // La fecha y hora en que se realizó el registro biométrico.
   final DateTime fechaRegistro;
 
-  /// La fecha y hora de la última actualización. Es nulo si nunca se ha modificado.
+  // La fecha y hora de la última actualización. Es nulo si nunca se ha modificado.
   final DateTime? fechaActualizacion;
 
-  /// Constructor principal para una instancia de [Biometrico].
+  // Constructor principal para una instancia de [Biometrico].
   Biometrico({
     required this.id,
     required this.empleadoId,
@@ -36,24 +55,23 @@ class Biometrico {
     this.fechaActualizacion,
   });
 
-  /// Construye una instancia de [Biometrico] a partir de un mapa JSON.
-  ///
-  /// Lanza [FormatException] si alguno de los campos requeridos (`id`,
-  /// `empleadoId`, `datoFacial`, `fechaRegistro`) es nulo o inválido.
+  // Construye una instancia de [Biometrico] a partir de un mapa JSON.
+  //
+  // Lanza una excepción [FormatException] si alguno de los campos requeridos es nulo o inválido.
   factory Biometrico.fromJson(Map<String, dynamic> json) {
-    // Función de ayuda para parsear fechas desde Timestamp o String.
-    DateTime? parseDate(dynamic date) {
-      if (date is Timestamp) return date.toDate();
-      if (date is String) return DateTime.tryParse(date); // Para retrocompatibilidad.
+    // Función de ayuda para interpretar fechas desde Timestamp o String.
+    DateTime? analizarFecha(dynamic fecha) {
+      if (fecha is Timestamp) return fecha.toDate();
+      if (fecha is String) return DateTime.tryParse(fecha);
       return null;
     }
 
-    final id = json[fieldId] as String?;
-    final empleadoId = json[fieldEmpleadoId] as String?;
-    final datoFacial = json[fieldDatoFacial] as String?;
-    final fechaRegistro = parseDate(json[fieldFechaRegistro]);
+    final id = json[campoId] as String?;
+    final empleadoId = json[campoEmpleadoId] as String?;
+    final datoFacial = json[campoDatoFacial] as String?;
+    final fechaRegistro = analizarFecha(json[campoFechaRegistro]);
 
-    // Principio "Fail Fast": Se valida que los datos esenciales existan y no estén vacíos.
+    // Principio de "fallo rápido": se valida que los datos esenciales existan y no estén vacíos.
     if (id == null || id.isEmpty) {
       throw FormatException("El campo 'id' es nulo o vacío en los datos biométricos.");
     }
@@ -72,27 +90,24 @@ class Biometrico {
       empleadoId: empleadoId,
       datoFacial: datoFacial,
       fechaRegistro: fechaRegistro,
-      fechaActualizacion: parseDate(json[fieldFechaActualizacion]),
+      fechaActualizacion: analizarFecha(json[campoFechaActualizacion]),
     );
   }
 
-  /// Convierte la instancia a un mapa JSON para ser guardado en Firestore.
-  ///
-  /// Las fechas de tipo [DateTime] se convierten a [Timestamp] para compatibilidad
-  /// y para permitir consultas eficientes por rango de fechas en Firestore.
+  // Convierte la instancia a un mapa JSON para ser guardado en Firestore.
   Map<String, dynamic> toJson() {
     return {
-      fieldId: id,
-      fieldEmpleadoId: empleadoId,
-      fieldDatoFacial: datoFacial,
-      fieldFechaRegistro: Timestamp.fromDate(fechaRegistro),
-      fieldFechaActualizacion: fechaActualizacion != null
+      campoId: id,
+      campoEmpleadoId: empleadoId,
+      campoDatoFacial: datoFacial,
+      campoFechaRegistro: Timestamp.fromDate(fechaRegistro),
+      campoFechaActualizacion: fechaActualizacion != null
           ? Timestamp.fromDate(fechaActualizacion!)
           : null,
     };
   }
   
-  /// Crea una copia de esta instancia, reemplazando los campos proporcionados.
+  // Crea una copia de esta instancia, reemplazando los campos proporcionados con nuevos valores.
   Biometrico copyWith({
     String? id,
     String? empleadoId,
