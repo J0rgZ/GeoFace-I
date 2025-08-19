@@ -1,3 +1,22 @@
+// -----------------------------------------------------------------------------
+// @Header:      Configuración de Endpoints de API
+// @Author:      Jorge Luis Briceño Diaz
+// @Description: Define el modelo `ApiConfig` para gestionar las URLs de los
+//              endpoints de la API, como la de identificación y sincronización.
+//              Facilita la gestión centralizada de las configuraciones de la API
+//              y la derivación de URLs base.
+//
+// @ModelName:   ApiConfig
+// @Location:    lib/config/api_config.dart
+// @StartDate:   15/07/2025
+// @EndDate:     30/07/2025
+// -----------------------------------------------------------------------------
+// @Modification: [Numero de modificacion]
+// @Date:        [Fecha de Modificación]
+// @Author:      [Nombre de quien modificó]
+// @Description: [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 class ApiConfig {
   final String identificationApiUrl;
   final String syncApiUrl;
@@ -15,7 +34,6 @@ class ApiConfig {
     if (syncApiUrl.endsWith('/sync-database')) {
        return syncApiUrl.substring(0, syncApiUrl.length - '/sync-database'.length);
     }
-    // Si no tiene el formato esperado, devolvemos la de identificación como fallback.
     return identificationApiUrl;
   }
 
