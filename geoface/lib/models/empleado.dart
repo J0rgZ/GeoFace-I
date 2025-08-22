@@ -63,13 +63,13 @@ class Empleado {
   factory Empleado.fromJson(Map<String, dynamic> json) {
     // Función pequeña para no repetir el código de parseo de fechas.
     // Si la fecha es inválida o nula, devuelve null para que lo podamos validar después.
-    DateTime? _parseDate(dynamic date) {
+    DateTime? parseDate(dynamic date) {
       if (date is Timestamp) return date.toDate();
       if (date is String) return DateTime.tryParse(date);
       return null;
     }
 
-    final fechaCreacion = _parseDate(json[fieldFechaCreacion]);
+    final fechaCreacion = parseDate(json[fieldFechaCreacion]);
 
     // --- APLICANDO "FAIL FAST" ---
     // Si la fecha de creación viene nula o en un formato que no entendemos,
@@ -94,7 +94,7 @@ class Empleado {
       // Por defecto, un empleado nuevo siempre está activo.
       activo: json[fieldActivo] ?? true,
       fechaCreacion: fechaCreacion, // Ya validamos que no es nula.
-      fechaModificacion: _parseDate(json[fieldFechaModificacion]),
+      fechaModificacion: parseDate(json[fieldFechaModificacion]),
       tieneUsuario: json[fieldTieneUsuario] ?? false,
     );
   }
