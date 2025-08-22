@@ -62,12 +62,7 @@ class Asistencia {
       ? fechaHoraSalida!.difference(fechaHoraEntrada)
       : DateTime.now().difference(fechaHoraEntrada);
 
-  /// Construye una instancia de [Asistencia] a partir de un mapa JSON.
-  ///
-  /// El mapa `json` debe provenir de Firestore.
-  ///
-  /// Lanza [FormatException] si el campo `fechaHoraEntrada` es nulo o
-  /// tiene un formato inválido, ya que es un dato esencial.
+
   factory Asistencia.fromJson(Map<String, dynamic> json) {
     // Función de ayuda para parsear objetos de fecha de forma segura.
     DateTime? parseDate(dynamic date) {
@@ -105,18 +100,6 @@ class Asistencia {
     return Asistencia.fromJson(map);
   }
 
-  /// Convierte la instancia de [Asistencia] a un mapa JSON para ser guardado en Firestore.
-  ///
-  // Nota sobre la serialización:
-  // Los campos de fecha (`fechaHoraEntrada`, `fechaHoraSalida`) son excluidos
-  // intencionalmente de este método.
-  //
-  // Razón: Para garantizar la integridad de los datos, la hora debe ser asignada
-  // por el servidor de Firestore, no por el cliente.
-  //
-  // Responsabilidad del llamador: El servicio que utilice este método
-  // DEBE añadir manualmente el timestamp del servidor al mapa resultante.
-  // Ejemplo: `mapa['fechaHoraEntrada'] = FieldValue.serverTimestamp();`
   Map<String, dynamic> toJson() {
     return {
       fieldId: id,
