@@ -29,7 +29,6 @@ class FakeGpsDetectorService {
 
       return null; // Sin problemas detectados
     } catch (e) {
-      print("Error obteniendo posición: $e");
       return "No se pudo verificar la ubicación.";
     }
   }

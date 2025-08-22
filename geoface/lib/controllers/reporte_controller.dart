@@ -160,8 +160,6 @@ class ReporteController extends ChangeNotifier {
         todosLosEmpleados: _todosLosEmpleados,
       );
       await pdfGenerator.generateAndSharePdf();
-    } catch (e) {
-      print("Error al generar o compartir el PDF: $e");
     } finally {
       _isExporting = false;
       notifyListeners();

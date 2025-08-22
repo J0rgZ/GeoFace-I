@@ -370,7 +370,7 @@ class FirebaseService {
           .map((doc) {
             final data = doc.data();
             data['id'] = doc.id;
-            return Asistencia.fromMap(data);
+            return Asistencia.fromJson(data);
           })
           .toList();
     } catch (e) {
