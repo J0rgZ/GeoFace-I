@@ -1,3 +1,23 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Controlador de Usuarios
+// @Autor:        Brayar Lopez Catunta
+// @Descripción:  Este archivo contiene la lógica de negocio para la gestión de
+//               usuarios del sistema. Maneja la creación, lectura, actualización
+//               y eliminación (CRUD) de usuarios de tipo 'ADMIN' y 'EMPLEADO',
+//               interactuando con Firebase Authentication y Cloud Firestore.
+//               También gestiona el estado de carga para las operaciones asíncronas.
+//
+// @NombreControlador: UserController
+// @Ubicacion:    lib/controllers/user_controller.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,11 +27,11 @@ class UserController with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   
-  // --- NUEVO: Manejo del estado de carga ---
+  // Variable privada para controlar el estado de carga y evitar múltiples envíos.
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
-  // --- NUEVO: Método privado para cambiar el estado de carga y notificar a los listeners ---
+  // Método centralizado para actualizar el estado de carga y notificar a la UI.
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
@@ -19,9 +39,9 @@ class UserController with ChangeNotifier {
 
   // --- MÉTODOS PARA GESTIÓN DE ADMINISTRADORES ---
 
-  /// Obtiene una lista de todos los usuarios con tipo 'ADMIN'.
-  /// FIX: Se eliminaron las llamadas a notifyListeners que causaban el error.
-  /// El FutureBuilder gestionará su propio estado de carga.
+  // Obtiene una lista de todos los usuarios con rol de 'ADMIN'.
+  // No notifica a los listeners aquí, ya que se usa principalmente con FutureBuilder,
+  // el cual gestiona su propio ciclo de vida y estados.
   Future<List<Usuario>> getAdministradores() async {
     try {
       final snapshot = await _firestore
@@ -36,12 +56,12 @@ class UserController with ChangeNotifier {
       
       return administradores;
     } catch (e) {
+      // Relanzamos el error para que sea manejado en la UI.
       throw Exception('Error al cargar los administradores.');
     }
   }
 
-  /// Crea un nuevo usuario administrador en Auth y Firestore.
-  /// Mantiene notifyListeners porque es una acción de usuario, no de build.
+  // Crea un nuevo usuario administrador en Firebase Auth y su documento correspondiente en Firestore.
   Future<void> createAdminUser({
     required String nombreUsuario,
     required String correo,
@@ -60,6 +80,7 @@ class UserController with ChangeNotifier {
       
       await _firestore.collection('usuarios').doc(uid).set(usuarioData);
     } on FirebaseAuthException catch (e) {
+      // Traducimos los errores comunes de Firebase a mensajes más claros para el usuario.
       switch (e.code) {
         case 'email-already-in-use': throw Exception('El correo electrónico ya está en uso.');
         case 'weak-password': throw Exception('La contraseña es demasiado débil.');
@@ -73,7 +94,7 @@ class UserController with ChangeNotifier {
     }
   }
   
-  /// Actualiza el nombre de un usuario administrador.
+  // Actualiza el nombre de un usuario administrador en Firestore.
   Future<void> updateAdminUser({required String userId, required String nombreUsuario}) async {
     _setLoading(true);
     try {
@@ -85,30 +106,26 @@ class UserController with ChangeNotifier {
     }
   }
 
-  /// Cambia la contraseña del usuario actualmente autenticado.
+  // Cambia la contraseña del usuario que ha iniciado sesión.
   Future<void> changePassword(String currentPassword, String newPassword) async {
-    // MODIFICADO: Inicia el estado de carga
     _setLoading(true);
-
     try {
       final user = _auth.currentUser;
       if (user == null || user.email == null) {
         throw Exception('No hay un usuario autenticado para realizar esta acción.');
       }
 
-      // 1. Reautenticar al usuario para confirmar que conoce la contraseña actual.
-      // Esta es una medida de seguridad requerida por Firebase.
+      // Por seguridad, Firebase exige reautenticar al usuario antes de cambiar la contraseña.
       AuthCredential credential = EmailAuthProvider.credential(
         email: user.email!,
         password: currentPassword,
       );
       await user.reauthenticateWithCredential(credential);
 
-      // 2. Si la reautenticación es exitosa, cambiar la contraseña.
+      // Si la reautenticación es exitosa, se procede a cambiar la contraseña.
       await user.updatePassword(newPassword);
       
     } on FirebaseAuthException catch (e) {
-      // Traducir errores de Firebase a mensajes amigables.
       if (e.code == 'wrong-password') {
         throw Exception('La contraseña actual es incorrecta.');
       } else if (e.code == 'weak-password') {
@@ -117,15 +134,13 @@ class UserController with ChangeNotifier {
         throw Exception('Ocurrió un error. Inténtalo de nuevo.');
       }
     } catch (e) {
-      // Capturar cualquier otro error.
       throw Exception('Un error inesperado ha ocurrido.');
     } finally {
-      // MODIFICADO: Finaliza el estado de carga, sin importar si hubo éxito o error.
       _setLoading(false);
     }
   }
   
-  /// Cambia el estado 'activo' de un usuario.
+  // Cambia el estado de un usuario entre 'activo' e 'inactivo'.
   Future<void> toggleUserStatus(Usuario user) async {
     _setLoading(true);
     try {
@@ -137,9 +152,9 @@ class UserController with ChangeNotifier {
     }
   }
 
-  // --- MÉTODOS PARA GESTIÓN DE EMPLEADOS (FIX APLICADO TAMBIÉN) ---
+  // --- MÉTODOS PARA GESTIÓN DE EMPLEADOS ---
 
-  /// Obtiene la lista de empleados sin usuario asignado.
+  // Obtiene la lista de empleados que aún no tienen una cuenta de usuario asignada.
   Future<List<Map<String, dynamic>>> getEmpleadosSinUsuario() async {
     try {
       final snapshot = await _firestore.collection('empleados').where('tieneUsuario', isEqualTo: false).get();
@@ -149,7 +164,7 @@ class UserController with ChangeNotifier {
     }
   }
   
-  /// Asigna un usuario a un empleado existente.
+  // Asigna una cuenta de usuario a un empleado, usando su DNI para el correo y contraseña inicial.
   Future<void> assignUserToEmpleado({required String empleadoId, required String dni}) async {
     _setLoading(true);
     try {
@@ -159,6 +174,7 @@ class UserController with ChangeNotifier {
       final empleadoData = empleadoDoc.data()!;
       if (empleadoData['dni'] != dni) throw Exception('El DNI no coincide.');
 
+      // Se genera un correo único y predecible para el empleado.
       final correo = '$dni@geoface.com';
       final userCredential = await _auth.createUserWithEmailAndPassword(email: correo, password: dni);
       
@@ -167,8 +183,10 @@ class UserController with ChangeNotifier {
         'empleadoId': empleadoId, 'activo': true, 'fechaCreacion': FieldValue.serverTimestamp(),
       };
       
+      // Se crea el documento del usuario y se actualiza el estado del empleado en una transacción implícita.
       await _firestore.collection('usuarios').doc(userCredential.user!.uid).set(usuarioData);
       await _firestore.collection('empleados').doc(empleadoId).update({'tieneUsuario': true});
+
     } on FirebaseAuthException catch (e) {
       if (e.code == 'email-already-in-use') throw Exception('Ya existe un usuario con este DNI.');
       throw Exception('Error de autenticación: ${e.message}');
