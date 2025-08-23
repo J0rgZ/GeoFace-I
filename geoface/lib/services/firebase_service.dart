@@ -11,7 +11,7 @@
 //
 // @NombreArchivo: firebase_service.dart
 // @Ubicacion:    lib/services/firebase_service.dart
-// @FechaInicio:  15/0h5/2025
+// @FechaInicio:  15/05/2025
 // @FechaFin:     25/05/2025
 // -----------------------------------------------------------------------------
 // @Modificacion: [Número de modificación]
