@@ -1,7 +1,7 @@
 // -----------------------------------------------------------------------------
-// @Header:      Gestión de Usuarios del Sistema
-// @Author:      Jorge Luis Briceño Diaz
-// @Description: Este archivo define el modelo de datos para la clase `Usuario`.
+// @Encabezado:      Gestión de Usuarios del Sistema
+// @Autor:      Jorge Luis Briceño Diaz
+// @Descripción: Este archivo define el modelo de datos para la clase `Usuario`.
 //              La clase `Usuario` representa a una entidad de usuario en el
 //              sistema, gestionando sus roles, datos de acceso y su
 //              interacción con la base de datos de Firestore. Este modelo
@@ -9,18 +9,17 @@
 //              de datos desde y hacia JSON, facilitando la comunicación con
 //              la base de datos.
 //
-// @ModelName:   Usuario
-// @Location:    lib/models/usuario.dart
-// @StartDate:   15/05/2025
-// @EndDate:     25/05/2025
+// @NombreModelo:   Usuario
+// @Ubicacion:    lib/models/usuario.dart
+// @FechaInicio:   15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
 // -----------------------------------------------------------------------------
 
-// -----------------------------------------------------------------------------
-// @Modification: [Numero de modificacion]
-// @Date:        [Fecha de Modificación]
-// @Author:      [Nombre de quien modificó]
-// @Description: [Descripción de los cambios realizados]
-// ----------------------------------------------------------------------------- 
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
