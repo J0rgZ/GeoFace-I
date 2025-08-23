@@ -1,45 +1,43 @@
-/// Representa el modelo de datos para una Sede o sucursal de la empresa.
-///
-/// Esta clase es inmutable, lo que significa que una vez que se crea una instancia
-/// de Sede sus propiedades no pueden cambiar. Para realizar una modificación
-/// se debe crear una nueva instancia a través del método `copyWith`.
+// -----------------------------------------------------------------------------
+// @Encabezado:   Gestión de Sedes
+// @Autor:        Brayar Lopez Catunta
+// @Descripción:  Define el modelo de datos para la clase `Sede`. Esta clase
+//               representa una sucursal o ubicación física de la empresa,
+//               incluyendo su nombre, dirección, geolocalización y estado
+//               operativo. El modelo es inmutable y está diseñado para manejar
+//               la serialización y deserialización de datos desde y hacia JSON.
+//
+// @NombreModelo: Sede
+// @Ubicacion:    lib/models/sede.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
+// Representa el modelo de datos para una Sede o sucursal de la empresa.
+//
+// Esta clase es inmutable. Si necesitas modificar una sede, no cambies
+// sus propiedades directamente; en su lugar, crea una nueva instancia
+// con los datos actualizados usando el método `copyWith`.
 class Sede {
-  // Principio: "Evitemos los números mágicos".
-  // Se define el 100 como una constante para que tenga un nombre claro.
+  // Se define un valor por defecto para el radio. Así evitamos "números mágicos" en el código.
   static const int kRadioPermitidoPorDefecto = 100;
 
-  /// Identificador único de la sede (ej: UUID).
   final String id;
-
-  /// Nombre comercial o descriptivo de la sede.
   final String nombre;
-
-  /// Dirección física de la sede.
   final String direccion;
-
-  /// Coordenada de latitud para la geolocalización.
   final double latitud;
-
-  /// Coordenada de longitud para la geolocalización.
   final double longitud;
-
-  /// Distancia en metros a la redonda desde la ubicación de la sede
-  /// donde se permiten ciertas acciones (ej: registrar asistencia).
   final int radioPermitido;
-
-  /// Indica si la sede está operativa o no.
   final bool activa;
-
-  /// Fecha y hora en que se registró la sede por primera vez.
   final DateTime fechaCreacion;
-
-  /// Fecha y hora de la última modificación de los datos de la sede.
-  /// Es opcional (`nullable`) porque una sede recién creada no tiene modificaciones.
+  // Es opcional porque una sede nueva no tiene modificaciones.
   final DateTime? fechaModificacion;
 
-  /// Constructor principal para crear una instancia de [Sede].
-  ///
-  /// Requiere todos los parámetros, excepto [fechaModificacion] que es opcional.
   Sede({
     required this.id,
     required this.nombre,
@@ -52,10 +50,7 @@ class Sede {
     this.fechaModificacion,
   });
 
-  /// Construye una instancia de [Sede] a partir de un mapa (generalmente de un JSON).
-  ///
-  /// Este es un "factory constructor" que se utiliza para la deserialización de datos,
-  /// por ejemplo, al recibir una respuesta de una API.
+  // Construye una instancia de Sede a partir de un mapa JSON.
   factory Sede.fromJson(Map<String, dynamic> json) {
     return Sede(
       id: json['id'],
@@ -63,24 +58,19 @@ class Sede {
       direccion: json['direccion'],
       latitud: json['latitud'],
       longitud: json['longitud'],
-      // Si 'radioPermitido' no viene en el JSON, se le asigna el valor por defecto.
-      // Esto previene errores y asegura consistencia.
+      // Si el radio no viene en el JSON, usamos el valor por defecto para evitar errores.
       radioPermitido: json['radioPermitido'] ?? kRadioPermitidoPorDefecto,
       activa: json['activa'],
-      // Convierte el string de fecha en formato ISO a un objeto DateTime.
+      // Se convierte el texto de fecha en formato ISO a un objeto DateTime.
       fechaCreacion: DateTime.parse(json['fechaCreacion']),
-      // Maneja el caso en que la fecha de modificación sea nula.
+      // Se maneja el caso en que la fecha de modificación pueda no existir.
       fechaModificacion: json['fechaModificacion'] != null
           ? DateTime.parse(json['fechaModificacion'])
           : null,
     );
   }
 
-  /// Convierte la instancia actual de [Sede] a un mapa.
-  ///
-  /// Este método es útil para la serialización de datos, es decir, para
-  /// convertir el objeto a un formato que pueda ser fácilmente guardado como JSON
-  /// o enviado a una API.
+  // Convierte la instancia de Sede a un mapa JSON.
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -90,17 +80,14 @@ class Sede {
       'longitud': longitud,
       'radioPermitido': radioPermitido,
       'activa': activa,
-      // Convierte el objeto DateTime a un string en formato estándar ISO 8601.
+      // Se convierte DateTime a un string en formato estándar ISO 8601 para guardarlo.
       'fechaCreacion': fechaCreacion.toIso8601String(),
       'fechaModificacion': fechaModificacion?.toIso8601String(),
     };
   }
 
-  /// Crea una copia de la instancia actual de [Sede] con la posibilidad de
-  /// modificar algunos de sus valores.
-  ///
-  /// Dado que la clase es inmutable, este método es la forma correcta de
-  /// "actualizar" una sede. Devuelve un nuevo objeto en lugar de mutar el original.
+  // Crea una copia de la instancia actual, permitiendo modificar solo algunos valores.
+  // Es la forma correcta de "actualizar" un objeto inmutable.
   Sede copyWith({
     String? id,
     String? nombre,
@@ -113,7 +100,7 @@ class Sede {
     DateTime? fechaModificacion,
   }) {
     return Sede(
-      // Si se proporciona un nuevo valor, se usa; si no, se mantiene el actual (`this.id`).
+      // Si se proporciona un nuevo valor, se usa; si no, se mantiene el actual (this.id).
       id: id ?? this.id,
       nombre: nombre ?? this.nombre,
       direccion: direccion ?? this.direccion,
@@ -122,20 +109,17 @@ class Sede {
       radioPermitido: radioPermitido ?? this.radioPermitido,
       activa: activa ?? this.activa,
       fechaCreacion: fechaCreacion ?? this.fechaCreacion,
-      // Al hacer una copia que modifica algún dato, se actualiza la
-      // fecha de modificación a la fecha y hora actuales.
+      // Al hacer una copia, se asume una modificación, por lo que se actualiza la fecha.
       fechaModificacion: fechaModificacion ?? DateTime.now(),
     );
   }
 
-  /// Crea una instancia de [Sede] con valores por defecto o "vacíos".
-  ///
-  /// Es útil para inicializar variables o estados en la UI antes de que los
-  /// datos reales sean cargados, evitando así errores por valores nulos.
+  // Crea una instancia "vacía" de Sede.
+  // Es muy útil para inicializar estados en la UI antes de que lleguen los datos reales,
+  // y así evitar errores por valores nulos.
   static Sede empty() {
     return Sede(
       id: '',
-      // Se utiliza un nombre descriptivo para indicar que es un objeto placeholder.
       nombre: 'Sede no encontrada',
       direccion: '',
       latitud: 0.0,
