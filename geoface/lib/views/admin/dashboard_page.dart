@@ -53,15 +53,14 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     await Future.wait([
       sedeController.getSedes(),
       empleadoController.getEmpleados(),
-      asistenciaController.getAllAsistencias(),
+      asistenciaController.getAsistenciasDeHoy(),
     ]);
     
     if (mounted) _animationController.forward();
   }
 
   int _getAsistenciasHoy(List<Asistencia> asistencias) {
-    final hoy = DateTime.now();
-    return asistencias.where((a) => date_utils.isSameDay(a.fechaHoraEntrada, hoy)).length;
+    return asistencias.length;
   }
 
   Map<String, int> _getAsistenciasPorSedeHoy(List<Asistencia> asistencias, List<Sede> sedes) {
