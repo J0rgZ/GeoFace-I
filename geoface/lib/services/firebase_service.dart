@@ -251,6 +251,25 @@ class FirebaseService {
     return null;
   }
 
+  Future<List<Asistencia>> getAsistenciasDeHoy() async {
+    // 1. Define el rango del día de hoy (desde las 00:00 hasta las 23:59)
+    final ahora = DateTime.now();
+    final inicioDelDia = DateTime(ahora.year, ahora.month, ahora.day);
+    final finDelDia = inicioDelDia.add(const Duration(days: 1));
+
+    // 2. Crea la consulta a Firestore
+    final querySnapshot = await _firestore
+        .collection('asistencias')
+        .where('fechaHoraEntrada', isGreaterThanOrEqualTo: inicioDelDia)
+        .where('fechaHoraEntrada', isLessThan: finDelDia)
+        .get();
+
+    // 3. Convierte los documentos a objetos Asistencia
+    return querySnapshot.docs
+        .map((doc) => Asistencia.fromJson({'id': doc.id, ...doc.data()}))
+        .toList();
+  }
+
   /// Obtiene una lista de asistencias filtrada por un rango de fechas y, opcionalmente, por una sede.
   Future<List<Asistencia>> getAsistenciasFiltradas({
     required DateTime fechaInicio,
