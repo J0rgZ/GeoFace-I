@@ -1,4 +1,22 @@
-// lib/models/empleado.dart
+// -----------------------------------------------------------------------------
+// @Encabezado:   Gestión de Empleados
+// @Autor:        Brayar Lopez Catunta
+// @Descripción:  Define el modelo de datos para la clase `Empleado`. Esta clase
+//               representa a un trabajador de la empresa, conteniendo su
+//               información personal, de contacto, cargo y estado. El modelo es
+//               inmutable y maneja la serialización y deserialización de datos
+//               desde y hacia un formato JSON para su uso con Firestore.
+//
+// @NombreModelo: Empleado
+// @Ubicacion:    lib/models/empleado.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -9,19 +27,19 @@ class Empleado {
   // Ojo: Centralizamos los nombres de los campos de Firestore aquí.
   // Así evitamos errores de tipeo al escribir "nombre", "apellidos", etc. a mano por todo el código.
   // Si se cambia un campo en la base de datos, solo lo modificamos en este lugar y listo.
-  static const String fieldId = 'id';
-  static const String fieldNombre = 'nombre';
-  static const String fieldApellidos = 'apellidos';
-  static const String fieldCorreo = 'correo';
-  static const String fieldCargo = 'cargo';
-  static const String fieldSedeId = 'sedeId';
-  static const String fieldDni = 'dni';
-  static const String fieldCelular = 'celular';
-  static const String fieldHayDatosBiometricos = 'hayDatosBiometricos';
-  static const String fieldActivo = 'activo';
-  static const String fieldFechaCreacion = 'fechaCreacion';
-  static const String fieldFechaModificacion = 'fechaModificacion';
-  static const String fieldTieneUsuario = 'tieneUsuario';
+  static const String campoId = 'id';
+  static const String campoNombre = 'nombre';
+  static const String campoApellidos = 'apellidos';
+  static const String campoCorreo = 'correo';
+  static const String campoCargo = 'cargo';
+  static const String campoSedeId = 'sedeId';
+  static const String campoDni = 'dni';
+  static const String campoCelular = 'celular';
+  static const String campoHayDatosBiometricos = 'hayDatosBiometricos';
+  static const String campoActivo = 'activo';
+  static const String campoFechaCreacion = 'fechaCreacion';
+  static const String campoFechaModificacion = 'fechaModificacion';
+  static const String campoTieneUsuario = 'tieneUsuario';
 
   final String id;
   final String nombre;
@@ -56,51 +74,51 @@ class Empleado {
     this.tieneUsuario = false,
   });
 
-  // Un getter simple para no estar concatenando el nombre a cada rato.
+  // Una propiedad computada simple para no estar concatenando el nombre a cada rato.
   String get nombreCompleto => '$nombre $apellidos';
 
-  /// Construye un Empleado desde el JSON que nos llega de Firestore.
+  // Construye un Empleado desde el mapa de datos (JSON) que nos llega de Firestore.
   factory Empleado.fromJson(Map<String, dynamic> json) {
-    // Función pequeña para no repetir el código de parseo de fechas.
+    // Función pequeña para no repetir el código de análisis de fechas.
     // Si la fecha es inválida o nula, devuelve null para que lo podamos validar después.
-    DateTime? parseDate(dynamic date) {
-      if (date is Timestamp) return date.toDate();
-      if (date is String) return DateTime.tryParse(date);
+    DateTime? analizarFecha(dynamic fecha) {
+      if (fecha is Timestamp) return fecha.toDate();
+      if (fecha is String) return DateTime.tryParse(fecha);
       return null;
     }
 
-    final fechaCreacion = parseDate(json[fieldFechaCreacion]);
+    final fechaCreacion = analizarFecha(json[campoFechaCreacion]);
 
-    // --- APLICANDO "FAIL FAST" ---
+    // --- Principio de "fallo rápido" ---
     // Si la fecha de creación viene nula o en un formato que no entendemos,
     // es mejor que la app falle aquí mismo a que creemos un Empleado con datos corruptos.
-    // Por eso lanzamos una excepción y detenemos todo.
+    // Por eso lanzamos una excepción y detenemos la creación del objeto.
     if (fechaCreacion == null) {
       throw FormatException(
-        'Error en los datos! La fecha de creación es nula o tiene un formato inválido para el empleado con ID: ${json[fieldId]}');
+        'Error en los datos. La fecha de creación es nula o tiene un formato inválido para el empleado con ID: ${json[campoId]}');
     }
     
     return Empleado(
-      // Usamos las constantes para leer los campos. Más seguro.
-      id: json[fieldId] ?? '',
-      nombre: json[fieldNombre] ?? '',
-      apellidos: json[fieldApellidos] ?? '',
-      correo: json[fieldCorreo] ?? '',
-      cargo: json[fieldCargo] ?? '',
-      sedeId: json[fieldSedeId] ?? '',
-      dni: json[fieldDni] ?? '',
-      celular: json[fieldCelular] ?? '',
-      hayDatosBiometricos: json[fieldHayDatosBiometricos] ?? false,
+      // Usamos las constantes para leer los campos. Es más seguro y fácil de mantener.
+      id: json[campoId] ?? '',
+      nombre: json[campoNombre] ?? '',
+      apellidos: json[campoApellidos] ?? '',
+      correo: json[campoCorreo] ?? '',
+      cargo: json[campoCargo] ?? '',
+      sedeId: json[campoSedeId] ?? '',
+      dni: json[campoDni] ?? '',
+      celular: json[campoCelular] ?? '',
+      hayDatosBiometricos: json[campoHayDatosBiometricos] ?? false,
       // Por defecto, un empleado nuevo siempre está activo.
-      activo: json[fieldActivo] ?? true,
+      activo: json[campoActivo] ?? true,
       fechaCreacion: fechaCreacion, // Ya validamos que no es nula.
-      fechaModificacion: parseDate(json[fieldFechaModificacion]),
-      tieneUsuario: json[fieldTieneUsuario] ?? false,
+      fechaModificacion: analizarFecha(json[campoFechaModificacion]),
+      tieneUsuario: json[campoTieneUsuario] ?? false,
     );
   }
 
   // Dejo este factory 'fromMap' por si alguna parte del código antiguo lo sigue usando.
-  // Así no rompemos nada. Simplemente llama al factory principal.
+  // Así no rompemos nada. Simplemente llama al constructor principal.
   factory Empleado.fromMap(Map<String, dynamic> map) {
     return Empleado.fromJson(map);
   }
@@ -109,19 +127,19 @@ class Empleado {
   // También usamos las constantes para asegurar que los nombres de los campos son correctos.
   Map<String, dynamic> toJson() {
     return {
-      fieldId: id,
-      fieldNombre: nombre,
-      fieldApellidos: apellidos,
-      fieldCorreo: correo,
-      fieldCargo: cargo,
-      fieldSedeId: sedeId,
-      fieldDni: dni,
-      fieldCelular: celular,
-      fieldHayDatosBiometricos: hayDatosBiometricos,
-      fieldActivo: activo,
-      fieldFechaCreacion: fechaCreacion,
-      fieldFechaModificacion: fechaModificacion,
-      fieldTieneUsuario: tieneUsuario,
+      campoId: id,
+      campoNombre: nombre,
+      campoApellidos: apellidos,
+      campoCorreo: correo,
+      campoCargo: cargo,
+      campoSedeId: sedeId,
+      campoDni: dni,
+      campoCelular: celular,
+      campoHayDatosBiometricos: hayDatosBiometricos,
+      campoActivo: activo,
+      campoFechaCreacion: fechaCreacion,
+      campoFechaModificacion: fechaModificacion,
+      campoTieneUsuario: tieneUsuario,
     };
   }
 
