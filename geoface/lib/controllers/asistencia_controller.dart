@@ -55,6 +55,10 @@ class AsistenciaController extends ChangeNotifier {
   bool get loading => _loading;
   String? get errorMessage => _errorMessage;
 
+  List<Asistencia> _asistenciasDeHoy = [];
+
+  List<Asistencia> get asistenciasDeHoy => _asistenciasDeHoy;
+
   // Verifica el estado actual de la asistencia de un empleado para el día de hoy.
   // Este método determina qué botón (Entrada o Salida) debe mostrar la UI.
   Future<AsistenciaStatus> checkEmpleadoAsistenciaStatus(String empleadoId) async {
@@ -217,6 +221,22 @@ class AsistenciaController extends ChangeNotifier {
     } finally {
       _loading = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> getAsistenciasDeHoy() async {
+    _loading = true;
+    _errorMessage = null;
+    // No notificamos aquí para no causar un parpadeo si _loadData usa Future.wait
+    
+    try {
+      // Tu FirebaseService necesitará un método que haga una consulta filtrada por fecha.
+      _asistenciasDeHoy = await _firebaseService.getAsistenciasDeHoy();
+    } catch (e) {
+      _errorMessage = 'Error al cargar asistencias de hoy: ${e.toString()}';
+    } finally {
+      _loading = false;
+      // Notificamos solo al final o dejamos que el Future.wait maneje el estado de la UI.
     }
   }
 
