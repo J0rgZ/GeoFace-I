@@ -1,25 +1,39 @@
-// en tu archivo theme.dart
+// -----------------------------------------------------------------------------
+// @Encabezado:   Tema de la Aplicación (Theme)
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo centraliza la configuración visual de toda la
+//               aplicación, definiendo los temas claro (light) y oscuro (dark)
+//               basados en los principios de diseño de Material 3. Se utiliza
+//               ColorScheme.fromSeed para generar paletas de colores armónicas
+//               y se personalizan los estilos de los widgets más comunes
+//               (botones, tarjetas, campos de texto, etc.) para asegurar una
+//               apariencia consistente y moderna.
+//
+// @NombreArchivo: app_theme.dart
+// @Ubicacion:    lib/themes/app_theme.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Un sistema de tema avanzado y elegante basado en Material 3.
-/// 
-/// Utiliza un único color semilla para generar una paleta de colores completa y armónica,
-/// garantizando coherencia visual, accesibilidad y una estética moderna.
-/// Este tema está diseñado para ser robusto, escalable y fácil de mantener.
+// Clase que contiene las configuraciones de los temas de la aplicación.
+// El constructor privado `_()` previene que esta clase sea instanciada.
 class AppTheme {
   AppTheme._();
 
-  // --- COLOR SEMILLA ---
-  // La única fuente de verdad para toda la paleta de colores.
-  // Material 3 generará los tonos primarios, secundarios y terciarios a partir de aquí.
+  // Color "semilla" principal a partir del cual se generarán las paletas de colores.
   static const Color _primarySeed = Color.fromARGB(255, 61, 3, 100);
-  
-  // El color de error generalmente se mantiene estático para ser universalmente reconocible.
+  // Color "semilla" para los estados de error.
   static const Color _errorSeed = Color(0xFFB00020);
 
-  // --- TEMAS PRINCIPALES ---
+  // Definición del tema claro.
   static final ThemeData lightTheme = _buildTheme(
     ColorScheme.fromSeed(
       seedColor: _primarySeed,
@@ -28,6 +42,7 @@ class AppTheme {
     ),
   );
 
+  // Definición del tema oscuro.
   static final ThemeData darkTheme = _buildTheme(
     ColorScheme.fromSeed(
       seedColor: _primarySeed,
@@ -36,41 +51,42 @@ class AppTheme {
     ),
   );
 
-  /// Método constructor de temas unificado y robusto.
-  /// Aplica estilos consistentes a todos los componentes principales de la app.
+  // Método privado y centralizado que construye el tema base a partir de un esquema de color.
+  // Esto evita la repetición de código y asegura que ambos temas compartan las mismas personalizaciones.
   static ThemeData _buildTheme(ColorScheme colorScheme) {
+    // Se crea un tema base de Material 3 a partir del `ColorScheme`.
     final baseTheme = ThemeData.from(colorScheme: colorScheme, useMaterial3: true);
     
+    // Se aplican personalizaciones sobre el tema base.
     return baseTheme.copyWith(
-      // --- TIPOGRAFÍA ---
-      // Usamos Google Fonts para una apariencia limpia y profesional.
-      // Se aplica el color 'onSurface' por defecto para garantizar la legibilidad.
+      // Se establece la tipografía `Inter` de Google Fonts para toda la app.
       textTheme: GoogleFonts.interTextTheme(baseTheme.textTheme).apply(
-        bodyColor: colorScheme.onSurface,
-        displayColor: colorScheme.onSurface,
+        bodyColor: colorScheme.onSurface, // Color para el texto principal.
+        displayColor: colorScheme.onSurface, // Color para los títulos.
       ),
 
+      // Color de fondo para los `Scaffold` (pantallas principales).
       scaffoldBackgroundColor: colorScheme.surface,
 
-      // --- ESTILOS DE COMPONENTES ESPECÍFICOS ---
-
+      // Estilo global para las `AppBar`.
       appBarTheme: AppBarTheme(
         backgroundColor: colorScheme.surface,
-        foregroundColor: colorScheme.onSurface,
+        foregroundColor: colorScheme.onSurface, // Color de íconos y texto del AppBar.
         elevation: 0,
-        // El tinte que se aplica cuando hay contenido debajo haciendo scroll.
+        // Tinte sutil que aparece al hacer scroll debajo del AppBar (guía de M3).
         scrolledUnderElevation: 4.0,
         surfaceTintColor: colorScheme.surfaceTint,
         centerTitle: true,
       ),
 
+      // Estilo global para las `Card`.
       cardTheme: CardTheme(
         clipBehavior: Clip.antiAlias,
-        elevation: 0,
+        elevation: 0, // Se prefieren bordes en lugar de sombras en M3.
         color: colorScheme.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          // Usamos outlineVariant para bordes sutiles y decorativos, como recomienda M3.
+          // Borde sutil que sigue las guías de Material 3.
           side: BorderSide(
             color: colorScheme.outlineVariant,
             width: 1.0,
@@ -78,19 +94,14 @@ class AppTheme {
         ),
       ),
 
-      // Estilos para botones, promoviendo una estética M3 moderna.
+      // Estilo para los `FilledButton`.
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          // La forma de "píldora" o estadio es muy común y moderna en M3.
-          shape: const StadiumBorder(),
-          // ----- AJUSTE DE RESPONSIVIDAD -----
-          // ELIMINADO: El padding fijo es una causa común de problemas de responsividad.
-          // Al quitarlo, los botones usarán el padding por defecto de Material 3,
-          // que es más adaptable a diferentes tamaños de pantalla.
-          // padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          shape: const StadiumBorder(), // Forma de "píldora", muy común en M3.
         ),
       ),
       
+      // Estilo para los `TextButton`.
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: colorScheme.primary,
@@ -98,7 +109,7 @@ class AppTheme {
         ),
       ),
 
-      // El FAB es un punto de acción clave. Usamos colores de "container" para destacarlo.
+      // Estilo para los `FloatingActionButton`.
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: colorScheme.primaryContainer,
         foregroundColor: colorScheme.onPrimaryContainer,
@@ -107,27 +118,21 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
 
-      // Campos de texto con un diseño limpio y claro.
+      // Estilo global para los campos de texto (`TextField`).
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: colorScheme.surfaceContainer,
-        // ----- AJUSTE DE RESPONSIVIDAD -----
-        // ELIMINADO: Al igual que con los botones, un padding de contenido fijo
-        // puede hacer que los campos de texto sean demasiado altos y causen overflows.
-        // Dejamos que Flutter maneje el padding interno para una mejor adaptabilidad.
-        // contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        
-        // Borde por defecto, sutil pero visible.
+        // Borde por defecto.
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: colorScheme.outlineVariant),
         ),
-        // Borde cuando el campo está enfocado, usando el color primario.
+        // Borde cuando el campo tiene el foco.
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: colorScheme.primary, width: 2.0),
         ),
-        // Borde para errores.
+        // Borde para errores de validación.
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: colorScheme.error, width: 1.0),
@@ -142,15 +147,15 @@ class AppTheme {
         ),
       ),
       
-      // Diálogos con el radio de borde estándar de M3.
+      // Estilo para los diálogos de alerta.
       dialogTheme: DialogTheme(
         backgroundColor: colorScheme.surface,
         surfaceTintColor: colorScheme.surfaceTint,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)), // Radio de borde estándar de M3.
         titleTextStyle: baseTheme.textTheme.headlineSmall,
       ),
       
-      // BottomSheet con un estilo suave y elevado.
+      // Estilo para las hojas inferiores (`BottomSheet`).
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: colorScheme.surfaceContainer,
         modalBackgroundColor: colorScheme.surfaceContainer,
@@ -160,7 +165,7 @@ class AppTheme {
         modalElevation: 0,
       ),
 
-      // Switches que usan los roles de color de forma nativa.
+      // Estilo para los interruptores (`Switch`).
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
@@ -176,7 +181,7 @@ class AppTheme {
         }),
       ),
 
-      // Estilo para Chips (filtros, etiquetas, etc.)
+      // Estilo para los `Chip` (usados para filtros, etiquetas, etc.).
       chipTheme: ChipThemeData(
         backgroundColor: colorScheme.surfaceContainer,
         labelStyle: baseTheme.textTheme.labelLarge,
