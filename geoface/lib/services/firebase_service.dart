@@ -1,4 +1,25 @@
-// services/firebase_service.dart
+// -----------------------------------------------------------------------------
+// @Encabezado:   Servicio de Acceso a Firebase
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la clase `FirebaseService`, que actúa como
+//               una capa de acceso a datos (Data Access Layer) o repositorio para
+//               todas las interacciones con los servicios de Firebase. Centraliza
+//               las operaciones con Cloud Firestore (CRUD para todas las colecciones)
+//               y Firebase Authentication, desacoplando la lógica de la base de
+//               datos de los controladores y la interfaz de usuario. Este enfoque
+//               mejora la mantenibilidad y la organización del código.
+//
+// @NombreArchivo: firebase_service.dart
+// @Ubicacion:    lib/services/firebase_service.dart
+// @FechaInicio:  15/0h5/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geoface/models/api_config.dart';
