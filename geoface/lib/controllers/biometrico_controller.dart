@@ -1,12 +1,30 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Controlador de Datos Biométricos
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo contiene la lógica para la gestión de datos
+//               biométricos faciales de los empleados. Se encarga de inicializar
+//               y controlar la cámara del dispositivo para capturar imágenes,
+//               y de realizar las operaciones CRUD (Crear, Leer, Actualizar,
+//               Eliminar) en Firebase Storage y Firestore para persistir
+//               dichos datos.
+//
+// @NombreControlador: BiometricoController
+// @Ubicacion:    lib/controllers/biometrico_controller.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
-
-// No necesitamos el modelo Biometrico aquí si manejamos los datos directamente.
-// Si lo usas en otro lugar, puedes mantenerlo.
 
 class BiometricoController extends ChangeNotifier {
   // --- DEPENDENCIAS ---
@@ -22,6 +40,7 @@ class BiometricoController extends ChangeNotifier {
   bool _isProcessing = false;
   
   // --- GETTERS PÚBLICOS ---
+  // Permiten que la UI acceda al estado del controlador de forma segura.
   bool get isCameraInitialized => _isCameraInitialized;
   String? get errorMessage => _errorMessage;
   bool get isProcessing => _isProcessing;
@@ -32,8 +51,9 @@ class BiometricoController extends ChangeNotifier {
 
   // --- MÉTODOS DE LA CÁMARA ---
 
+  // Inicializa la cámara frontal del dispositivo para la captura de imágenes.
   Future<void> initCamera() async {
-    if (_isCameraInitialized) return; // Evitar reinicialización
+    if (_isCameraInitialized) return; // Evita reinicializaciones innecesarias.
     
     _errorMessage = null;
     try {
@@ -42,6 +62,7 @@ class BiometricoController extends ChangeNotifier {
         throw Exception('No se encontraron cámaras disponibles.');
       }
       
+      // Se prioriza la cámara frontal, que es la estándar para reconocimiento facial.
       final frontCamera = cameras.firstWhere(
         (c) => c.lensDirection == CameraLensDirection.front,
         orElse: () => cameras.first,
@@ -49,7 +70,7 @@ class BiometricoController extends ChangeNotifier {
       
       cameraController = CameraController(
         frontCamera,
-        ResolutionPreset.high, // Usar alta resolución para mejor calidad de reconocimiento
+        ResolutionPreset.high, // Alta resolución para mejor calidad de reconocimiento.
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
@@ -64,6 +85,8 @@ class BiometricoController extends ChangeNotifier {
     }
   }
   
+  // Libera los recursos de la cámara cuando ya no se necesita.
+  // Es crucial para evitar fugas de memoria y problemas de rendimiento.
   Future<void> stopCamera() async {
     if (cameraController != null && cameraController!.value.isInitialized) {
       await cameraController!.dispose();
@@ -73,6 +96,7 @@ class BiometricoController extends ChangeNotifier {
     }
   }
   
+  // Captura una foto usando el controlador de la cámara y la devuelve como un archivo (File).
   Future<File?> takePicture() async {
     if (!_isCameraInitialized || cameraController == null) {
       _errorMessage = 'La cámara no está lista.';
@@ -90,15 +114,14 @@ class BiometricoController extends ChangeNotifier {
     }
   }
 
-  // --- MÉTODOS DE FIREBASE (CRUD PARA MÚLTIPLES IMÁGENES) ---
+  // --- MÉTODOS DE FIREBASE ---
 
-  /// Obtiene las URLs de las imágenes biométricas de un empleado.
-  /// Devuelve una lista vacía si no hay registro.
+  // Obtiene las URLs de las imágenes biométricas de un empleado desde Firestore.
   Future<List<String>> getBiometricoUrlsByEmpleadoId(String empleadoId) async {
     try {
       final doc = await _findBiometricDocument(empleadoId);
       if (doc == null || !doc.exists) {
-        return [];
+        return []; // Devuelve una lista vacía si no hay registro.
       }
       
       final data = doc.data() as Map<String, dynamic>;
@@ -112,8 +135,7 @@ class BiometricoController extends ChangeNotifier {
     }
   }
 
-  /// Registra o actualiza el biométrico de un empleado con un conjunto de imágenes.
-  /// Sube los archivos a Storage y guarda/actualiza el documento en Firestore.
+  // Registra o actualiza el biométrico de un empleado con un conjunto de imágenes.
   Future<bool> registerOrUpdateBiometricoWithMultipleFiles(String empleadoId, List<File> images) async {
     if (images.length != 3) {
       _errorMessage = "Se requieren exactamente 3 imágenes.";
@@ -124,10 +146,11 @@ class BiometricoController extends ChangeNotifier {
     _setProcessing(true);
     
     try {
-      // 1. Antes de subir las nuevas, elimina las imágenes y el documento antiguos.
+      // 1. Antes de subir las nuevas imágenes, se elimina cualquier registro biométrico anterior
+      // para mantener la consistencia y evitar datos huérfanos.
       await deleteBiometricoByEmpleadoId(empleadoId, fromUpdate: true);
 
-      // 2. Sube las nuevas imágenes a Firebase Storage
+      // 2. Se suben las nuevas imágenes a Firebase Storage.
       final List<String> newImageUrls = [];
       for (int i = 0; i < images.length; i++) {
         final file = images[i];
@@ -138,8 +161,8 @@ class BiometricoController extends ChangeNotifier {
         newImageUrls.add(downloadUrl);
       }
 
-      // 3. Crea o actualiza el documento en Firestore
-      // Usamos el ID del empleado como ID del documento para asegurar que solo haya uno.
+      // 3. Se crea o actualiza el documento en Firestore usando el ID del empleado como clave.
+      // Esto asegura que cada empleado tenga un único documento biométrico.
       await _firestore.collection('biometricos').doc(empleadoId).set({
         'empleadoId': empleadoId,
         'datosFaciales': newImageUrls,
@@ -147,7 +170,7 @@ class BiometricoController extends ChangeNotifier {
         'fechaModificacion': FieldValue.serverTimestamp(),
       });
 
-      // 4. (Opcional) Actualizar un flag en el documento del empleado
+      // 4. Se actualiza el flag en el documento del empleado para reflejar que tiene datos biométricos.
       await _firestore.collection('empleados').doc(empleadoId).update({
         'hayDatosBiometricos': true,
         'fechaModificacion': FieldValue.serverTimestamp(),
@@ -163,36 +186,36 @@ class BiometricoController extends ChangeNotifier {
     }
   }
   
-  /// Elimina el registro biométrico completo de un empleado.
+  // Elimina el registro biométrico completo de un empleado.
   Future<bool> deleteBiometricoByEmpleadoId(String empleadoId, {bool fromUpdate = false}) async {
-    // 'fromUpdate' evita notificar a la UI cuando es una operación interna.
+    // El parámetro `fromUpdate` evita notificar a la UI cuando es una operación interna de actualización.
     if (!fromUpdate) _setProcessing(true);
 
     try {
       final doc = await _findBiometricDocument(empleadoId);
       if (doc == null || !doc.exists) {
         if (!fromUpdate) _setProcessing(false);
-        return true; // No había nada que borrar, operación exitosa.
+        return true; // No había nada que borrar, se considera una operación exitosa.
       }
 
       final data = doc.data() as Map<String, dynamic>;
       final urls = List<String>.from(data['datosFaciales'] ?? []);
 
-      // 1. Eliminar imágenes de Firebase Storage
+      // 1. Se eliminan las imágenes de Firebase Storage.
       for (final url in urls) {
         try {
-          // No uses el ID, usa la URL completa que es más robusta
           final ref = _storage.refFromURL(url);
           await ref.delete();
         } catch (e) {
+          // Se ignora el error si la imagen ya no existe, para que el proceso no falle.
           debugPrint("No se pudo borrar la imagen $url: $e. Puede que ya no exista.");
         }
       }
 
-      // 2. Eliminar el documento de Firestore
+      // 2. Se elimina el documento de Firestore.
       await doc.reference.delete();
       
-      // 3. (Opcional) Actualizar flag en el empleado
+      // 3. Se actualiza el flag en el documento del empleado.
       await _firestore.collection('empleados').doc(empleadoId).update({
         'hayDatosBiometricos': false,
         'fechaModificacion': FieldValue.serverTimestamp(),
@@ -210,24 +233,25 @@ class BiometricoController extends ChangeNotifier {
 
   // --- MÉTODOS PRIVADOS AUXILIARES ---
 
-  /// Busca el documento biométrico de un empleado.
+  // Busca el documento biométrico de un empleado.
+  // La búsqueda es directa y eficiente al usar el ID del empleado como ID del documento.
   Future<DocumentSnapshot?> _findBiometricDocument(String empleadoId) async {
-    // Como ahora el ID del documento es el ID del empleado, la búsqueda es directa y más rápida.
     final docRef = _firestore.collection('biometricos').doc(empleadoId);
     final doc = await docRef.get();
     return doc.exists ? doc : null;
   }
   
-  /// Helper para gestionar el estado de procesamiento y notificar a los listeners.
+  // Método centralizado para gestionar el estado de procesamiento.
   void _setProcessing(bool value) {
     _isProcessing = value;
     if (!_isProcessing) {
-      _errorMessage = null; // Limpiar errores al finalizar una operación
+      _errorMessage = null; // Limpia errores al finalizar una operación.
     }
     notifyListeners();
   }
 
   // --- LIMPIEZA ---
+  // Se asegura de liberar la cámara al destruir el controlador para evitar fugas de memoria.
   @override
   void dispose() {
     stopCamera();
