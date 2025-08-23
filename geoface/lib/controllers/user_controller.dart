@@ -36,7 +36,6 @@ class UserController with ChangeNotifier {
       
       return administradores;
     } catch (e) {
-      print('Error al obtener administradores: $e');
       throw Exception('Error al cargar los administradores.');
     }
   }
