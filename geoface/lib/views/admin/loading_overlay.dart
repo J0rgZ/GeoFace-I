@@ -1,3 +1,23 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Overlay de Carga Personalizado
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define un widget de overlay de carga que se
+//               superpone sobre el contenido principal durante operaciones
+//               asíncronas. Incluye indicador de progreso circular, mensaje
+//               personalizable y fondo semitransparente para proporcionar
+//               feedback visual al usuario durante procesos de carga.
+//
+// @NombreArchivo: loading_overlay.dart
+// @Ubicacion:    lib/views/admin/loading_overlay.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 

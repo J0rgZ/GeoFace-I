@@ -1,3 +1,23 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Manejador de Permisos de la Aplicación
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la pantalla de configuración de permisos
+//               necesarios para el funcionamiento de la aplicación GeoFace.
+//               Maneja la solicitud de permisos de cámara y ubicación de forma
+//               interactiva con animaciones Lottie y una interfaz moderna que
+//               guía al usuario paso a paso en la concesión de permisos.
+//
+// @NombreArchivo: permissions_handler.dart
+// @Ubicacion:    lib/views/permissions_handler.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:lottie/lottie.dart';

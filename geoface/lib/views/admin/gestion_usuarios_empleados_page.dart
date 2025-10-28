@@ -1,3 +1,23 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Página de Gestión de Usuarios Empleados
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la página para gestionar usuarios empleados
+//               del sistema. Permite visualizar la lista de empleados con sus
+//               cuentas de usuario asociadas, gestionar estados de activación,
+//               y realizar operaciones de administración de usuarios empleados
+//               con integración al sistema de autenticación.
+//
+// @NombreArchivo: gestion_usuarios_empleados_page.dart
+// @Ubicacion:    lib/views/admin/gestion_usuarios_empleados_page.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/empleado_controller.dart';

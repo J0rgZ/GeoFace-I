@@ -1,3 +1,25 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Servicio de Detección de GPS Falso
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la clase `FakeGpsDetectorService`, que se
+//               encarga de detectar si el dispositivo está utilizando una
+//               ubicación falsa o simulada. Verifica tanto si la ubicación es
+//               marcada como "mock" por el sistema como si tiene una precisión
+//               muy baja que podría indicar manipulación. Es una medida de
+//               seguridad importante para prevenir fraudes en el sistema de
+//               asistencia.
+//
+// @NombreArchivo: fake_gps_detector_service.dart
+// @Ubicacion:    lib/services/fake_gps_detector_service.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:geolocator/geolocator.dart';
 
 class FakeGpsDetectorService {

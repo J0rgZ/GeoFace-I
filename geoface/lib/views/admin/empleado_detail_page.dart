@@ -1,3 +1,23 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Página de Detalle de Empleado
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la página de detalle completo de un empleado
+//               específico. Incluye visualización de información personal,
+//               laboral y de contacto, edición de datos, gestión de datos
+//               biométricos, historial de asistencias y navegación a funciones
+//               relacionadas como registro biométrico.
+//
+// @NombreArchivo: empleado_detail_page.dart
+// @Ubicacion:    lib/views/admin/empleado_detail_page.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geoface/views/admin/registro_biometrico_page.dart';

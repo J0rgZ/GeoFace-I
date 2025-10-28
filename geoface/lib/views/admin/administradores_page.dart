@@ -1,3 +1,24 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Página de Gestión de Administradores
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la página para gestionar usuarios
+//               administradores del sistema. Incluye visualización de lista
+//               de administradores, creación de nuevos administradores,
+//               edición de datos existentes, gestión de estados y navegación
+//               a formularios de administración con animaciones y estados
+//               de carga.
+//
+// @NombreArchivo: administradores_page.dart
+// @Ubicacion:    lib/views/admin/administradores_page.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/auth_controller.dart';

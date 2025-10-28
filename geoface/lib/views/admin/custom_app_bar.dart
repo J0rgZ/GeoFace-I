@@ -1,3 +1,23 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Barra de Aplicación Personalizada
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define un widget personalizado de AppBar que
+//               proporciona una barra de aplicación reutilizable con
+//               personalización de colores, títulos, subtítulos, acciones
+//               y control del estilo del sistema operativo para mantener
+//               consistencia visual en toda la aplicación.
+//
+// @NombreArchivo: custom_app_bar.dart
+// @Ubicacion:    lib/views/admin/custom_app_bar.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/material.dart';
 
 class LoadingOverlay extends StatelessWidget {

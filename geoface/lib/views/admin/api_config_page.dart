@@ -1,3 +1,23 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Página de Configuración de API
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la página para configurar los endpoints
+//               de API externa. Permite a los administradores establecer las
+//               URLs de los servicios de identificación y sincronización,
+//               con validación de URLs, pruebas de conectividad y persistencia
+//               de la configuración en Firebase.
+//
+// @NombreArchivo: api_config_page.dart
+// @Ubicacion:    lib/views/admin/api_config_page.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 // lib/screens/admin/api_config_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';

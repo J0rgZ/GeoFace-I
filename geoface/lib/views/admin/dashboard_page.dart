@@ -1,4 +1,24 @@
-// views/admin/dashboard_page.dart
+// -----------------------------------------------------------------------------
+// @Encabezado:   Página del Dashboard Administrativo
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la página principal del dashboard
+//               administrativo de GeoFace. Proporciona una vista general
+//               de las estadísticas del sistema, incluyendo métricas de
+//               sedes, empleados, asistencias y gráficos de rendimiento.
+//               Incluye animaciones, estados de carga con shimmer y
+//               navegación a otras secciones administrativas.
+//
+// @NombreArchivo: dashboard_page.dart
+// @Ubicacion:    lib/views/admin/dashboard_page.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';

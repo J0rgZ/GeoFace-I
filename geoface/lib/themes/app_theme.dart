@@ -1,13 +1,11 @@
 // -----------------------------------------------------------------------------
-// @Encabezado:   Tema de la Aplicación (Theme)
+// @Encabezado:   Configuración de Temas de la Aplicación
 // @Autor:        Jorge Luis Briceño Diaz
-// @Descripción:  Este archivo centraliza la configuración visual de toda la
-//               aplicación, definiendo los temas claro (light) y oscuro (dark)
-//               basados en los principios de diseño de Material 3. Se utiliza
-//               ColorScheme.fromSeed para generar paletas de colores armónicas
-//               y se personalizan los estilos de los widgets más comunes
-//               (botones, tarjetas, campos de texto, etc.) para asegurar una
-//               apariencia consistente y moderna.
+// @Descripción:  Este archivo define la configuración de temas visuales de la
+//               aplicación GeoFace. Incluye la definición de temas claro y oscuro
+//               basados en Material 3, utilizando `ColorScheme.fromSeed` para
+//               generar paletas de colores coherentes y personalizando estilos
+//               específicos de widgets para mantener consistencia visual.
 //
 // @NombreArchivo: app_theme.dart
 // @Ubicacion:    lib/themes/app_theme.dart

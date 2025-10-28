@@ -1,4 +1,22 @@
-// lib/controllers/api_config_controller.dart
+// -----------------------------------------------------------------------------
+// @Encabezado:   Controlador de Configuración de API
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo contiene la lógica de negocio para la gestión de
+//               la configuración de endpoints de API externa. Se encarga de
+//               cargar, guardar y validar las URLs de los servicios de
+//               identificación y sincronización, además de ejecutar llamadas
+//               HTTP para sincronizar la base de datos remota.
+//
+// @NombreControlador: ApiConfigController
+// @Ubicacion:    lib/controllers/api_config_controller.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;

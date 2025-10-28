@@ -1,4 +1,24 @@
-// <-- CAMBIO: Añadimos las importaciones para http y json
+// -----------------------------------------------------------------------------
+// @Encabezado:   Página de Marcación de Asistencia para Empleados
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la página principal para que los empleados
+//               marquen su asistencia usando reconocimiento facial. Integra
+//               cámara, GPS, verificación de identidad mediante API externa,
+//               validación de geocercas y registro de entrada/salida en Firebase.
+//               Incluye manejo de estados del flujo de marcación y validaciones
+//               de seguridad contra fraudes.
+//
+// @NombreArchivo: marcar_asistencia_page.dart
+// @Ubicacion:    lib/views/empleado/marcar_asistencia_page.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/material.dart';

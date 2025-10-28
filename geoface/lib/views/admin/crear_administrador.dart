@@ -1,3 +1,23 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Página de Creación de Administrador
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la página para crear nuevos usuarios
+//               administradores del sistema. Incluye formulario con campos
+//               para nombre, correo electrónico y contraseña, validación
+//               de datos, gestión de estados de carga y integración con
+//               UserController para persistir la información en Firebase.
+//
+// @NombreArchivo: crear_administrador.dart
+// @Ubicacion:    lib/views/admin/crear_administrador.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '/../controllers/user_controller.dart';

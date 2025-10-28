@@ -1,3 +1,23 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Página de Inicio de Sesión para Administradores
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la página de login para administradores
+//               de la aplicación GeoFace. Incluye validación de credenciales,
+//               manejo de estados de carga y error, diseño responsivo adaptativo
+//               para diferentes tamaños de pantalla, y navegación al dashboard
+//               administrativo tras autenticación exitosa.
+//
+// @NombreArchivo: login_page.dart
+// @Ubicacion:    lib/views/auth/login_page.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart';

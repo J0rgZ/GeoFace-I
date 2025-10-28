@@ -1,3 +1,23 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Página de Registro de Datos Biométricos
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la página para registrar datos biométricos
+//               faciales de empleados. Incluye captura de imágenes con cámara,
+//               procesamiento y almacenamiento en Firebase Storage, validación
+//               de calidad de imagen, y gestión del estado de registro con
+//               animaciones y feedback visual para el usuario.
+//
+// @NombreArchivo: registro_biometrico_page.dart
+// @Ubicacion:    lib/views/admin/registro_biometrico_page.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 // lib/screens/registro_biometrico_screen.dart
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';

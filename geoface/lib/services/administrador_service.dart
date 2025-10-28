@@ -1,4 +1,23 @@
-// FILE: lib/services/administrador_service.dart
+// -----------------------------------------------------------------------------
+// @Encabezado:   Servicio de Administradores
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la clase `AdministradorService`, que actúa
+//               como una capa de servicio para la gestión de usuarios
+//               administradores. Se encarga de las operaciones CRUD con Firebase
+//               Authentication y Cloud Firestore, incluyendo la creación de
+//               cuentas, actualización de datos y gestión de estados. Centraliza
+//               la lógica de negocio relacionada con administradores.
+//
+// @NombreArchivo: administrador_service.dart
+// @Ubicacion:    lib/services/administrador_service.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';

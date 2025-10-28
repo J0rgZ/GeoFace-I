@@ -1,4 +1,24 @@
-// views/admin/empleados_page.dart
+// -----------------------------------------------------------------------------
+// @Encabezado:   Página de Gestión de Empleados
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la página de gestión completa de empleados
+//               para administradores. Incluye funcionalidades de búsqueda,
+//               filtrado por estado, creación, edición, eliminación y gestión
+//               de datos biométricos. Proporciona una interfaz moderna con
+//               animaciones, estados de carga y navegación fluida entre
+//               diferentes vistas de gestión de empleados.
+//
+// @NombreArchivo: empleados_page.dart
+// @Ubicacion:    lib/views/admin/empleados_page.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geoface/views/admin/empleado_detail_page.dart';

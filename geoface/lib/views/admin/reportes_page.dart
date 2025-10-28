@@ -1,4 +1,24 @@
-// views/admin/reportes_page.dart (VERSIÓN PREMIUM)
+// -----------------------------------------------------------------------------
+// @Encabezado:   Página de Generación de Reportes de Asistencia
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la página de generación y visualización
+//               de reportes detallados de asistencia para administradores.
+//               Incluye filtros por sede y mes, generación de reportes con
+//               estadísticas de asistencias, ausencias y tardanzas, exportación
+//               a PDF, y visualización expandible del detalle diario con
+//               información completa de cada empleado.
+//
+// @NombreArchivo: reportes_page.dart
+// @Ubicacion:    lib/views/admin/reportes_page.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:month_picker_dialog/month_picker_dialog.dart';

@@ -1,3 +1,23 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Página de Cambio de Contraseña
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la página para cambiar la contraseña del
+//               usuario autenticado. Incluye formulario seguro con validación
+//               de contraseña actual, nueva contraseña y confirmación,
+//               integración con AuthController para ejecutar la lógica de
+//               negocio y retroalimentación clara al usuario.
+//
+// @NombreArchivo: cambiar_contrasena_page.dart
+// @Ubicacion:    lib/views/admin/cambiar_contrasena_page.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 // FILE: lib/views/admin/cambiar_contrasena_page.dart
 
 import 'package:flutter/material.dart';

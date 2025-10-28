@@ -1,3 +1,23 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Página de Crear/Editar Administrador
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define el formulario para crear y editar usuarios
+//               administradores. Incluye campos para nombre, correo electrónico
+//               y contraseña, validación de formularios, gestión de estados
+//               de carga, animaciones y navegación con integración al
+//               AdministradorController para persistir los datos.
+//
+// @NombreArchivo: add_edit_admin_page.dart
+// @Ubicacion:    lib/views/admin/add_edit_admin_page.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/administrador_controller.dart';

@@ -1,3 +1,23 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Página de Formulario de Sede
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define el formulario para crear y editar sedes.
+//               Incluye campos para nombre, dirección, coordenadas geográficas,
+//               radio permitido y estado activo/inactivo. Integra Google Maps
+//               para selección de ubicación, validación de formularios y
+//               navegación a la página de selección de mapa.
+//
+// @NombreArchivo: sede_form_page.dart
+// @Ubicacion:    lib/views/admin/sede_form_page.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 // views/admin/sede_form_page.dart
 import 'dart:async';
 import 'package:flutter/material.dart';

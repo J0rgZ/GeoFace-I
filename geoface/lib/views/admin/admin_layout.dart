@@ -1,3 +1,23 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Layout Principal del Administrador
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define el layout principal para la interfaz de
+//               administrador. Incluye navegación por pestañas, menú de
+//               configuración superior, barra de navegación inferior
+//               personalizada, gestión de temas y control del estilo del
+//               sistema operativo para una experiencia inmersiva.
+//
+// @NombreArchivo: admin_layout.dart
+// @Ubicacion:    lib/views/admin/admin_layout.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geoface/views/admin/api_config_page.dart';

@@ -1,4 +1,23 @@
-// FILE: lib/controllers/administrador_controller.dart
+// -----------------------------------------------------------------------------
+// @Encabezado:   Controlador de Administradores
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo contiene la lógica de negocio para la gestión de
+//               usuarios administradores del sistema. Se encarga de las
+//               operaciones CRUD (Crear, Leer, Actualizar, Eliminar) para
+//               administradores, interactuando con el servicio de administradores
+//               y gestionando el estado de carga y errores para la UI.
+//
+// @NombreControlador: AdministradorController
+// @Ubicacion:    lib/controllers/administrador_controller.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/material.dart';
 import '../models/usuario.dart';
 import '../services/administrador_service.dart';

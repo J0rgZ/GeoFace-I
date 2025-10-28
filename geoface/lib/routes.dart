@@ -1,3 +1,23 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Configuración de Rutas de la Aplicación
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define las rutas de navegación de la aplicación
+//               GeoFace. Contiene la configuración de rutas nombradas y el
+//               método `generateRoute` que maneja la navegación entre diferentes
+//               pantallas de la aplicación, incluyendo el menú principal,
+//               autenticación, dashboard administrativo y páginas de gestión.
+//
+// @NombreArchivo: routes.dart
+// @Ubicacion:    lib/routes.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 // FILE: routes.dart
 import 'package:flutter/material.dart';
 import 'views/auth/login_page.dart';

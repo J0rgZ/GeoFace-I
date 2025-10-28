@@ -1,3 +1,23 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Página de Selección de Ubicación en Mapa
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la página para seleccionar la ubicación
+//               de una sede usando Google Maps. Permite al usuario mover el
+//               mapa y seleccionar una ubicación específica mediante un pin
+//               animado, con geocodificación inversa para mostrar la dirección
+//               correspondiente y validación de la ubicación seleccionada.
+//
+// @NombreArchivo: sede_mapa_seleccion_page.dart
+// @Ubicacion:    lib/views/admin/sede_mapa_seleccion_page.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 // views/admin/map_selection_page.dart
 import 'dart:async';
 import 'package:flutter/material.dart';

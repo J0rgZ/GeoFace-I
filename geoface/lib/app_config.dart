@@ -1,3 +1,23 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Configuración General de la Aplicación
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo contiene las configuraciones estáticas y constantes
+//               de la aplicación GeoFace. Define configuraciones de SharedPreferences,
+//               URLs de API, configuraciones de geolocalización, nombres de
+//               colecciones de Firestore, y otras constantes globales necesarias
+//               para el funcionamiento de la aplicación.
+//
+// @NombreArchivo: app_config.dart
+// @Ubicacion:    lib/app_config.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AppConfig {

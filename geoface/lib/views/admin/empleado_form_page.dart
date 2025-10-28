@@ -1,3 +1,23 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Página de Formulario de Empleado
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define el formulario para crear y editar empleados.
+//               Incluye campos para información personal, laboral y de contacto,
+//               selección de sede, validación de datos únicos (DNI, correo),
+//               y gestión de estados activo/inactivo con validaciones
+//               completas del formulario.
+//
+// @NombreArchivo: empleado_form_page.dart
+// @Ubicacion:    lib/views/admin/empleado_form_page.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 // views/admin/empleado_form_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

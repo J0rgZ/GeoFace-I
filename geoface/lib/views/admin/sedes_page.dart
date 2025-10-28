@@ -1,3 +1,24 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Página de Gestión de Sedes
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la página de gestión completa de sedes
+//               para administradores. Incluye funcionalidades de búsqueda,
+//               filtrado por estado, creación, edición, eliminación y cambio
+//               de estado de sedes. Proporciona una interfaz moderna con
+//               animaciones, validaciones de integridad referencial y
+//               navegación fluida entre diferentes vistas de gestión.
+//
+// @NombreArchivo: sedes_page.dart
+// @Ubicacion:    lib/views/admin/sedes_page.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';

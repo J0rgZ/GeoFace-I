@@ -1,4 +1,23 @@
-// utils/pdf_report_generator.dart
+// -----------------------------------------------------------------------------
+// @Encabezado:   Generador de Reportes PDF
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la clase `PdfReportGenerator`, que se
+//               encarga de generar reportes detallados de asistencia en formato
+//               PDF. Utiliza el paquete `pdf` para crear documentos con
+//               tablas, gráficos y formato profesional, incluyendo resúmenes
+//               estadísticos y detalles diarios de asistencias y ausencias.
+//
+// @NombreArchivo: pdf_report_generator.dart
+// @Ubicacion:    lib/utils/pdf_report_generator.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'dart:developer';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';

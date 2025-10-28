@@ -1,4 +1,23 @@
-// lib/utils/location_helper.dart
+// -----------------------------------------------------------------------------
+// @Encabezado:   Utilidades de Geolocalización
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la clase `LocationHelper`, que contiene
+//               métodos de utilidad para cálculos geográficos. Incluye la
+//               función para calcular distancias entre coordenadas usando la
+//               fórmula de Haversine, que es esencial para validar si un
+//               empleado está dentro del radio permitido para marcar asistencia.
+//
+// @NombreArchivo: location_helper.dart
+// @Ubicacion:    lib/utils/location_helper.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'dart:math';
 
 class LocationHelper {

@@ -1,3 +1,24 @@
+// -----------------------------------------------------------------------------
+// @Encabezado:   Pantalla Principal del Menú
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo define la pantalla principal de la aplicación
+//               GeoFace, que incluye el menú principal con sincronización de
+//               tiempo de servidores, verificación de GPS falso, y navegación
+//               a las funciones de marcar asistencia y acceso administrativo.
+//               También contiene las clases TimeService y ResponsiveConfig
+//               para gestión de tiempo y diseño responsivo.
+//
+// @NombreArchivo: main_menu_screen.dart
+// @Ubicacion:    lib/views/main_menu_screen.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geoface/services/fake_gps_detector_service.dart';

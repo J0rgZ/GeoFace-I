@@ -1,4 +1,24 @@
-// utils/date_utils.dart
+// -----------------------------------------------------------------------------
+// @Encabezado:   Utilidades de Fechas y Tiempo
+// @Autor:        Jorge Luis Briceño Diaz
+// @Descripción:  Este archivo contiene funciones de utilidad para el manejo de
+//               fechas y tiempo en la aplicación. Incluye funciones para
+//               formatear fechas, calcular duraciones, verificar si dos fechas
+//               son del mismo día, y obtener rangos de fechas (inicio/fin de
+//               mes, inicio de semana). Utiliza el paquete `intl` para
+//               formateo localizado.
+//
+// @NombreArchivo: date_utils.dart
+// @Ubicacion:    lib/utils/date_utils.dart
+// @FechaInicio:  15/05/2025
+// @FechaFin:     25/05/2025
+// -----------------------------------------------------------------------------
+// @Modificacion: [Número de modificación]
+// @Fecha:        [Fecha de Modificación]
+// @Autor:        [Nombre de quien modificó]
+// @Descripción:  [Descripción de los cambios realizados]
+// -----------------------------------------------------------------------------
+
 import 'package:intl/intl.dart';
 
 // Verifica si dos fechas son el mismo día
