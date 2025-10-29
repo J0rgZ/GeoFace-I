@@ -89,7 +89,7 @@ Actualmente, GeoFace se encuentra en fase de despliegue controlado. Para obtener
 | Componente | Tecnología Principal | Descripción |
 | :--- | :--- | :--- |
 | **App Móvil** | `Flutter` | Interfaz de usuario moderna y fluida para dispositivos Android. |
-| **Panel Web** | `ASP.NET MVC` | Plataforma de administración robusta y escalable. |
+| **App Móvil** | `ASP.NET MVC` | Plataforma de administración robusta y escalable. |
 | **Backend** | `Firebase (BaaS)` | Gestiona la base de datos (Firestore), la autenticación de usuarios (Auth) y el almacenamiento de imágenes (Storage). |
 | **Reconocimiento Facial** | `Python API` | Un servicio personalizado que procesa y valida la identidad facial, garantizando un control total sobre el algoritmo. |
 | **Geolocalización** | `Google Maps Platform`| Provee los servicios de mapas y cálculo de distancia para el geofencing. |
