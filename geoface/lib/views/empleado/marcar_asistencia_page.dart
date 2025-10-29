@@ -256,11 +256,6 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
       }
     }
   }
-
-  // --- El resto del código no necesita cambios ---
-  // (incluyendo _showCustomInfoDialog, _processImageToBytes, _handleIdentityVerification,
-  // _handleMarkAttendance, ciclo de vida, permisos, y todos los widgets _build*)
-  // Pego el resto del código para que sea un solo bloque.
   
   void _showCustomInfoDialog({
     required String title,
