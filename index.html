@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="GeoFace - Sistema de Control de Asistencia con Biometría y Geolocalización">
+    <title>GeoFace - Descarga y Prueba</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            background: linear-gradient(135deg, #6A1B9A 0%, #8E24AA 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .header h1 .icon {
+            font-size: 1.2em;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.95;
+        }
+
+        .badge {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 20px;
+            border-radius: 20px;
+            margin-top: 15px;
+            font-size: 0.9em;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .section {
+            margin-bottom: 35px;
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title .icon {
+            font-size: 1.2em;
+            color: #6A1B9A;
+        }
+
+        .download-box {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border: 2px solid #6A1B9A;
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .download-box h3 {
+            color: #6A1B9A;
+            font-size: 1.3em;
+            margin-bottom: 20px;
+        }
+
+        .qr-container {
+            display: flex;
+            justify-content: center;
+            margin: 30px 0;
+        }
+
+        .qr-code {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .qr-code img {
+            width: 250px;
+            height: 250px;
+            display: block;
+        }
+
+        .download-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #6A1B9A 0%, #8E24AA 100%);
+            color: white;
+            padding: 18px 40px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-size: 1.1em;
+            font-weight: bold;
+            margin: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(106, 27, 154, 0.4);
+        }
+
+        .download-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(106, 27, 154, 0.6);
+        }
+
+        .download-btn:active {
+            transform: translateY(0);
+        }
+
+        .app-info {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .info-value {
+            color: #333;
+        }
+
+        .steps-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .steps-list li {
+            background: #f8f9fa;
+            margin-bottom: 15px;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 4px solid #6A1B9A;
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .steps-list li:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .step-number {
+            background: linear-gradient(135deg, #6A1B9A 0%, #8E24AA 100%);
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-content strong {
+            color: #6A1B9A;
+            display: block;
+            margin-bottom: 5px;
+            font-size: 1.1em;
+        }
+
+        .credentials-box {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            border: 2px solid #ffc107;
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+
+        .credentials-box h4 {
+            color: #856404;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .credential-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .credential-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .credential-label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .credential-value {
+            background: #f8f9fa;
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #6A1B9A;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .warning-box h4 {
+            color: #856404;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .warning-box p {
+            color: #856404;
+            margin-bottom: 8px;
+        }
+
+        .footer {
+            background: #2c3e50;
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .footer p {
+            margin: 5px 0;
+            opacity: 0.9;
+        }
+
+        .footer a {
+            color: #8E24AA;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        .icon {
+            display: inline-block;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .header p {
+                font-size: 1em;
+            }
+
+            .content {
+                padding: 25px 20px;
+            }
+
+            .qr-code img {
+                width: 200px;
+                height: 200px;
+            }
+
+            .download-btn {
+                display: block;
+                margin: 10px 0;
+            }
+
+            .info-row {
+                flex-direction: column;
+                gap: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <span class="icon">🛰️</span>
+                GeoFace
+            </h1>
+            <p>Modernizando el Control de Asistencia</p>
+            <div class="badge">v1.0.0 - Versión de Prueba</div>
+        </div>
+
+        <div class="content">
+            <!-- Información de la Aplicación -->
+            <div class="section">
+                <h2 class="section-title">
+                    <span class="icon">📱</span>
+                    Información de la Aplicación
+                </h2>
+                <div class="app-info">
+                    <div class="info-row">
+                        <span class="info-label">Nombre:</span>
+                        <span class="info-value">GeoFace</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Versión:</span>
+                        <span class="info-value">1.0.0</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Plataforma:</span>
+                        <span class="info-value">Android</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Tamaño Aprox:</span>
+                        <span class="info-value">~50 MB</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Requisitos:</span>
+                        <span class="info-value">Android 6.0+ (API 23+)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Descarga -->
+            <div class="section">
+                <h2 class="section-title">
+                    <span class="icon">⬇️</span>
+                    Descargar GeoFace
+                </h2>
+                <div class="download-box">
+                    <h3>Escanee el código QR o haga clic en el botón</h3>
+                    
+                    <div class="qr-container">
+                        <div class="qr-code">
+                            <img id="qrImage" src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://J0rgZ.github.io/GeoFace-I/GeoFace.apk" alt="QR Code para descargar GeoFace">
+                        </div>
+                    </div>
+
+                    <a href="GeoFace.apk" class="download-btn" download>
+                        📥 Descargar APK Ahora
+                    </a>
+                </div>
+            </div>
+
+            <!-- Instrucciones -->
+            <div class="section">
+                <h2 class="section-title">
+                    <span class="icon">📋</span>
+                    Instrucciones de Instalación
+                </h2>
+                <ol class="steps-list">
+                    <li>
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <strong>Descargar el APK</strong>
+                            <span>Descargue el archivo GeoFace.apk en su dispositivo Android usando el botón o código QR de arriba.</span>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <strong>Habilitar Fuentes Desconocidas</strong>
+                            <span>Vaya a Configuración → Seguridad → Instalación de aplicaciones. Active la opción "Permitir instalación de fuentes desconocidas" para su navegador o gestor de archivos.</span>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <strong>Instalar la Aplicación</strong>
+                            <span>Busque el archivo descargado (generalmente en la carpeta "Descargas") y tóquelo para iniciar la instalación. Siga las instrucciones en pantalla.</span>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <strong>Conceder Permisos</strong>
+                            <span>Cuando abra la aplicación por primera vez, permita el acceso a la cámara y ubicación cuando se le solicite. Estos permisos son esenciales para el funcionamiento de GeoFace.</span>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="step-number">5</div>
+                        <div class="step-content">
+                            <strong>Iniciar Sesión</strong>
+                            <span>Use las credenciales de prueba proporcionadas abajo para acceder al sistema de administración.</span>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+
+            <!-- Credenciales de Prueba -->
+            <div class="section">
+                <h2 class="section-title">
+                    <span class="icon">🔑</span>
+                    Credenciales de Prueba
+                </h2>
+                <div class="credentials-box">
+                    <h4>
+                        <span class="icon">👤</span>
+                        Usuario de Administrador
+                    </h4>
+                    <div class="credential-item">
+                        <span class="credential-label">Usuario:</span>
+                        <span class="credential-value">admin</span>
+                    </div>
+                    <div class="credential-item">
+                        <span class="credential-label">Contraseña:</span>
+                        <span class="credential-value">123456</span>
+                    </div>
+                </div>
+
+                <div class="warning-box">
+                    <h4>
+                        <span class="icon">⚠️</span>
+                        Nota Importante
+                    </h4>
+                    <p><strong>Esta es una versión de prueba</strong> destinada únicamente para evaluación y demostración.</p>
+                    <p>Para uso en producción, contacte al equipo de soporte para obtener credenciales oficiales y configuración del sistema.</p>
+                </div>
+            </div>
+
+            <!-- Características -->
+            <div class="section">
+                <h2 class="section-title">
+                    <span class="icon">✨</span>
+                    Características Principales
+                </h2>
+                <div class="app-info">
+                    <p style="margin-bottom: 15px; color: #333;">GeoFace incluye las siguientes características:</p>
+                    <ul style="list-style-position: inside; color: #555; line-height: 1.8;">
+                        <li><strong>🛡️ Reconocimiento Facial Biométrico:</strong> Verificación de identidad mediante captura facial</li>
+                        <li><strong>📍 Geolocalización:</strong> Verificación de ubicación para asegurar presencia en sedes autorizadas</li>
+                        <li><strong>⏰ Control de Asistencia:</strong> Registro automático de entrada y salida</li>
+                        <li><strong>👥 Gestión de Empleados:</strong> Administración completa de personal y sedes</li>
+                        <li><strong>📊 Reportes y Estadísticas:</strong> Visualización de registros y métricas laborales</li>
+                        <li><strong>📄 Generación de PDFs:</strong> Exportación de reportes detallados</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>GeoFace</strong> - Sistema de Control de Asistencia</p>
+            <p>Desarrollado por <strong>CaelTek</strong> para Arod Contratistas Generales S.R.L.</p>
+            <p>Creado por estudiantes de la Universidad Privada de Tacna</p>
+            <p style="margin-top: 15px;">
+                <a href="https://github.com/J0rgZ/GeoFace-I">Ver Repositorio en GitHub</a>
+            </p>
+            <p style="margin-top: 10px; font-size: 0.9em; opacity: 0.8;">
+                © 2025 CaelTek - Todos los derechos reservados
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+
