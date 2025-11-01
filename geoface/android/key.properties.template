@@ -1,0 +1,19 @@
+# Archivo de configuración para la firma del APK/AAB
+# Copia este archivo como 'key.properties' y completa con tus credenciales reales
+# IMPORTANTE: key.properties está en .gitignore, NO subas tus credenciales al repositorio
+
+# Ruta al archivo keystore (relativa a la carpeta android/)
+# Si el keystore está en android/app/, solo pon el nombre del archivo
+# Si está en la raíz del proyecto, usa ../mi-clave-lanzamiento.jks
+storeFile=../mi-clave-lanzamiento.jks
+
+# Alias de la clave en el keystore
+keyAlias=tu-alias-aqui
+
+# Contraseña del keystore
+storePassword=tu-contraseña-keystore-aqui
+
+# Contraseña de la clave
+keyPassword=tu-contraseña-clave-aqui
+
+

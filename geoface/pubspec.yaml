@@ -1,7 +1,7 @@
 name: geoface
-description: "A new Flutter project."
+description: "Sistema de control de asistencia laboral mediante reconocimiento facial y geolocalización. GeoFace permite a empresas gestionar eficientemente el registro de entrada y salida de sus empleados."
 publish_to: 'none'
-version: 0.1.0
+version: 1.0.0+1
 
 environment:
   sdk: ^3.7.2
