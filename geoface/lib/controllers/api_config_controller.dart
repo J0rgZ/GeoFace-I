@@ -21,10 +21,10 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/api_config.dart';
-import '../services/firebase_service.dart';
+import '../services/api_config_service.dart';
 
 class ApiConfigController with ChangeNotifier {
-  final FirebaseService _firebaseService = FirebaseService();
+  final ApiConfigService _apiConfigService = ApiConfigService();
 
   ApiConfig _apiConfig = ApiConfig.empty;
   bool _isLoading = false;
@@ -45,7 +45,7 @@ class ApiConfigController with ChangeNotifier {
     _setLoading(true);
     _error = null;
     try {
-      _apiConfig = await _firebaseService.getApiConfig();
+      _apiConfig = await _apiConfigService.getApiConfig();
     } catch (e) {
       _error = "Error al cargar la configuración: ${e.toString()}";
       _apiConfig = ApiConfig.empty;
@@ -73,7 +73,7 @@ class ApiConfigController with ChangeNotifier {
     );
 
     try {
-      await _firebaseService.saveApiConfig(newConfig);
+      await _apiConfigService.saveApiConfig(newConfig);
       _apiConfig = newConfig; // Actualiza el estado local
       _setLoading(false);
       return true;

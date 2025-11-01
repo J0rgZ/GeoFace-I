@@ -21,12 +21,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
-import '../services/firebase_service.dart';
+import '../services/sede_service.dart';
 import '../models/sede.dart';
 
 class SedeController extends ChangeNotifier {
   
-  final FirebaseService _firebaseService = FirebaseService();
+  final SedeService _sedeService = SedeService();
   final Uuid _uuid = Uuid();
 
   // Estado interno del controlador.
@@ -48,7 +48,7 @@ class SedeController extends ChangeNotifier {
     
     try {
       // 2. Llama al servicio para obtener los datos.
-      _sedes = await _firebaseService.getSedes();
+      _sedes = await _sedeService.getSedes();
     } catch (e) {
       // 3. Si algo sale mal, se captura el error.
       _errorMessage = 'Error al cargar sedes: ${e.toString()}';
@@ -85,7 +85,7 @@ class SedeController extends ChangeNotifier {
         fechaCreacion: DateTime.now(),
       );
       
-      await _firebaseService.addSede(sede);
+      await _sedeService.addSede(sede);
       
       // Se refresca la lista local para que la UI muestre la nueva sede inmediatamente.
       await getSedes();
@@ -114,7 +114,7 @@ class SedeController extends ChangeNotifier {
     
     try {
       // Primero, obtenemos la sede actual para usar `copyWith`.
-      final sedeActual = await _firebaseService.getSedeById(id);
+      final sedeActual = await _sedeService.getSedeById(id);
       
       if (sedeActual == null) {
         throw Exception('Sede no encontrada con el id: $id');
@@ -131,7 +131,7 @@ class SedeController extends ChangeNotifier {
         activa: activa,
       );
       
-      await _firebaseService.updateSede(sedeActualizada);
+      await _sedeService.updateSede(sedeActualizada);
       
       // Refrescamos la lista para reflejar los cambios en la UI.
       await getSedes();
@@ -151,7 +151,7 @@ class SedeController extends ChangeNotifier {
     notifyListeners();
     
     try {
-      await _firebaseService.deleteSede(id);
+      await _sedeService.deleteSede(id);
       
       // Refrescamos la lista para que el elemento eliminado desaparezca de la UI.
       await getSedes();

@@ -250,13 +250,13 @@ class _EmpleadoDetailPageState extends State<EmpleadoDetailPage> {
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(
-              color: Theme.of(context).colorScheme.outline.withOpacity(0.5),
+              color: Theme.of(context).colorScheme.outline.withValues(alpha:0.5),
             ),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(
-              color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+              color: Theme.of(context).colorScheme.outline.withValues(alpha:0.3),
             ),
           ),
           focusedBorder: OutlineInputBorder(
@@ -275,7 +275,7 @@ class _EmpleadoDetailPageState extends State<EmpleadoDetailPage> {
           filled: true,
           fillColor: _isEditing 
               ? Theme.of(context).colorScheme.surface
-              : Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+              : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha:0.3),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
         keyboardType: keyboardType,
@@ -284,7 +284,7 @@ class _EmpleadoDetailPageState extends State<EmpleadoDetailPage> {
         validator: validator,
         textCapitalization: textCapitalization,
         style: _isEditing ? null : TextStyle(
-          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha:0.8),
         ),
       ),
     );
@@ -302,13 +302,13 @@ class _EmpleadoDetailPageState extends State<EmpleadoDetailPage> {
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: Theme.of(context).colorScheme.outline.withOpacity(0.5),
+                color: Theme.of(context).colorScheme.outline.withValues(alpha:0.5),
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                color: Theme.of(context).colorScheme.outline.withValues(alpha:0.3),
               ),
             ),
             focusedBorder: OutlineInputBorder(
@@ -387,7 +387,7 @@ class _EmpleadoDetailPageState extends State<EmpleadoDetailPage> {
             Text(
               'Cargando información...',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha:0.7),
               ),
             ),
           ],
@@ -414,7 +414,7 @@ class _EmpleadoDetailPageState extends State<EmpleadoDetailPage> {
             Text(
               'No se pudo cargar la información del empleado',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha:0.7),
               ),
             ),
             const SizedBox(height: 24),
@@ -529,8 +529,8 @@ class _EmpleadoDetailPageState extends State<EmpleadoDetailPage> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Theme.of(context).colorScheme.primaryContainer.withOpacity(0.7),
-            Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+            Theme.of(context).colorScheme.primaryContainer.withValues(alpha:0.7),
+            Theme.of(context).colorScheme.primaryContainer.withValues(alpha:0.3),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -549,7 +549,7 @@ class _EmpleadoDetailPageState extends State<EmpleadoDetailPage> {
                 tag: 'empleado-avatar-${widget.empleadoId}',
                 child: CircleAvatar(
                   radius: 50,
-                  backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                  backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha:0.1),
                   child: Text(
                     _getInitials(nombreCompleto),
                     style: Theme.of(context).textTheme.headlineLarge?.copyWith(
@@ -604,7 +604,7 @@ class _EmpleadoDetailPageState extends State<EmpleadoDetailPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: (_empleado!.activo ? Colors.green : Colors.red).withOpacity(0.1),
+              color: (_empleado!.activo ? Colors.green : Colors.red).withValues(alpha:0.1),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: _empleado!.activo ? Colors.green : Colors.red,
@@ -644,12 +644,12 @@ class _EmpleadoDetailPageState extends State<EmpleadoDetailPage> {
       decoration: BoxDecoration(
         border: Border.all(
           color: hasBiometrics 
-              ? Colors.green.withOpacity(0.3)
-              : Theme.of(context).colorScheme.outline.withOpacity(0.3),
+              ? Colors.green.withValues(alpha:0.3)
+              : Theme.of(context).colorScheme.outline.withValues(alpha:0.3),
         ),
         borderRadius: BorderRadius.circular(12),
         color: hasBiometrics
-            ? Colors.green.withOpacity(0.05)
+            ? Colors.green.withValues(alpha:0.05)
             : Theme.of(context).colorScheme.surface,
       ),
       child: InkWell(
@@ -663,8 +663,8 @@ class _EmpleadoDetailPageState extends State<EmpleadoDetailPage> {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: hasBiometrics
-                      ? Colors.green.withOpacity(0.1)
-                      : Theme.of(context).colorScheme.errorContainer.withOpacity(0.1),
+                      ? Colors.green.withValues(alpha:0.1)
+                      : Theme.of(context).colorScheme.errorContainer.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
@@ -697,7 +697,7 @@ class _EmpleadoDetailPageState extends State<EmpleadoDetailPage> {
                           ? 'Reconocimiento facial habilitado'
                           : 'Toque para configurar reconocimiento facial',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha:0.7),
                       ),
                     ),
                   ],
@@ -706,7 +706,7 @@ class _EmpleadoDetailPageState extends State<EmpleadoDetailPage> {
               Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha:0.5),
               ),
             ],
           ),

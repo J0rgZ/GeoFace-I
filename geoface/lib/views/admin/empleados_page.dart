@@ -73,7 +73,9 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
     _fabAnimationController.forward();
     
     Future.microtask(() {
-      Provider.of<EmpleadoController>(context, listen: false).getEmpleados();
+      if (mounted) {
+        Provider.of<EmpleadoController>(context, listen: false).getEmpleados();
+      }
     });
 
     _searchController.addListener(_onSearchChanged);
@@ -386,7 +388,7 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
             border: Border.all(
               color: _isSearchExpanded 
                   ? theme.colorScheme.primary 
-                  : theme.colorScheme.outline.withOpacity(0.3),
+                  : theme.colorScheme.outline.withValues(alpha:0.3),
               width: _isSearchExpanded ? 2 : 1,
             ),
             color: theme.colorScheme.surface,
@@ -488,7 +490,7 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
                 side: BorderSide(
                   color: isSelected 
                       ? theme.colorScheme.primary 
-                      : theme.colorScheme.outline.withOpacity(0.3),
+                      : theme.colorScheme.outline.withValues(alpha:0.3),
                 ),
               ),
             ),
@@ -525,7 +527,7 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
-            color: theme.colorScheme.outline.withOpacity(0.1),
+            color: theme.colorScheme.outline.withValues(alpha:0.1),
             width: 1,
           ),
         ),
@@ -545,7 +547,7 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
                       gradient: LinearGradient(
                         colors: [
                           theme.colorScheme.primaryContainer,
-                          theme.colorScheme.primaryContainer.withOpacity(0.7),
+                          theme.colorScheme.primaryContainer.withValues(alpha:0.7),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -553,7 +555,7 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: theme.colorScheme.primary.withOpacity(0.2),
+                          color: theme.colorScheme.primary.withValues(alpha:0.2),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -608,7 +610,7 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: colorEstado.withOpacity(0.1),
+                              color: colorEstado.withValues(alpha:0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
@@ -679,7 +681,7 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
               width: 120,
               height: 120,
               decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                color: theme.colorScheme.primaryContainer.withValues(alpha:0.3),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -727,7 +729,7 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha:0.5),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -779,7 +781,7 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                color: theme.colorScheme.errorContainer.withOpacity(0.3),
+                color: theme.colorScheme.errorContainer.withValues(alpha:0.3),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -841,7 +843,7 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
                   height: 4,
                   width: 40,
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.outline.withOpacity(0.4),
+                    color: theme.colorScheme.outline.withValues(alpha:0.4),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -857,13 +859,13 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
                         gradient: LinearGradient(
                           colors: [
                             theme.colorScheme.primaryContainer,
-                            theme.colorScheme.primaryContainer.withOpacity(0.7),
+                            theme.colorScheme.primaryContainer.withValues(alpha:0.7),
                           ],
                         ),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: theme.colorScheme.primary.withOpacity(0.2),
+                            color: theme.colorScheme.primary.withValues(alpha:0.2),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -943,10 +945,10 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
                   margin: const EdgeInsets.symmetric(vertical: 8),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha:0.3),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: theme.colorScheme.outline.withOpacity(0.2),
+                      color: theme.colorScheme.outline.withValues(alpha:0.2),
                     ),
                   ),
                   child: Row(
@@ -1046,8 +1048,8 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: isDestructive 
-                    ? theme.colorScheme.error.withOpacity(0.2)
-                    : theme.colorScheme.outline.withOpacity(0.1),
+                    ? theme.colorScheme.error.withValues(alpha:0.2)
+                    : theme.colorScheme.outline.withValues(alpha:0.1),
               ),
             ),
             child: Row(
@@ -1057,8 +1059,8 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
                   height: 40,
                   decoration: BoxDecoration(
                     color: isDestructive 
-                        ? theme.colorScheme.error.withOpacity(0.1)
-                        : theme.colorScheme.primaryContainer.withOpacity(0.3),
+                        ? theme.colorScheme.error.withValues(alpha:0.1)
+                        : theme.colorScheme.primaryContainer.withValues(alpha:0.3),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -1083,7 +1085,7 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
                         subtitle,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: isDestructive 
-                              ? theme.colorScheme.error.withOpacity(0.7)
+                              ? theme.colorScheme.error.withValues(alpha:0.7)
                               : theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
@@ -1122,7 +1124,7 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: theme.colorScheme.error.withOpacity(0.1),
+                color: theme.colorScheme.error.withValues(alpha:0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -1149,7 +1151,7 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: theme.colorScheme.errorContainer.withOpacity(0.3),
+                color: theme.colorScheme.errorContainer.withValues(alpha:0.3),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(

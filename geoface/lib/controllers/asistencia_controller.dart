@@ -21,7 +21,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
-import '../services/firebase_service.dart';
+import '../services/asistencia_service.dart';
+import '../services/sede_service.dart';
 import '../services/location_service.dart';
 import '../services/time_service.dart';
 import '../models/asistencia.dart';
@@ -38,7 +39,8 @@ enum AsistenciaStatus {
 // Controlador que encapsula toda la lógica de negocio para la gestión de asistencias.
 class AsistenciaController extends ChangeNotifier {
   // --- INYECCIÓN DE SERVICIOS ---
-  final FirebaseService _firebaseService = FirebaseService();
+  final AsistenciaService _asistenciaService = AsistenciaService();
+  final SedeService _sedeService = SedeService();
   final LocationService _locationService = LocationService();
   final Uuid _uuid = Uuid();
   
@@ -66,7 +68,7 @@ class AsistenciaController extends ChangeNotifier {
     _errorMessage = null;
     
     try {
-      final asistenciaHoy = await _firebaseService.getTodayAsistencia(empleadoId);
+      final asistenciaHoy = await _asistenciaService.getTodayAsistencia(empleadoId);
       
       if (asistenciaHoy == null) {
         _asistenciaActiva = null;
@@ -102,13 +104,13 @@ class AsistenciaController extends ChangeNotifier {
       final networkTime = await TimeService.getCurrentNetworkTime();
       
       // 2. Verifica que no exista ya un registro para hoy, evitando duplicados.
-      final asistenciaHoy = await _firebaseService.getTodayAsistencia(empleadoId);
+      final asistenciaHoy = await _asistenciaService.getTodayAsistencia(empleadoId);
       if (asistenciaHoy != null) {
         throw Exception('Ya tiene un registro de asistencia para el día de hoy.');
       }
       
       // 3. Obtiene los datos de la sede para validar la ubicación.
-      final sede = await _firebaseService.getSedeById(sedeId);
+      final sede = await _sedeService.getSedeById(sedeId);
       if (sede == null) throw Exception('Sede no encontrada');
       
       // 4. Obtiene la ubicación GPS actual del dispositivo.
@@ -133,7 +135,7 @@ class AsistenciaController extends ChangeNotifier {
         capturaEntrada: capturaEntrada,
       );
       
-      await _firebaseService.registrarEntrada(nuevaAsistencia);
+      await _asistenciaService.registrarEntrada(nuevaAsistencia);
       _asistenciaActiva = nuevaAsistencia;
       
       return true;
@@ -164,7 +166,7 @@ class AsistenciaController extends ChangeNotifier {
       
       // Si el estado se perdió (ej. app cerrada), busca la asistencia en Firebase como respaldo.
       if (asistenciaParaCerrar == null) {
-        asistenciaParaCerrar = await _firebaseService.getTodayAsistencia(empleadoId);
+        asistenciaParaCerrar = await _asistenciaService.getTodayAsistencia(empleadoId);
         if (asistenciaParaCerrar == null || asistenciaParaCerrar.fechaHoraSalida != null) {
           throw Exception('No tiene una entrada registrada hoy para marcar salida.');
         }
@@ -187,7 +189,7 @@ class AsistenciaController extends ChangeNotifier {
         'fechaHoraSalida': networkTime,
       };
       
-      await _firebaseService.registrarSalida(asistenciaParaCerrar.id, salidaData);
+      await _asistenciaService.registrarSalida(asistenciaParaCerrar.id, salidaData);
       
       // Actualiza el objeto local para que la UI refleje el cambio instantáneamente.
       _asistenciaActiva = _asistenciaActiva?.copyWith(
@@ -215,7 +217,7 @@ class AsistenciaController extends ChangeNotifier {
     notifyListeners();
     
     try {
-      _asistencias = await _firebaseService.getAsistenciasByEmpleado(empleadoId);
+      _asistencias = await _asistenciaService.getAsistenciasByEmpleado(empleadoId);
     } catch (e) {
       _errorMessage = 'Error al cargar asistencias: ${e.toString()}';
     } finally {
@@ -227,16 +229,16 @@ class AsistenciaController extends ChangeNotifier {
   Future<void> getAsistenciasDeHoy() async {
     _loading = true;
     _errorMessage = null;
-    // No notificamos aquí para no causar un parpadeo si _loadData usa Future.wait
+    notifyListeners();
     
     try {
-      // Tu FirebaseService necesitará un método que haga una consulta filtrada por fecha.
-      _asistenciasDeHoy = await _firebaseService.getAsistenciasDeHoy();
+      // Obtiene las asistencias del día de hoy.
+      _asistenciasDeHoy = await _asistenciaService.getAsistenciasDeHoy();
     } catch (e) {
       _errorMessage = 'Error al cargar asistencias de hoy: ${e.toString()}';
     } finally {
       _loading = false;
-      // Notificamos solo al final o dejamos que el Future.wait maneje el estado de la UI.
+      notifyListeners();
     }
   }
 
@@ -245,6 +247,15 @@ class AsistenciaController extends ChangeNotifier {
   void clearState() {
     _asistenciaActiva = null;
     _errorMessage = null;
+    _asistencias = [];
+    _asistenciasDeHoy = [];
+    notifyListeners();
+  }
+
+  // Limpia solo las asistencias del empleado (usado por el admin para no mezclar datos).
+  // Este método permite que el admin pueda cargar sus datos sin que se vean afectados
+  // por las asistencias del empleado que inició sesión previamente.
+  void clearEmpleadoAsistencias() {
     _asistencias = [];
     notifyListeners();
   }

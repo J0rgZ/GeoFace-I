@@ -156,10 +156,12 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
           ),
           FilledButton(
             onPressed: () async {
+              if (!mounted) return;
               final authController = Provider.of<AuthController>(context, listen: false);
+              final navigator = Navigator.of(context);
               await authController.logout();
               if (mounted) {
-                Navigator.of(context).pushReplacementNamed(AppRoutes.login);
+                navigator.pushReplacementNamed(AppRoutes.login);
               }
             },
             style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
@@ -178,9 +180,90 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
     final isDarkMode = theme.brightness == Brightness.dark;
     final authController = context.watch<AuthController>();
     final currentUser = authController.currentUser;
+    final authStatus = authController.status;
 
-    if (currentUser == null) {
+    // Si está cargando o inicializando, mostrar indicador de carga
+    if (authStatus == AuthStatus.loading || authStatus == AuthStatus.initial) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    // Si no hay usuario autenticado, mostrar error
+    if (authStatus == AuthStatus.unauthenticated || currentUser == null) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline_rounded, size: 64, color: theme.colorScheme.error),
+              const SizedBox(height: 16),
+              Text(
+                'Sesión No Iniciada',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  color: theme.colorScheme.error,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Por favor, inicia sesión nuevamente.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // PROTECCIÓN CRÍTICA: Solo verificar rol cuando el usuario está completamente autenticado
+    // Esperar a que el estado sea authenticated antes de verificar el rol
+    if (authStatus == AuthStatus.authenticated) {
+      // Si el usuario NO es admin, redirigir inmediatamente
+      if (!authController.isAdmin) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          // Guardar Navigator antes de operaciones asíncronas
+          final navigator = Navigator.of(context);
+          authController.logout().then((_) {
+            if (mounted) {
+              navigator.pushNamedAndRemoveUntil(
+                AppRoutes.mainMenu,
+                (route) => false,
+              );
+            }
+          });
+        });
+        return Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.security_rounded, size: 64, color: theme.colorScheme.error),
+                const SizedBox(height: 16),
+                Text(
+                  'Acceso No Autorizado',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    color: theme.colorScheme.error,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Solo los administradores pueden acceder a esta sección.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                const CircularProgressIndicator(),
+              ],
+            ),
+          ),
+        );
+      }
     }
 
     // AnnotatedRegion controla el estilo de la UI del sistema (barras de estado y navegación).
@@ -193,14 +276,33 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: isDarkMode ? Brightness.light : Brightness.dark,
       ),
-      child: Scaffold(
-        appBar: _buildAppBar(theme, currentUser),
-        body: TabBarView(
-          controller: _tabController,
-          physics: const NeverScrollableScrollPhysics(), // Deshabilita el deslizamiento.
-          children: _pageCache,
+      child: PopScope(
+        // PROTECCIÓN: Prevenir navegación no autorizada con el botón retroceder
+        canPop: authController.isAdmin, // Solo permite retroceder si es admin
+        onPopInvokedWithResult: (bool didPop, Object? result) async {
+          // Si se intentó retroceder y el usuario no es admin, forzar redirección
+          if (!authController.isAdmin && !didPop) {
+            if (!mounted) return;
+            // Guardar Navigator antes de operaciones asíncronas
+            final navigator = Navigator.of(context);
+            await authController.logout();
+            if (mounted) {
+              navigator.pushNamedAndRemoveUntil(
+                AppRoutes.mainMenu,
+                (route) => false,
+              );
+            }
+          }
+        },
+        child: Scaffold(
+          appBar: _buildAppBar(theme, currentUser),
+          body: TabBarView(
+            controller: _tabController,
+            physics: const NeverScrollableScrollPhysics(), // Deshabilita el deslizamiento.
+            children: _pageCache,
+          ),
+          bottomNavigationBar: _buildBottomNav(theme),
         ),
-        bottomNavigationBar: _buildBottomNav(theme),
       ),
     );
   }
@@ -225,7 +327,7 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
             margin: const EdgeInsets.only(right: 16),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceVariant.withOpacity(0.7),
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha:0.7),
               borderRadius: BorderRadius.circular(24),
             ),
             child: Row(
@@ -259,9 +361,9 @@ class _AdminLayoutState extends State<AdminLayout> with SingleTickerProviderStat
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -5)),
+          BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 20, offset: const Offset(0, -5)),
         ],
-        border: Border(top: BorderSide(color: theme.colorScheme.outline.withOpacity(0.2), width: 1)),
+        border: Border(top: BorderSide(color: theme.colorScheme.outline.withValues(alpha:0.2), width: 1)),
       ),
       child: SafeArea(
         child: Padding(
@@ -342,7 +444,7 @@ class _SettingsMenu extends StatelessWidget {
     return GestureDetector(
       onTap: () => Navigator.pop(context), // Cierra el menú al tocar el fondo.
       child: Material(
-        color: Colors.black.withOpacity(0.6),
+        color: Colors.black.withValues(alpha:0.6),
         child: Align(
           alignment: Alignment.topCenter,
           child: GestureDetector(
@@ -354,7 +456,7 @@ class _SettingsMenu extends StatelessWidget {
                 color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, spreadRadius: 5)
+                  BoxShadow(color: Colors.black.withValues(alpha:0.1), blurRadius: 20, spreadRadius: 5)
                 ],
               ),
               child: Column(

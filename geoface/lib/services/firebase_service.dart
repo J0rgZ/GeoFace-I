@@ -22,6 +22,7 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:geoface/models/api_config.dart';
 import '../app_config.dart';
 import '../models/empleado.dart';
@@ -93,8 +94,8 @@ class FirebaseService {
       }
       return null;
     } catch (e) {
-      print('Error al obtener usuario por email: $e');
-      throw e; // Relanza la excepción para que sea manejada por el llamador.
+      debugPrint('Error al obtener usuario por email: $e');
+      rethrow; // Relanza la excepción para que sea manejada por el llamador.
     }
   }
 
@@ -133,7 +134,7 @@ class FirebaseService {
       }
       return null;
     } catch (e) {
-      print('Error al buscar empleado por DNI: ${e.toString()}');
+      debugPrint('Error al buscar empleado por DNI: ${e.toString()}');
       throw Exception('No se pudo obtener el empleado por DNI');
     }
   }
@@ -234,7 +235,7 @@ class FirebaseService {
       }
       return null;
     } catch (e) {
-      print('Error al obtener asistencia activa: $e');
+      debugPrint('Error al obtener asistencia activa: $e');
       throw Exception('No se pudo obtener la asistencia activa');
     }
   }
@@ -320,7 +321,7 @@ class FirebaseService {
           })
           .toList();
     } catch (e) {
-      print('Error al obtener asistencias filtradas: ${e.toString()}');
+      debugPrint('Error al obtener asistencias filtradas: ${e.toString()}');
       throw Exception('No se pudieron cargar las asistencias filtradas');
     }
   }
@@ -349,7 +350,7 @@ class FirebaseService {
       }
       return null;
     } catch (e) {
-      print('Error al buscar asistencia completada para hoy: $e');
+      debugPrint('Error al buscar asistencia completada para hoy: $e');
       return null; // Devuelve null en caso de error para no bloquear el flujo.
     }
   }
@@ -378,7 +379,7 @@ class FirebaseService {
       }
       return null;
     } catch (e) {
-      print('Error al obtener asistencia del día: $e');
+      debugPrint('Error al obtener asistencia del día: $e');
       throw Exception('No se pudo obtener la asistencia del día');
     }
   }
@@ -414,7 +415,7 @@ class FirebaseService {
           })
           .toList();
     } catch (e) {
-      print('Error al obtener todas las asistencias: ${e.toString()}');
+      debugPrint('Error al obtener todas las asistencias: ${e.toString()}');
       throw Exception('No se pudieron cargar las asistencias');
     }
   }
@@ -442,13 +443,12 @@ class FirebaseService {
         });
       }).toList();
     } catch (e) {
-      print('Error al obtener administradores desde el servicio: $e');
+      debugPrint('Error al obtener administradores desde el servicio: $e');
       throw Exception('No se pudieron cargar los administradores.');
     }
   }
 
   /// Envía un correo electrónico para restablecer la contraseña.
-  /// TODO: Implementar la lógica para llamar a `_auth.sendPasswordResetEmail(email: correo)`.
   sendPasswordResetEmail(String correo) {}
 
   // ------------------------------------------------------------------
@@ -466,7 +466,7 @@ class FirebaseService {
         SetOptions(merge: true)
       );
     } catch (e) {
-      print("Error al guardar la configuración de la API: $e");
+      debugPrint("Error al guardar la configuración de la API: $e");
       throw Exception("No se pudo guardar la configuración. Inténtalo de nuevo.");
     }
   }
@@ -484,7 +484,7 @@ class FirebaseService {
       // Si el documento no existe, devuelve una configuración vacía/predeterminada.
       return ApiConfig.empty;
     } catch (e) {
-      print("Error al obtener la configuración de la API: $e");
+      debugPrint("Error al obtener la configuración de la API: $e");
       throw Exception("No se pudo cargar la configuración de la API.");
     }
   }

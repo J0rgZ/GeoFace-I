@@ -168,6 +168,9 @@ class UserController with ChangeNotifier {
   Future<void> assignUserToEmpleado({required String empleadoId, required String dni}) async {
     _setLoading(true);
     try {
+      // SEGURIDAD: Nota: Firebase Auth automáticamente inicia sesión con el nuevo usuario
+      // Por eso debemos cerrar sesión después de crearlo
+      
       final empleadoDoc = await _firestore.collection('empleados').doc(empleadoId).get();
       if (!empleadoDoc.exists) throw Exception('El empleado no existe.');
       
@@ -176,16 +179,26 @@ class UserController with ChangeNotifier {
 
       // Se genera un correo único y predecible para el empleado.
       final correo = '$dni@geoface.com';
+      // NOTA: Firebase Auth automáticamente inicia sesión con el nuevo usuario
       final userCredential = await _auth.createUserWithEmailAndPassword(email: correo, password: dni);
       
       final usuarioData = {
-        'nombreUsuario': empleadoData['nombre'], 'correo': correo, 'tipoUsuario': 'EMPLEADO',
-        'empleadoId': empleadoId, 'activo': true, 'fechaCreacion': FieldValue.serverTimestamp(),
+        'nombreUsuario': empleadoData['nombre'], 
+        'correo': correo, 
+        'tipoUsuario': 'EMPLEADO',
+        'empleadoId': empleadoId, 
+        'activo': true, 
+        'fechaCreacion': FieldValue.serverTimestamp(),
+        'debeCambiarContrasena': true, // Marca que debe cambiar contraseña al primer acceso
       };
       
-      // Se crea el documento del usuario y se actualiza el estado del empleado en una transacción implícita.
+      // Se crea el documento del usuario y se actualiza el estado del empleado
       await _firestore.collection('usuarios').doc(userCredential.user!.uid).set(usuarioData);
       await _firestore.collection('empleados').doc(empleadoId).update({'tieneUsuario': true});
+
+      // SEGURIDAD CRÍTICA: Cerrar sesión del empleado recién creado
+      // Esto evita que el admin quede autenticado como empleado
+      await _auth.signOut();
 
     } on FirebaseAuthException catch (e) {
       if (e.code == 'email-already-in-use') throw Exception('Ya existe un usuario con este DNI.');

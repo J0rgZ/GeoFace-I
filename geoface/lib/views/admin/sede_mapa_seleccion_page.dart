@@ -1,23 +1,3 @@
-// -----------------------------------------------------------------------------
-// @Encabezado:   Página de Selección de Ubicación en Mapa
-// @Autor:        Jorge Luis Briceño Diaz
-// @Descripción:  Este archivo define la página para seleccionar la ubicación
-//               de una sede usando Google Maps. Permite al usuario mover el
-//               mapa y seleccionar una ubicación específica mediante un pin
-//               animado, con geocodificación inversa para mostrar la dirección
-//               correspondiente y validación de la ubicación seleccionada.
-//
-// @NombreArchivo: sede_mapa_seleccion_page.dart
-// @Ubicacion:    lib/views/admin/sede_mapa_seleccion_page.dart
-// @FechaInicio:  15/05/2025
-// @FechaFin:     25/05/2025
-// -----------------------------------------------------------------------------
-// @Modificacion: [Número de modificación]
-// @Fecha:        [Fecha de Modificación]
-// @Autor:        [Nombre de quien modificó]
-// @Descripción:  [Descripción de los cambios realizados]
-// -----------------------------------------------------------------------------
-
 // views/admin/map_selection_page.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -149,7 +129,9 @@ class _MapSelectionPageState extends State<MapSelectionPage>
   Future<void> _goToCurrentUserLocation() async {
     try {
       Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high);
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ));
       _mapController.animateCamera(
         CameraUpdate.newLatLngZoom(
             LatLng(position.latitude, position.longitude), 17.0),
@@ -185,8 +167,8 @@ class _MapSelectionPageState extends State<MapSelectionPage>
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Theme.of(context).colorScheme.primary.withOpacity(0.8),
-                Theme.of(context).colorScheme.primary.withOpacity(0.6)
+                Theme.of(context).colorScheme.primary.withValues(alpha:0.8),
+                Theme.of(context).colorScheme.primary.withValues(alpha:0.6)
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -239,7 +221,7 @@ class _MapSelectionPageState extends State<MapSelectionPage>
             width: 5,
             height: 5,
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.3),
+              color: Colors.black.withValues(alpha:0.3),
               shape: BoxShape.circle,
             ),
           ),
@@ -267,7 +249,7 @@ class _MapSelectionPageState extends State<MapSelectionPage>
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.2),
+                color: Colors.black.withValues(alpha:0.2),
                 blurRadius: 15,
                 offset: const Offset(0, 8),
               )

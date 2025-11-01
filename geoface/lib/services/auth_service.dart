@@ -106,4 +106,27 @@ class AuthService {
     final userData = await getCurrentUserData();
     return userData?.isAdmin ?? false;
   }
+
+  /// Envía un correo electrónico para restablecer la contraseña.
+  /// También marca que el usuario debe cambiar su contraseña después del reset.
+  Future<void> sendPasswordResetEmail(String correo) async {
+    await _firebaseAuth.sendPasswordResetEmail(email: correo);
+    
+    // Marcar que el usuario debe cambiar su contraseña después del reset
+    try {
+      final user = await _firestore
+          .collection('usuarios')
+          .where('correo', isEqualTo: correo)
+          .limit(1)
+          .get();
+      
+      if (user.docs.isNotEmpty) {
+        await _firestore.collection('usuarios').doc(user.docs.first.id).update({
+          'debeCambiarContrasena': true,
+        });
+      }
+    } catch (e) {
+      debugPrint('Error al actualizar debeCambiarContrasena: $e');
+    }
+  }
 }

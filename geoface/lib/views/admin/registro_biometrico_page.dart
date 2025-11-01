@@ -51,7 +51,7 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen>
   bool _isProcessing = false;
 
   List<String> _existingBiometricUrls = [];
-  List<File> _capturedImages = [];
+  final List<File> _capturedImages = [];
   int _captureStep = 0;
   bool _isCaptureMode = false;
 
@@ -338,15 +338,14 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return WillPopScope(
-      onWillPop: () async {
-        if (_isCaptureMode) {
+    return PopScope(
+      canPop: !_isCaptureMode,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _isCaptureMode) {
           _controller.stopCamera();
           setState(() => _isCaptureMode = false);
           _slideController.reset();
-          return false;
         }
-        return true;
       },
       child: Scaffold(
         backgroundColor: colorScheme.surface,
@@ -412,7 +411,7 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen>
 
   Widget _buildProcessingOverlay() {
     return Container(
-      color: Colors.black.withOpacity(0.6),
+      color: Colors.black.withValues(alpha:0.6),
       child: Center(
         child: Container(
           padding: const EdgeInsets.all(24),
@@ -458,13 +457,13 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen>
               gradient: LinearGradient(
                 colors: hasBiometrics 
                   ? [theme.colorScheme.primary, theme.colorScheme.secondary]
-                  : [theme.colorScheme.outline.withOpacity(0.3), theme.colorScheme.outline.withOpacity(0.1)],
+                  : [theme.colorScheme.outline.withValues(alpha:0.3), theme.colorScheme.outline.withValues(alpha:0.1)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: (hasBiometrics ? theme.colorScheme.primary : theme.colorScheme.outline).withOpacity(0.2),
+                  color: (hasBiometrics ? theme.colorScheme.primary : theme.colorScheme.outline).withValues(alpha:0.2),
                   blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
@@ -473,7 +472,7 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen>
             child: Icon(
               hasBiometrics ? Icons.verified_user_rounded : Icons.account_circle_outlined,
               size: 60,
-              color: hasBiometrics ? Colors.white : theme.colorScheme.onSurface.withOpacity(0.5),
+              color: hasBiometrics ? Colors.white : theme.colorScheme.onSurface.withValues(alpha:0.5),
             ),
           ),
           
@@ -494,7 +493,7 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha:0.5),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -513,10 +512,10 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen>
             width: double.infinity,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha:0.3),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: theme.colorScheme.outline.withOpacity(0.2),
+                color: theme.colorScheme.outline.withValues(alpha:0.2),
               ),
             ),
             child: Column(
@@ -594,7 +593,7 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen>
                           loadingBuilder: (c, child, progress) => progress == null
                               ? child
                               : Container(
-                                  color: theme.colorScheme.surfaceVariant,
+                                  color: theme.colorScheme.surfaceContainerHighest,
                                   child: const Center(
                                     child: CircularProgressIndicator(strokeWidth: 2),
                                   ),
@@ -644,7 +643,7 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen>
                 onPressed: _showDeleteConfirmDialog,
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 18),
-                  side: BorderSide(color: theme.colorScheme.error.withOpacity(0.5)),
+                  side: BorderSide(color: theme.colorScheme.error.withValues(alpha:0.5)),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
               ),
@@ -671,8 +670,8 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  theme.colorScheme.primary.withOpacity(0.1),
-                  theme.colorScheme.secondary.withOpacity(0.05),
+                  theme.colorScheme.primary.withValues(alpha:0.1),
+                  theme.colorScheme.secondary.withValues(alpha:0.05),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -687,7 +686,7 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen>
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withOpacity(0.1),
+                          color: theme.colorScheme.primary.withValues(alpha:0.1),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -733,7 +732,7 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen>
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
+                          color: Colors.green.withValues(alpha:0.1),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -788,11 +787,11 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen>
                             : null,
                         color: isCaptured 
                             ? null 
-                            : theme.colorScheme.outline.withOpacity(0.3),
+                            : theme.colorScheme.outline.withValues(alpha:0.3),
                         borderRadius: BorderRadius.circular(3),
                         boxShadow: isCaptured ? [
                           BoxShadow(
-                            color: theme.colorScheme.primary.withOpacity(0.3),
+                            color: theme.colorScheme.primary.withValues(alpha:0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -828,13 +827,13 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen>
                           height: 350,
                           decoration: BoxDecoration(
                             border: Border.all(
-                              color: Colors.white.withOpacity(0.8),
+                              color: Colors.white.withValues(alpha:0.8),
                               width: 3,
                             ),
                             borderRadius: BorderRadius.circular(180),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.white.withOpacity(0.2),
+                                color: Colors.white.withValues(alpha:0.2),
                                 blurRadius: 20,
                                 spreadRadius: 2,
                               ),
@@ -874,7 +873,7 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen>
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.3),
+                                  color: Colors.black.withValues(alpha:0.3),
                                   blurRadius: 15,
                                   offset: const Offset(0, 5),
                                 ),
@@ -906,7 +905,7 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen>
             color: theme.colorScheme.surface,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha:0.05),
                 blurRadius: 10,
                 offset: const Offset(0, -2),
               ),
@@ -923,7 +922,7 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen>
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          side: BorderSide(color: theme.colorScheme.outline.withOpacity(0.5)),
+                          side: BorderSide(color: theme.colorScheme.outline.withValues(alpha:0.5)),
                         ),
                       ),
                     ),
@@ -963,7 +962,7 @@ class _RegistroBiometricoScreenState extends State<RegistroBiometricoScreen>
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: theme.colorScheme.primary.withOpacity(0.4),
+                                color: theme.colorScheme.primary.withValues(alpha:0.4),
                                 blurRadius: 20,
                                 spreadRadius: 2,
                               ),

@@ -70,6 +70,9 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     final empleadoController = Provider.of<EmpleadoController>(context, listen: false);
     final asistenciaController = Provider.of<AsistenciaController>(context, listen: false);
 
+    // Limpia las asistencias del empleado para evitar mezclar datos
+    asistenciaController.clearEmpleadoAsistencias();
+
     await Future.wait([
       sedeController.getSedes(),
       empleadoController.getEmpleados(),
@@ -115,7 +118,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
 
           final sedes = sedeController.sedes;
           final empleados = empleadoController.empleados;
-          final asistencias = asistenciaController.asistencias;
+          final asistencias = asistenciaController.asistenciasDeHoy;
           final sedesActivas = sedes.where((s) => s.activa).length;
           final empleadosActivos = empleados.where((e) => e.activo).length;
           final asistenciasHoy = _getAsistenciasHoy(asistencias);
@@ -303,7 +306,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
           begin: Alignment.topLeft, end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(28),
-        boxShadow: [BoxShadow(color: data.color.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))],
+        boxShadow: [BoxShadow(color: data.color.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 10))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -315,13 +318,13 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: data.onColor.withOpacity(0.15), borderRadius: BorderRadius.circular(16)),
+                decoration: BoxDecoration(color: data.onColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)),
                 child: Icon(data.icon, color: data.onColor, size: 24),
               ),
               if (data.total != null)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: data.onColor.withOpacity(0.15), borderRadius: BorderRadius.circular(100)),
+                  decoration: BoxDecoration(color: data.onColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(100)),
                   child: Text('de ${data.total}', style: theme.textTheme.labelMedium?.copyWith(color: data.onColor)),
                 ),
             ],
@@ -356,7 +359,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
                 if (data.description != null)
                   Text(
                     data.description!,
-                    style: theme.textTheme.bodySmall?.copyWith(color: data.onColor.withOpacity(0.7)),
+                    style: theme.textTheme.bodySmall?.copyWith(color: data.onColor.withValues(alpha: 0.7)),
                   ),
               ],
             ),
@@ -551,7 +554,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     return Row(children: [
       Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(16)),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)),
         child: Icon(icon, color: color, size: 28),
       ),
       const SizedBox(width: 16),
@@ -570,7 +573,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
       height: 150,
       child: Center(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 48, color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6)),
+          Icon(icon, size: 48, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6)),
           const SizedBox(height: 16),
           Text(text, style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
         ]),

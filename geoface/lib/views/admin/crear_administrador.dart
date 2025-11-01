@@ -23,7 +23,7 @@ import 'package:provider/provider.dart';
 import '/../controllers/user_controller.dart';
 
 class CrearAdministradorPage extends StatefulWidget {
-  const CrearAdministradorPage({Key? key}) : super(key: key);
+  const CrearAdministradorPage({super.key});
 
   @override
   State<CrearAdministradorPage> createState() => _CrearAdministradorPageState();

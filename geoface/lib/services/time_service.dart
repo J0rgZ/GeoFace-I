@@ -21,6 +21,7 @@
 // -----------------------------------------------------------------------------
 
 import 'package:ntp/ntp.dart';
+import 'package:flutter/foundation.dart';
 
 // Clase de servicio para obtener la hora de una fuente fiable en internet.
 class TimeService {
@@ -43,7 +44,7 @@ class TimeService {
       );
     } catch (e) {
       // Si ocurre un error (generalmente por falta de conexión), se registra en la consola.
-      print("Error al obtener la hora de red, usando hora local: $e");
+      debugPrint("Error al obtener la hora de red, usando hora local: $e");
       
       // Se devuelve la hora local del dispositivo como última opción.
       // Nota: En un sistema de alta seguridad, se podría registrar que esta

@@ -280,7 +280,7 @@ class _SedeFormPageState extends State<SedeFormPage> {
   Widget _buildLocationCard() {
     return Card(
       elevation: 4,
-      shadowColor: Colors.black.withOpacity(0.1),
+      shadowColor: Colors.black.withValues(alpha:0.1),
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Column(
@@ -311,7 +311,7 @@ class _SedeFormPageState extends State<SedeFormPage> {
   Widget _buildDetailsCard() {
     return Card(
       elevation: 4,
-      shadowColor: Colors.black.withOpacity(0.1),
+      shadowColor: Colors.black.withValues(alpha:0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -337,7 +337,7 @@ class _SedeFormPageState extends State<SedeFormPage> {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
                 tileColor:
-                    Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                    Theme.of(context).colorScheme.primary.withValues(alpha:0.05),
                 secondary: Icon(
                   _activa ? Icons.check_circle_outline : Icons.highlight_off,
                   color: _activa ? Colors.green : Colors.grey,
@@ -390,7 +390,7 @@ class _SedeFormPageState extends State<SedeFormPage> {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.black.withOpacity(0.5), Colors.transparent],
+                  colors: [Colors.black.withValues(alpha:0.5), Colors.transparent],
                   begin: Alignment.bottomCenter,
                   end: Alignment.center,
                 ),
@@ -400,7 +400,7 @@ class _SedeFormPageState extends State<SedeFormPage> {
           Positioned(
             bottom: 12,
             child: Material(
-              color: Colors.black.withOpacity(0.7),
+              color: Colors.black.withValues(alpha:0.7),
               borderRadius: BorderRadius.circular(20),
               child: InkWell(
                 onTap: _openMapSelection,
@@ -468,7 +468,7 @@ class _SedeFormPageState extends State<SedeFormPage> {
       prefixIcon: Icon(icon),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       filled: true,
-      fillColor: Colors.black.withOpacity(0.04),
+      fillColor: Colors.black.withValues(alpha:0.04),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide:

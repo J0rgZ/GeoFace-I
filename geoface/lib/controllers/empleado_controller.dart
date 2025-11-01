@@ -21,12 +21,12 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../services/firebase_service.dart';
+import '../services/empleado_service.dart';
 import '../models/empleado.dart';
 
 
 class EmpleadoController extends ChangeNotifier {
-  final FirebaseService _firebaseService = FirebaseService();
+  final EmpleadoService _empleadoService = EmpleadoService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final Uuid _uuid = Uuid();
@@ -58,7 +58,7 @@ class EmpleadoController extends ChangeNotifier {
   Future<void> getEmpleados() async {
     _setState(loading: true);
     try {
-      _empleados = await _firebaseService.getEmpleados();
+      _empleados = await _empleadoService.getEmpleados();
     } catch (e) {
       _errorMessage = 'Error al cargar empleados: ${e.toString()}';
     } finally {
@@ -71,7 +71,7 @@ class EmpleadoController extends ChangeNotifier {
   Future<List<Empleado>> fetchEmpleados() async {
     _setState(loading: true);
     try {
-      _empleados = await _firebaseService.getEmpleados();
+      _empleados = await _empleadoService.getEmpleados();
       _setState(loading: false);
       return _empleados;
     } catch (e) {
@@ -85,7 +85,7 @@ class EmpleadoController extends ChangeNotifier {
   // Obtiene un único empleado por su ID.
   Future<Empleado?> getEmpleadoById(String id) async {
     try {
-      return await _firebaseService.getEmpleadoById(id);
+      return await _empleadoService.getEmpleadoById(id);
     } catch (e) {
       _errorMessage = 'Error al cargar empleado: ${e.toString()}';
       notifyListeners();
@@ -99,7 +99,7 @@ class EmpleadoController extends ChangeNotifier {
     try {
       // Nota: Si la cantidad de empleados es muy grande, sería más eficiente
       // hacer una consulta directa a Firestore con un `where`.
-      final todosEmpleados = await _firebaseService.getEmpleados();
+      final todosEmpleados = await _empleadoService.getEmpleados();
       final empleadosSede = todosEmpleados.where((emp) => emp.sedeId == sedeId).toList();
       _setState(loading: false);
       return empleadosSede;
@@ -166,7 +166,7 @@ class EmpleadoController extends ChangeNotifier {
         fechaCreacion: DateTime.now(),
       );
       
-      await _firebaseService.addEmpleado(empleado);
+      await _empleadoService.addEmpleado(empleado);
       await getEmpleados(); // Refresca la lista local.
       _setState(loading: false);
       return true;
@@ -189,7 +189,7 @@ class EmpleadoController extends ChangeNotifier {
   }) async {
     _setState(loading: true);
     try {
-      final empleadoActual = await _firebaseService.getEmpleadoById(id);
+      final empleadoActual = await _empleadoService.getEmpleadoById(id);
       if (empleadoActual == null) throw Exception("No se encontró el empleado a actualizar.");
       
       final errores = await validarDatosUnicos(dni: dni, correo: correo, empleadoIdActual: id);
@@ -210,7 +210,7 @@ class EmpleadoController extends ChangeNotifier {
         fechaModificacion: DateTime.now(),
       );
       
-      await _firebaseService.updateEmpleado(empleadoActualizado);
+      await _empleadoService.updateEmpleado(empleadoActualizado);
       await getEmpleados();
       _setState(loading: false);
       return true;
@@ -223,7 +223,7 @@ class EmpleadoController extends ChangeNotifier {
   Future<bool> deleteEmpleado(String id) async {
     _setState(loading: true);
     try {
-      await _firebaseService.deleteEmpleado(id);
+      await _empleadoService.deleteEmpleado(id);
       await getEmpleados();
       _setState(loading: false);
       return true;
@@ -240,7 +240,7 @@ class EmpleadoController extends ChangeNotifier {
         activo: !empleado.activo, // Invierte el estado actual.
         fechaModificacion: DateTime.now(),
       );
-      await _firebaseService.updateEmpleado(empleadoActualizado);
+      await _empleadoService.updateEmpleado(empleadoActualizado);
       
       await getEmpleados();
       _setState(loading: false);
@@ -262,7 +262,10 @@ class EmpleadoController extends ChangeNotifier {
       final password = empleado.dni;
       
       // 1. Crea el usuario en Firebase Authentication.
+      // IMPORTANTE: Firebase Auth automáticamente inicia sesión con el nuevo usuario.
+      // Esto es un problema de seguridad si el admin está creando usuarios.
       final userCredential = await _auth.createUserWithEmailAndPassword(email: correo, password: password);
+      final nuevoUsuarioId = userCredential.user!.uid;
       
       // 2. Crea el documento en la colección 'usuarios' de Firestore.
       final usuarioData = {
@@ -272,12 +275,22 @@ class EmpleadoController extends ChangeNotifier {
         'empleadoId': empleado.id,
         'activo': true,
         'fechaCreacion': FieldValue.serverTimestamp(),
+        'debeCambiarContrasena': true, // Marca que debe cambiar contraseña al primer acceso
       };
-      await _firestore.collection('usuarios').doc(userCredential.user!.uid).set(usuarioData);
+      await _firestore.collection('usuarios').doc(nuevoUsuarioId).set(usuarioData);
 
       // 3. Actualiza el flag 'tieneUsuario' en el documento del empleado.
       final empleadoActualizado = empleado.copyWith(tieneUsuario: true);
-      await _firebaseService.updateEmpleado(empleadoActualizado);
+      await _empleadoService.updateEmpleado(empleadoActualizado);
+
+      // 4. SEGURIDAD CRÍTICA: Cerrar sesión del empleado recién creado.
+      // Después de crear el usuario, Firebase Auth automáticamente inicia sesión como ese empleado.
+      // Esto es un problema de seguridad porque el admin quedaría autenticado como empleado.
+      // Al cerrar sesión, el admin deberá volver a iniciar sesión para continuar trabajando.
+      await _auth.signOut();
+      
+      // NOTA: No es posible restaurar automáticamente la sesión del admin sin su contraseña.
+      // El admin debe volver a iniciar sesión después de crear usuarios.
 
       _setState(loading: false);
       return true;
@@ -291,18 +304,4 @@ class EmpleadoController extends ChangeNotifier {
     }
   }
 
-  // Inicia el flujo de restablecimiento de contraseña de Firebase.
-  Future<bool> resetEmpleadoPassword({required Empleado empleado}) async {
-    _setState(loading: true);
-    try {
-      final correo = '${empleado.dni}@geoface.com';
-      await _firebaseService.sendPasswordResetEmail(correo);
-      _setState(loading: false);
-      return true;
-    } catch (e) {
-      final errorMsg = e.toString().replaceFirst("Exception: ", "");
-      _setState(loading: false, error: errorMsg);
-      return false;
-    }
-  }
 }

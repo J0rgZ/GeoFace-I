@@ -102,19 +102,19 @@ class TimeService {
             _isOnline = true;
             _currentTimeSource = '${api['name']} (Sincronizado)';
 
-            print('✓ Sincronizado con: ${api['name']}');
-            print('✓ Hora Base API (Lima): ${_baseApiTime.toString()}');
+            debugPrint('✓ Sincronizado con: ${api['name']}');
+            debugPrint('✓ Hora Base API (Lima): ${_baseApiTime.toString()}');
 
             return;
           }
         }
       } catch (e) {
-        print('✗ Error con ${api['name']}: $e');
+        debugPrint('✗ Error con ${api['name']}: $e');
         continue;
       }
     }
 
-    print('✗ Todas las APIs fallaron. Usando tiempo local.');
+    debugPrint('✗ Todas las APIs fallaron. Usando tiempo local.');
     _isOnline = false;
     _currentTimeSource = 'APIs no disponibles - Tiempo Local';
     _syncStopwatch.stop();
@@ -138,7 +138,7 @@ class TimeService {
           return null;
       }
     } catch (e) {
-      print('Error parseando ${api['name']}: $e');
+      debugPrint('Error parseando ${api['name']}: $e');
       return null;
     }
   }
@@ -596,7 +596,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
                 Container(
                   padding: EdgeInsets.all(config.padding * 0.5),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -641,7 +641,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
               vertical: config.margin * 0.5,
             ),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -682,7 +682,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
   Widget _buildMenuButton(ResponsiveConfig config) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
+        color: Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(12),
       ),
       child: IconButton(
@@ -712,10 +712,10 @@ class _MainMenuScreenState extends State<MainMenuScreen>
           child: Container(
             padding: EdgeInsets.all(config.padding * 1.5),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 width: 1.5,
               ),
             ),
@@ -725,7 +725,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
                 Text(
                   dateFormat.format(_currentTime).toUpperCase(),
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                     fontSize: config.dateSize,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 1.5,
@@ -746,7 +746,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
                       shadows: [
                         Shadow(
                           blurRadius: 10.0,
-                          color: Colors.black.withOpacity(0.3),
+                          color: Colors.black.withValues(alpha: 0.3),
                           offset: const Offset(0, 4),
                         ),
                       ],
@@ -776,13 +776,13 @@ class _MainMenuScreenState extends State<MainMenuScreen>
       ),
       decoration: BoxDecoration(
         color: isOnline ? 
-          _secondaryColor.withOpacity(0.1) : 
-          Colors.orange.withOpacity(0.1),
+          _secondaryColor.withValues(alpha: 0.1) : 
+          Colors.orange.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isOnline ? 
-            _secondaryColor.withOpacity(0.3) : 
-            Colors.orange.withOpacity(0.3),
+            _secondaryColor.withValues(alpha: 0.3) : 
+            Colors.orange.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
@@ -826,7 +826,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
             ),
             elevation: 0,
             padding: EdgeInsets.zero,
-            disabledBackgroundColor: Colors.grey.withOpacity(0.2), // Estilo para deshabilitado
+            disabledBackgroundColor: Colors.grey.withValues(alpha: 0.2), // Estilo para deshabilitado
           ),
           child: Ink(
             decoration: BoxDecoration(
@@ -889,7 +889,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: (isOnline ? _secondaryColor : Colors.orange).withOpacity(0.5),
+                color: (isOnline ? _secondaryColor : Colors.orange).withValues(alpha: 0.5),
                 blurRadius: 5,
                 spreadRadius: 2,
               ),
@@ -900,7 +900,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
         Text(
           isOnline ? 'Hora sincronizada Online' : 'Tiempo local (UTC-5) - Sin conexión',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.7),
+            color: Colors.white.withValues(alpha: 0.7),
             fontSize: config.statusSize,
             fontWeight: FontWeight.w500,
           ),
@@ -912,30 +912,69 @@ class _MainMenuScreenState extends State<MainMenuScreen>
   Widget _buildAdminAccess(ResponsiveConfig config) {
     return Container(
       padding: EdgeInsets.all(config.padding),
-      child: TextButton.icon(
-        onPressed: () {
-          HapticFeedback.lightImpact();
-          widget.onAdminLogin(context);
-        },
-        icon: Icon(
-          Icons.admin_panel_settings,
-          color: Colors.white.withOpacity(0.9),
-          size: config.iconSize * 0.7,
-        ),
-        label: Text(
-          'Acceso Administrativo',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
-            fontWeight: FontWeight.w500,
-            fontSize: config.statusSize + 2,
+      child: Column(
+        children: [
+          // Botón de acceso de empleado
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                Navigator.of(context).pushNamed('/login-empleado');
+              },
+              icon: Icon(
+                Icons.person_outline,
+                color: Colors.white.withValues(alpha: 0.9),
+                size: config.iconSize * 0.7,
+              ),
+              label: Text(
+                'Iniciar Sesión como Empleado',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  fontWeight: FontWeight.w500,
+                  fontSize: config.statusSize + 2,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: EdgeInsets.symmetric(
+                  horizontal: config.padding,
+                  vertical: config.margin,
+                ),
+                side: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  width: 1.5,
+                ),
+              ),
+            ),
           ),
-        ),
-        style: TextButton.styleFrom(
-          padding: EdgeInsets.symmetric(
-            horizontal: config.padding,
-            vertical: config.margin,
+          const SizedBox(height: 12),
+          // Botón de acceso administrativo
+          TextButton.icon(
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              widget.onAdminLogin(context);
+            },
+            icon: Icon(
+              Icons.admin_panel_settings,
+              color: Colors.white.withValues(alpha: 0.9),
+              size: config.iconSize * 0.7,
+            ),
+            label: Text(
+              'Acceso Administrativo',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.9),
+                fontWeight: FontWeight.w500,
+                fontSize: config.statusSize + 2,
+              ),
+            ),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.symmetric(
+                horizontal: config.padding,
+                vertical: config.margin,
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -948,7 +987,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
       child: GestureDetector(
         onTap: _toggleMenu,
         child: Container(
-          color: Colors.black.withOpacity(0.3),
+          color: Colors.black.withValues(alpha: 0.3),
           child: Stack(
             children: [
               Positioned(
@@ -968,7 +1007,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),

@@ -27,7 +27,7 @@ void main() async {
     await Firebase.initializeApp();
     await AppConfig.initialize();
   } catch (e) {
-    print("Error en inicialización: $e");
+    debugPrint("Error en inicialización: $e");
   }
   
   runApp(
@@ -115,7 +115,7 @@ class _MyAppState extends State<MyApp> {
             end: Alignment.bottomCenter,
             colors: [
               Theme.of(context).primaryColor,
-              Theme.of(context).primaryColor.withOpacity(0.8),
+              Theme.of(context).primaryColor.withValues(alpha: 0.8),
             ],
           ),
         ),

@@ -32,6 +32,7 @@ class Usuario {
   final bool activo;
   final DateTime fechaCreacion;
   final DateTime? fechaUltimoAcceso;
+  final bool debeCambiarContrasena;
 
   Usuario({
     required this.id,
@@ -42,6 +43,7 @@ class Usuario {
     required this.activo,
     required this.fechaCreacion,
     this.fechaUltimoAcceso,
+    this.debeCambiarContrasena = false,
   });
 
   /// Comprueba si el usuario tiene el rol de 'ADMIN'.
@@ -72,6 +74,7 @@ class Usuario {
       activo: json['activo'] ?? false,
       fechaCreacion: parsearFecha(json['fechaCreacion']) ?? DateTime.now(),
       fechaUltimoAcceso: parsearFecha(json['fechaUltimoAcceso']),
+      debeCambiarContrasena: json['debeCambiarContrasena'] ?? false,
     );
   }
 
@@ -87,6 +90,7 @@ class Usuario {
       // por primera vez para garantizar la consistencia de la hora del servidor.
       'fechaCreacion': fechaCreacion.toIso8601String(),
       'fechaUltimoAcceso': fechaUltimoAcceso?.toIso8601String(),
+      'debeCambiarContrasena': debeCambiarContrasena,
     };
   }
 }

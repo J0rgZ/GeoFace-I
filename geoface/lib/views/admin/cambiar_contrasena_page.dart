@@ -31,7 +31,7 @@ import '../../models/usuario.dart';
 /// la nueva contraseña y su confirmación. Se integra con AuthController para
 /// ejecutar la lógica de negocio y proporciona retroalimentación clara al usuario.
 class CambiarContrasenaPage extends StatefulWidget {
-  const CambiarContrasenaPage({Key? key}) : super(key: key);
+  const CambiarContrasenaPage({super.key});
 
   @override
   State<CambiarContrasenaPage> createState() => _CambiarContrasenaPageState();

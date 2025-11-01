@@ -251,7 +251,7 @@ class PdfReportGenerator {
               pw.SizedBox(height: 20),
             ]
           );
-        }).toList(),
+        }),
       ]
     );
   }

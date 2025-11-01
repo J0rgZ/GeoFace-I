@@ -23,7 +23,9 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:geoface/services/firebase_service.dart';
+import 'package:geoface/services/empleado_service.dart';
+import 'package:geoface/services/sede_service.dart';
+import 'package:geoface/services/asistencia_service.dart';
 import 'package:geoface/models/sede.dart';
 import 'package:geoface/models/asistencia.dart';
 import 'package:geoface/utils/location_helper.dart';
@@ -61,7 +63,9 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
   MarcacionFlowState _flowState = MarcacionFlowState.inicializando;
   CameraController? _cameraController;
   final TextEditingController _dniController = TextEditingController();
-  final FirebaseService _firebaseService = FirebaseService();
+  final EmpleadoService _empleadoService = EmpleadoService();
+  final SedeService _sedeService = SedeService();
+  final AsistenciaService _asistenciaService = AsistenciaService();
 
   // <-- CAMBIO: La URL ahora es una variable de estado, no una constante.
   String? _recognitionApiUrl;
@@ -319,17 +323,18 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
     try {
       if (empleadoId == null) throw Exception("ID de empleado no proporcionado.");
       
-      _empleado = await _firebaseService.getEmpleadoById(empleadoId);
+      _empleado = await _empleadoService.getEmpleadoById(empleadoId);
       if (_empleado == null) throw Exception("Empleado reconocido (ID: $empleadoId), pero no encontrado en la base de datos.");
       if (_empleado!.activo != true) throw Exception("Este empleado no se encuentra activo. Contacte a RR.HH.");
       
       _dniController.text = _empleado!.dni;
       _isFaceVerified = true;
 
-      _sede = await _firebaseService.getSedeById(_empleado!.sedeId);
+      _sede = await _sedeService.getSedeById(_empleado!.sedeId);
       if (_sede == null) throw Exception("La sede asignada no fue encontrada.");
       if (_sede!.activa != true) throw Exception("La sede '${_sede!.nombre}' no se encuentra activa.");
 
+      if (!mounted) return;
       final asistenciaController = Provider.of<AsistenciaController>(context, listen: false);
       final status = await asistenciaController.checkEmpleadoAsistenciaStatus(_empleado!.id);
       
@@ -343,7 +348,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
           _asistenciaDelDia = asistenciaController.asistenciaActiva;
           break;
         case AsistenciaStatus.jornadaCompleta:
-          _asistenciaDelDia = await _firebaseService.getCompletedAsistenciaForToday(_empleado!.id);
+          _asistenciaDelDia = await _asistenciaService.getCompletedAsistenciaForToday(_empleado!.id);
           setState(() => _flowState = MarcacionFlowState.jornadaCompletada);
           return;
         case AsistenciaStatus.error:
@@ -369,10 +374,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
   Future<void> _handleMarkAttendance() async {
     setState(() => _isProcessing = true);
     final asistenciaController = Provider.of<AsistenciaController>(context, listen: false);
-
-    // TODO: Subir _capturedImageBytes a Firebase Storage y obtener URL.
     final String capturaString = "face_capture_placeholder";
-
     try {
       bool success;
       if (_esEntrada) {
@@ -436,7 +438,11 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
     }
     if (permission == LocationPermission.deniedForever) throw Exception("Permiso de ubicación denegado permanentemente.");
     
-    _currentPosition = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    _currentPosition = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+      ),
+    );
   }
 
   @override
@@ -623,10 +629,10 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
-        side: BorderSide(color: color.withOpacity(0.5), width: 1.5),
+        side: BorderSide(color: color.withValues(alpha: 0.5), width: 1.5),
         borderRadius: BorderRadius.circular(16),
       ),
-      color: color.withOpacity(0.05),
+      color: color.withValues(alpha: 0.05),
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Row(
@@ -639,7 +645,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
                 children: [
                   Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
                   const SizedBox(height: 4),
-                  Text(message, style: TextStyle(color: color.withOpacity(0.9))),
+                  Text(message, style: TextStyle(color: color.withValues(alpha: 0.9))),
                 ],
               ),
             ),
@@ -652,7 +658,7 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
   Widget _buildStatusCard({required String title, required IconData icon, required Color color, required List<Widget> children}) {
     return Card(
       elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.05),
+      shadowColor: Colors.black.withValues(alpha: 0.05),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(20.0),

@@ -32,8 +32,7 @@ class AddEditAdminPage extends StatefulWidget {
   State<AddEditAdminPage> createState() => _AddEditAdminPageState();
 }
 
-class _AddEditAdminPageState extends State<AddEditAdminPage>
-    with TickerProviderStateMixin {
+class _AddEditAdminPageState extends State<AddEditAdminPage> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nombreController;
   late TextEditingController _correoController;
@@ -41,11 +40,6 @@ class _AddEditAdminPageState extends State<AddEditAdminPage>
 
   bool _isEditMode = false;
   bool _obscurePassword = true;
-  
-  late AnimationController _animationController;
-  late AnimationController _formAnimationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
@@ -55,33 +49,6 @@ class _AddEditAdminPageState extends State<AddEditAdminPage>
     _nombreController = TextEditingController(text: _isEditMode ? widget.admin!.nombreUsuario : '');
     _correoController = TextEditingController(text: _isEditMode ? widget.admin!.correo : '');
     _passwordController = TextEditingController();
-
-    // Inicializar animaciones
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-
-    _formAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
-
-    _fadeAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    );
-
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _formAnimationController,
-      curve: Curves.easeOutBack,
-    ));
-
-    _animationController.forward();
-    _formAnimationController.forward();
   }
 
   @override
@@ -89,8 +56,6 @@ class _AddEditAdminPageState extends State<AddEditAdminPage>
     _nombreController.dispose();
     _correoController.dispose();
     _passwordController.dispose();
-    _animationController.dispose();
-    _formAnimationController.dispose();
     super.dispose();
   }
 
@@ -126,22 +91,16 @@ class _AddEditAdminPageState extends State<AddEditAdminPage>
         SnackBar(
           content: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(50),
-                ),
-                child: const Icon(Icons.check, color: Colors.white, size: 20),
-              ),
+              const Icon(Icons.check_circle_outline, color: Colors.white, size: 24),
               const SizedBox(width: 12),
               Expanded(child: Text(successMessage)),
             ],
           ),
-          backgroundColor: Colors.green,
+          backgroundColor: Colors.green.shade600,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 3),
         ),
       );
       Navigator.of(context).pop(true);
@@ -150,14 +109,7 @@ class _AddEditAdminPageState extends State<AddEditAdminPage>
         SnackBar(
           content: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(50),
-                ),
-                child: const Icon(Icons.error, color: Colors.white, size: 20),
-              ),
+              const Icon(Icons.error_outline, color: Colors.white, size: 24),
               const SizedBox(width: 12),
               Expanded(child: Text('Error: ${adminController.errorMessage}')),
             ],
@@ -166,74 +118,273 @@ class _AddEditAdminPageState extends State<AddEditAdminPage>
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 4),
         ),
       );
     }
   }
 
-  Widget _buildHeaderSection() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Theme.of(context).colorScheme.primary,
-            Theme.of(context).colorScheme.primary.withOpacity(0.8),
-          ],
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final adminController = context.watch<AdministradorController>();
+
+    return Scaffold(
+      backgroundColor: colorScheme.surface,
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
+        title: Text(
+          _isEditMode ? 'Editar Administrador' : 'Nuevo Administrador',
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-      child: Column(
-        children: [
-          Hero(
-            tag: 'admin_avatar',
-            child: Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Card de encabezado
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  margin: const EdgeInsets.only(bottom: 32),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        colorScheme.primaryContainer,
+                        colorScheme.primaryContainer.withValues(alpha: 0.7),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: colorScheme.primary.withValues(alpha: 0.2),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Icon(
+                          _isEditMode ? Icons.edit_rounded : Icons.person_add_rounded,
+                          size: 32,
+                          color: colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _isEditMode ? 'Editar Administrador' : 'Nuevo Administrador',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _isEditMode 
+                                  ? 'Modifica la información del administrador'
+                                  : 'Completa los datos para crear un nuevo administrador',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Campo Nombre
+                _buildFormField(
+                  controller: _nombreController,
+                  label: 'Nombre de Usuario',
+                  icon: Icons.person_outline_rounded,
+                  hint: 'Ingresa el nombre completo',
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El nombre de usuario es requerido';
+                    }
+                    if (value.trim().length < 3) {
+                      return 'El nombre debe tener al menos 3 caracteres';
+                    }
+                    return null;
+                  },
+                ),
+
+                // Campo Correo
+                _buildFormField(
+                  controller: _correoController,
+                  label: 'Correo Electrónico',
+                  icon: Icons.email_outlined,
+                  hint: _isEditMode 
+                      ? 'No se puede modificar' 
+                      : 'ejemplo@admin.com',
+                  keyboardType: TextInputType.emailAddress,
+                  readOnly: _isEditMode,
+                  validator: (value) {
+                    if (_isEditMode) return null;
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El correo electrónico es requerido';
+                    }
+                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                      return 'Ingresa un correo electrónico válido';
+                    }
+                    return null;
+                  },
+                ),
+
+                // Campo Contraseña (solo en creación)
+                if (!_isEditMode) ...[
+                  _buildFormField(
+                    controller: _passwordController,
+                    label: 'Contraseña',
+                    icon: Icons.lock_outline_rounded,
+                    hint: 'Mínimo 6 caracteres',
+                    obscureText: _obscurePassword,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword 
+                            ? Icons.visibility_off_outlined 
+                            : Icons.visibility_outlined,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'La contraseña es requerida';
+                      }
+                      if (value.length < 6) {
+                        return 'La contraseña debe tener al menos 6 caracteres';
+                      }
+                      return null;
+                    },
+                  ),
+                  
+                  // Información adicional
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 32),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.blue.shade200,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.info_outline_rounded,
+                            color: Colors.blue.shade700,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Información importante',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue.shade900,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'El administrador recibirá un correo con sus credenciales de acceso al sistema.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue.shade900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
-              ),
-              child: Icon(
-                _isEditMode ? Icons.edit_rounded : Icons.person_add_rounded,
-                size: 40,
-                color: Colors.white,
-              ),
+
+                // Botón de guardar
+                SizedBox(
+                  height: 56,
+                  child: FilledButton.icon(
+                    onPressed: adminController.isLoading ? null : _saveForm,
+                    icon: adminController.isLoading
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: colorScheme.onPrimary,
+                            ),
+                          )
+                        : Icon(
+                            _isEditMode ? Icons.save_rounded : Icons.person_add_rounded,
+                            size: 22,
+                          ),
+                    label: Text(
+                      adminController.isLoading
+                          ? 'Procesando...'
+                          : (_isEditMode ? 'Guardar Cambios' : 'Crear Administrador'),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colorScheme.primary,
+                      foregroundColor: colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 2,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            _isEditMode ? 'Editar Administrador' : 'Nuevo Administrador',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _isEditMode 
-                ? 'Modifica la información del administrador'
-                : 'Completa los datos para crear un nuevo administrador',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white.withOpacity(0.9),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -249,300 +400,103 @@ class _AddEditAdminPageState extends State<AddEditAdminPage>
     Widget? suffixIcon,
     String? Function(String?)? validator,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
-      child: TextFormField(
-        controller: controller,
-        readOnly: readOnly,
-        obscureText: obscureText,
-        keyboardType: keyboardType,
-        validator: validator,
-        style: TextStyle(
-          fontSize: 16,
-          color: readOnly ? Theme.of(context).disabledColor : null,
-        ),
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: hint,
-          prefixIcon: Container(
-            margin: const EdgeInsets.all(8),
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: readOnly 
-                  ? Theme.of(context).disabledColor.withOpacity(0.1)
-                  : Theme.of(context).colorScheme.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              icon,
-              color: readOnly 
-                  ? Theme.of(context).disabledColor
-                  : Theme.of(context).colorScheme.primary,
-              size: 20,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurface,
+              letterSpacing: 0.5,
             ),
           ),
-          suffixIcon: suffixIcon,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(
-              color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: controller,
+            readOnly: readOnly,
+            obscureText: obscureText,
+            keyboardType: keyboardType,
+            validator: validator,
+            style: TextStyle(
+              fontSize: 16,
+              color: readOnly ? colorScheme.onSurface.withValues(alpha: 0.6) : colorScheme.onSurface,
             ),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(
-              color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(
-              color: Theme.of(context).colorScheme.primary,
-              width: 2,
-            ),
-          ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(
-              color: Theme.of(context).colorScheme.error,
-              width: 2,
-            ),
-          ),
-          focusedErrorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(
-              color: Theme.of(context).colorScheme.error,
-              width: 2,
-            ),
-          ),
-          filled: readOnly,
-          fillColor: readOnly 
-              ? Theme.of(context).disabledColor.withOpacity(0.05)
-              : null,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 16,
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final adminController = context.watch<AdministradorController>();
-
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_rounded),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          if (_isEditMode)
-            Container(
-              margin: const EdgeInsets.only(right: 16),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
               ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.edit, size: 16),
-                  SizedBox(width: 4),
-                  Text('Editar', style: TextStyle(fontSize: 12)),
-                ],
-              ),
-            ),
-        ],
-      ),
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: Column(
-          children: [
-            _buildHeaderSection(),
-            Expanded(
-              child: SlideTransition(
-                position: _slideAnimation,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildFormField(
-                          controller: _nombreController,
-                          label: 'Nombre de Usuario',
-                          icon: Icons.person_outline_rounded,
-                          hint: 'Ingresa el nombre de usuario',
-                          validator: (value) => value!.trim().isEmpty 
-                              ? 'El nombre de usuario es requerido' 
-                              : null,
-                        ),
-                        
-                        _buildFormField(
-                          controller: _correoController,
-                          label: 'Correo Electrónico',
-                          icon: Icons.email_outlined,
-                          hint: _isEditMode 
-                              ? 'No se puede modificar en modo edición'
-                              : 'ejemplo@admin.com',
-                          keyboardType: TextInputType.emailAddress,
-                          readOnly: _isEditMode,
-                          validator: (value) {
-                            if (_isEditMode) return null;
-                            if (value == null || value.trim().isEmpty) {
-                              return 'El correo electrónico es requerido';
-                            }
-                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                              return 'Ingresa un correo electrónico válido';
-                            }
-                            return null;
-                          },
-                        ),
-
-                        if (!_isEditMode) ...[
-                          _buildFormField(
-                            controller: _passwordController,
-                            label: 'Contraseña',
-                            icon: Icons.lock_outline_rounded,
-                            hint: 'Mínimo 6 caracteres',
-                            obscureText: _obscurePassword,
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword 
-                                    ? Icons.visibility_off_outlined 
-                                    : Icons.visibility_outlined,
-                                color: Theme.of(context).colorScheme.outline,
-                              ),
-                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.length < 6) {
-                                return 'La contraseña debe tener al menos 6 caracteres';
-                              }
-                              return null;
-                            },
-                          ),
-                          
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            margin: const EdgeInsets.only(bottom: 20),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.info_outline_rounded,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    'El administrador recibirá un correo con sus credenciales de acceso.',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-
-                        const SizedBox(height: 32),
-
-                        Container(
-                          height: 56,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Theme.of(context).colorScheme.primary,
-                                Theme.of(context).colorScheme.primary.withOpacity(0.8),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
-                                blurRadius: 12,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
-                          ),
-                          child: ElevatedButton(
-                            onPressed: adminController.isLoading ? null : _saveForm,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            child: adminController.isLoading
-                                ? Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      const Text('Procesando...'),
-                                    ],
-                                  )
-                                : Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        _isEditMode 
-                                            ? Icons.save_rounded 
-                                            : Icons.person_add_rounded,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        _isEditMode 
-                                            ? 'Guardar Cambios' 
-                                            : 'Crear Administrador',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 24),
-                      ],
-                    ),
-                  ),
+              prefixIcon: Container(
+                margin: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: readOnly 
+                      ? colorScheme.surfaceContainerHighest
+                      : colorScheme.primaryContainer.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  color: readOnly 
+                      ? colorScheme.onSurfaceVariant
+                      : colorScheme.primary,
+                  size: 22,
                 ),
               ),
+              suffixIcon: suffixIcon,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: colorScheme.outline.withValues(alpha: 0.3),
+                  width: 1.5,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: colorScheme.outline.withValues(alpha: 0.3),
+                  width: 1.5,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: colorScheme.primary,
+                  width: 2,
+                ),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: colorScheme.error,
+                  width: 2,
+                ),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: colorScheme.error,
+                  width: 2,
+                ),
+              ),
+              filled: true,
+              fillColor: readOnly 
+                  ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.3)
+                  : colorScheme.surface,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 18,
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

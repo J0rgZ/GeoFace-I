@@ -33,7 +33,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final SystemUiOverlayStyle? systemOverlayStyle;
 
   const CustomAppBar({
-    Key? key,
+    super.key,
     required this.title,
     this.subtitle,
     this.onBackPressed,
@@ -43,7 +43,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.foregroundColor,
     this.elevation = 0.0,
     this.systemOverlayStyle,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -67,8 +67,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.normal,
-                color: foregroundColor?.withOpacity(0.8) ?? 
-                       theme.primaryTextTheme.titleLarge?.color?.withOpacity(0.8),
+                color: foregroundColor?.withValues(alpha: 0.8) ?? 
+                       theme.primaryTextTheme.titleLarge?.color?.withValues(alpha: 0.8),
               ),
             ),
         ],

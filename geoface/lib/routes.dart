@@ -20,7 +20,10 @@
 
 // FILE: routes.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'controllers/auth_controller.dart';
 import 'views/auth/login_page.dart';
+import 'views/auth/login_empleado_page.dart';
 import 'views/admin/dashboard_page.dart';
 import 'views/admin/empleados_page.dart';
 import 'views/admin/sedes_page.dart';
@@ -29,6 +32,9 @@ import 'views/admin/empleado_detail_page.dart';
 import 'views/admin/registro_biometrico_page.dart';
 import 'views/admin/sede_detail_page.dart';
 import 'views/empleado/marcar_asistencia_page.dart';
+import 'views/empleado/empleado_layout.dart';
+import 'views/empleado/cambiar_contrasena_empleado_page.dart';
+import 'views/empleado/historial_asistencias_page.dart';
 import 'views/admin/admin_layout.dart';
 import 'views/admin/gestion_usuarios_empleados_page.dart';
 import 'models/empleado.dart';
@@ -47,6 +53,10 @@ class AppRoutes {
   static const String biometrico = '/biometricos';
   static const String gestionUsuariosEmpleados = '/gestion-usuarios-empleados';
   static const String adminLayout = '/admin';
+  static const String empleadoLayout = '/empleado';
+  static const String cambiarContrasenaEmpleado = '/empleado/cambiar-contrasena';
+  static const String historialAsistencias = '/empleado/historial';
+  static const String loginEmpleado = '/login-empleado';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     // Widget de error genérico para rutas con argumentos faltantes
@@ -60,12 +70,56 @@ class AppRoutes {
     switch (settings.name) {
       case login:
         return MaterialPageRoute(builder: (_) => const LoginPage());
+      case loginEmpleado:
+        return MaterialPageRoute(builder: (_) => const LoginEmpleadoPage());
       case dashboard:
-        return MaterialPageRoute(builder: (_) => const DashboardPage());
+        // PROTECCIÓN: Solo admins pueden acceder al dashboard
+        return MaterialPageRoute(
+          builder: (context) {
+            final authController = Provider.of<AuthController>(context, listen: false);
+            if (!authController.isAdmin) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                Navigator.of(context).pushReplacementNamed(AppRoutes.mainMenu);
+              });
+              return Scaffold(
+                body: Center(child: Text('Acceso No Autorizado')),
+              );
+            }
+            return const DashboardPage();
+          },
+        );
       case empleados:
-        return MaterialPageRoute(builder: (_) => const EmpleadosPage());
+        // PROTECCIÓN: Solo admins pueden acceder
+        return MaterialPageRoute(
+          builder: (context) {
+            final authController = Provider.of<AuthController>(context, listen: false);
+            if (!authController.isAdmin) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                Navigator.of(context).pushReplacementNamed(AppRoutes.mainMenu);
+              });
+              return Scaffold(
+                body: Center(child: Text('Acceso No Autorizado')),
+              );
+            }
+            return const EmpleadosPage();
+          },
+        );
       case gestionUsuariosEmpleados:
-        return MaterialPageRoute(builder: (_) => const GestionUsuariosEmpleadosPage());
+        // PROTECCIÓN: Solo admins pueden acceder
+        return MaterialPageRoute(
+          builder: (context) {
+            final authController = Provider.of<AuthController>(context, listen: false);
+            if (!authController.isAdmin) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                Navigator.of(context).pushReplacementNamed(AppRoutes.mainMenu);
+              });
+              return Scaffold(
+                body: Center(child: Text('Acceso No Autorizado')),
+              );
+            }
+            return const GestionUsuariosEmpleadosPage();
+          },
+        );
       case empleadoDetail:
         // MEJORA: Verificación segura de argumentos.
         final args = settings.arguments;
@@ -76,7 +130,21 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => errorRoute(settings.name!));
 
       case sedes:
-        return MaterialPageRoute(builder: (_) => const SedesPage());
+        // PROTECCIÓN: Solo admins pueden acceder
+        return MaterialPageRoute(
+          builder: (context) {
+            final authController = Provider.of<AuthController>(context, listen: false);
+            if (!authController.isAdmin) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                Navigator.of(context).pushReplacementNamed(AppRoutes.mainMenu);
+              });
+              return Scaffold(
+                body: Center(child: Text('Acceso No Autorizado')),
+              );
+            }
+            return const SedesPage();
+          },
+        );
       
       case sedeDetail:
         // MEJORA: Verificación segura de argumentos.
@@ -88,7 +156,21 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => errorRoute(settings.name!));
 
       case reportes:
-        return MaterialPageRoute(builder: (_) => const ReportesPage());
+        // PROTECCIÓN: Solo admins pueden acceder
+        return MaterialPageRoute(
+          builder: (context) {
+            final authController = Provider.of<AuthController>(context, listen: false);
+            if (!authController.isAdmin) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                Navigator.of(context).pushReplacementNamed(AppRoutes.mainMenu);
+              });
+              return Scaffold(
+                body: Center(child: Text('Acceso No Autorizado')),
+              );
+            }
+            return const ReportesPage();
+          },
+        );
       
       case marcarAsistencia:
         // Esta ruta ahora no espera argumentos, lo cual es más lógico.
@@ -105,7 +187,49 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => errorRoute(settings.name!));
         
       case adminLayout:
-        return MaterialPageRoute(builder: (_) => const AdminLayout());
+        // PROTECCIÓN DE SEGURIDAD: Verificar que el usuario es ADMIN
+        // La verificación real se hace dentro de AdminLayout después de que los datos se carguen
+        return MaterialPageRoute(
+          builder: (context) {
+            final authController = Provider.of<AuthController>(context, listen: false);
+            // Esperar a que la autenticación esté lista antes de verificar
+            // AdminLayout manejará la verificación completa del rol
+            if (authController.status == AuthStatus.unauthenticated) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                Navigator.of(context).pushReplacementNamed(AppRoutes.mainMenu);
+              });
+              return Scaffold(
+                body: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline_rounded, size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Sesión No Iniciada',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text('Por favor, inicia sesión nuevamente.'),
+                      const SizedBox(height: 24),
+                      const CircularProgressIndicator(),
+                    ],
+                  ),
+                ),
+              );
+            }
+            return const AdminLayout();
+          },
+        );
+
+      case empleadoLayout:
+        return MaterialPageRoute(builder: (_) => const EmpleadoLayout());
+
+      case cambiarContrasenaEmpleado:
+        return MaterialPageRoute(builder: (_) => const CambiarContrasenaEmpleadoPage());
+
+      case historialAsistencias:
+        return MaterialPageRoute(builder: (_) => const HistorialAsistenciasPage());
 
       default:
         return MaterialPageRoute(

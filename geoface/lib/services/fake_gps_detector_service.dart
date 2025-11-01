@@ -21,6 +21,7 @@
 // -----------------------------------------------------------------------------
 
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter/foundation.dart';
 
 class FakeGpsDetectorService {
   /// Verifica si la ubicación es falsa o manipulada
@@ -28,7 +29,7 @@ class FakeGpsDetectorService {
     try {
       return position.isMocked;
     } catch (e) {
-      print("Error verificando ubicación falsa: $e");
+      debugPrint("Error verificando ubicación falsa: $e");
       return true; // Si falla, mejor prevenir
     }
   }

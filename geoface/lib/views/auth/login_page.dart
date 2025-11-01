@@ -54,13 +54,14 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
+      final navigator = Navigator.of(context);
       final success = await authController.login(
         _emailController.text.trim(),
         _passwordController.text,
       );
 
       if (success && mounted) {
-        Navigator.of(context).pushReplacementNamed(AppRoutes.adminLayout);
+        navigator.pushReplacementNamed(AppRoutes.adminLayout);
       }
     }
   }
@@ -100,11 +101,11 @@ class _LoginPageState extends State<LoginPage> {
                 left: 16,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: colorScheme.surface.withOpacity(0.9),
+                    color: colorScheme.surface.withValues(alpha:0.9),
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: colorScheme.shadow.withOpacity(0.1),
+                        color: colorScheme.shadow.withValues(alpha:0.1),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -142,7 +143,7 @@ class _LoginPageState extends State<LoginPage> {
                       builder: (context, authController, _) {
                         return Card(
                           elevation: 6,
-                          shadowColor: colorScheme.primary.withOpacity(0.2),
+                          shadowColor: colorScheme.primary.withValues(alpha:0.2),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(24),
                           ),
@@ -193,7 +194,7 @@ class _LoginPageState extends State<LoginPage> {
                                         color: colorScheme.primaryContainer,
                                         borderRadius: BorderRadius.circular(16),
                                         border: Border.all(
-                                          color: colorScheme.primary.withOpacity(0.6),
+                                          color: colorScheme.primary.withValues(alpha:0.6),
                                           width: 1.5,
                                         ),
                                       ),
@@ -231,7 +232,7 @@ class _LoginPageState extends State<LoginPage> {
                                       enabledBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(14),
                                         borderSide: BorderSide(
-                                          color: colorScheme.outline.withOpacity(0.7),
+                                          color: colorScheme.outline.withValues(alpha:0.7),
                                           width: 1,
                                         ),
                                       ),
@@ -276,7 +277,7 @@ class _LoginPageState extends State<LoginPage> {
                                           _obscurePassword
                                               ? Icons.visibility_outlined
                                               : Icons.visibility_off_outlined,
-                                          color: colorScheme.primary.withOpacity(0.7),
+                                          color: colorScheme.primary.withValues(alpha:0.7),
                                           size: isSmallScreen ? 20 : 22,
                                         ),
                                         onPressed: () {
@@ -296,7 +297,7 @@ class _LoginPageState extends State<LoginPage> {
                                       enabledBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(14),
                                         borderSide: BorderSide(
-                                          color: colorScheme.outline.withOpacity(0.7),
+                                          color: colorScheme.outline.withValues(alpha:0.7),
                                           width: 1,
                                         ),
                                       ),
@@ -328,7 +329,7 @@ class _LoginPageState extends State<LoginPage> {
                                       margin: EdgeInsets.only(bottom: isSmallScreen ? 16 : 20),
                                       padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
                                       decoration: BoxDecoration(
-                                        color: theme.colorScheme.errorContainer.withOpacity(0.7),
+                                        color: theme.colorScheme.errorContainer.withValues(alpha:0.7),
                                         borderRadius: BorderRadius.circular(14),
                                       ),
                                       child: Column(
@@ -359,7 +360,7 @@ class _LoginPageState extends State<LoginPage> {
                                           Text(
                                             'Si tiene problemas para iniciar sesión, comuníquese con el equipo de soporte técnico.',
                                             style: TextStyle(
-                                              color: theme.colorScheme.onErrorContainer.withOpacity(0.8),
+                                              color: theme.colorScheme.onErrorContainer.withValues(alpha:0.8),
                                               fontSize: isSmallScreen ? 11 : 12,
                                             ),
                                           ),
@@ -446,7 +447,7 @@ class _LoginPageState extends State<LoginPage> {
                                           vertical: isSmallScreen ? 12 : 14,
                                         ),
                                         side: BorderSide(
-                                          color: colorScheme.primary.withOpacity(0.7),
+                                          color: colorScheme.primary.withValues(alpha:0.7),
                                           width: 1.5,
                                         ),
                                         shape: RoundedRectangleBorder(
@@ -486,14 +487,14 @@ class _LoginPageState extends State<LoginPage> {
                                         Icon(
                                           Icons.shield,
                                           size: isSmallScreen ? 12 : 14,
-                                          color: colorScheme.onSurface.withOpacity(0.6),
+                                          color: colorScheme.onSurface.withValues(alpha:0.6),
                                         ),
                                         SizedBox(width: 4),
                                         Text(
                                           'Acceso exclusivo para administradores',
                                           style: TextStyle(
                                             fontSize: isSmallScreen ? 11 : 12,
-                                            color: colorScheme.onSurface.withOpacity(0.6),
+                                            color: colorScheme.onSurface.withValues(alpha:0.6),
                                           ),
                                         ),
                                       ],

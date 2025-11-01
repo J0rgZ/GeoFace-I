@@ -26,9 +26,9 @@ class PermissionsHandlerScreen extends StatefulWidget {
   final VoidCallback onPermissionsGranted;
 
   const PermissionsHandlerScreen({
-    Key? key,
+    super.key,
     required this.onPermissionsGranted,
-  }) : super(key: key);
+  });
 
   @override
   State<PermissionsHandlerScreen> createState() => _PermissionsHandlerScreenState();
@@ -170,7 +170,7 @@ class _PermissionsHandlerScreenState extends State<PermissionsHandlerScreen>
                 animation: _progressController,
                 builder: (context, child) => LinearProgressIndicator(
                   value: (_currentPage + 1) / _permissions.length,
-                  backgroundColor: Colors.grey.withOpacity(0.2),
+                  backgroundColor: Colors.grey.withValues(alpha:0.2),
                   valueColor: AlwaysStoppedAnimation(theme.primaryColor),
                   minHeight: 4,
                 ),
@@ -230,7 +230,7 @@ class _PermissionsHandlerScreenState extends State<PermissionsHandlerScreen>
                             width: 180,
                             height: 180,
                             decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.1),
+                              color: Colors.green.withValues(alpha:0.1),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
@@ -292,7 +292,7 @@ class _PermissionsHandlerScreenState extends State<PermissionsHandlerScreen>
                     margin: const EdgeInsets.only(bottom: 16),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
+                      color: Colors.green.withValues(alpha:0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -374,7 +374,7 @@ class _PermissionsHandlerScreenState extends State<PermissionsHandlerScreen>
                   width: 100,
                   height: 100,
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
+                    color: Colors.green.withValues(alpha:0.1),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -415,7 +415,7 @@ class _PermissionsHandlerScreenState extends State<PermissionsHandlerScreen>
                   decoration: BoxDecoration(
                     color: theme.cardColor,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                    border: Border.all(color: Colors.grey.withValues(alpha:0.2)),
                   ),
                   child: Row(
                     children: [

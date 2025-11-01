@@ -108,6 +108,7 @@ class _SedesPageState extends State<SedesPage> with TickerProviderStateMixin {
     // `Future.microtask` ejecuta el código después del primer frame,
     // evitando que operaciones pesadas bloqueen la renderización inicial de la UI.
     Future.microtask(() {
+      if (!mounted) return;
       // Obtiene la lista de sedes.
       Provider.of<SedeController>(context, listen: false).getSedes();
       // Precarga la lista de empleados. Esto es una optimización para que la validación
@@ -239,8 +240,10 @@ class _SedesPageState extends State<SedesPage> with TickerProviderStateMixin {
     }
 
     // Si no hay empleados, procede con la eliminación.
+    if (!mounted) return;
     final sedeController = Provider.of<SedeController>(context, listen: false);
     final success = await sedeController.deleteSede(sede.id);
+    if (!mounted) return;
     if (success) {
       _showFeedback('${sede.nombre} ha sido eliminada.');
     } else {
@@ -454,7 +457,7 @@ class _SedesPageState extends State<SedesPage> with TickerProviderStateMixin {
             border: Border.all(
               color: _isSearchExpanded 
                   ? theme.colorScheme.primary 
-                  : theme.colorScheme.outline.withOpacity(0.3),
+                  : theme.colorScheme.outline.withValues(alpha:0.3),
               width: _isSearchExpanded ? 2 : 1,
             ),
             color: theme.colorScheme.surface,
@@ -524,7 +527,7 @@ class _SedesPageState extends State<SedesPage> with TickerProviderStateMixin {
                 color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurfaceVariant,
               ),
               side: BorderSide(
-                color: isSelected ? Colors.transparent : theme.colorScheme.outline.withOpacity(0.3),
+                color: isSelected ? Colors.transparent : theme.colorScheme.outline.withValues(alpha:0.3),
               ),
             ),
           );
@@ -555,7 +558,7 @@ class _SedesPageState extends State<SedesPage> with TickerProviderStateMixin {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: theme.colorScheme.outline.withOpacity(0.1)),
+          side: BorderSide(color: theme.colorScheme.outline.withValues(alpha:0.1)),
         ),
         child: InkWell(
           onTap: () => _showSedeOptions(context, sede), // Muestra opciones al tocar.
@@ -574,7 +577,7 @@ class _SedesPageState extends State<SedesPage> with TickerProviderStateMixin {
                       gradient: LinearGradient(
                         colors: [
                           theme.colorScheme.primaryContainer,
-                          theme.colorScheme.primaryContainer.withOpacity(0.7),
+                          theme.colorScheme.primaryContainer.withValues(alpha:0.7),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -623,7 +626,7 @@ class _SedesPageState extends State<SedesPage> with TickerProviderStateMixin {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: colorEstado.withOpacity(0.1),
+                          color: colorEstado.withValues(alpha:0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -777,7 +780,7 @@ class _SedesPageState extends State<SedesPage> with TickerProviderStateMixin {
               mainAxisSize: MainAxisSize.min, // El BottomSheet ocupa solo el espacio necesario.
               children: [
                 // "Handle" decorativo.
-                Container(height: 4, width: 40, decoration: BoxDecoration(color: theme.colorScheme.outline.withOpacity(0.4), borderRadius: BorderRadius.circular(2))),
+                Container(height: 4, width: 40, decoration: BoxDecoration(color: theme.colorScheme.outline.withValues(alpha:0.4), borderRadius: BorderRadius.circular(2))),
                 const SizedBox(height: 24),
                 
                 // Cabecera del BottomSheet con info de la sede.
@@ -786,7 +789,7 @@ class _SedesPageState extends State<SedesPage> with TickerProviderStateMixin {
                     Container(
                       width: 64, height: 64,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(colors: [theme.colorScheme.primaryContainer, theme.colorScheme.primaryContainer.withOpacity(0.7)]),
+                        gradient: LinearGradient(colors: [theme.colorScheme.primaryContainer, theme.colorScheme.primaryContainer.withValues(alpha:0.7)]),
                         shape: BoxShape.circle,
                       ),
                       child: Center(child: Text(_getSedeInitials(sede.nombre), style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: theme.colorScheme.primary))),
@@ -818,9 +821,9 @@ class _SedesPageState extends State<SedesPage> with TickerProviderStateMixin {
                   margin: const EdgeInsets.symmetric(vertical: 8),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha:0.3),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: theme.colorScheme.outline.withOpacity(0.2)),
+                    border: Border.all(color: theme.colorScheme.outline.withValues(alpha:0.2)),
                   ),
                   child: Row(
                     children: [
@@ -879,13 +882,13 @@ class _SedesPageState extends State<SedesPage> with TickerProviderStateMixin {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: isDestructive ? theme.colorScheme.error.withOpacity(0.2) : theme.colorScheme.outline.withOpacity(0.1)),
+            border: Border.all(color: isDestructive ? theme.colorScheme.error.withValues(alpha:0.2) : theme.colorScheme.outline.withValues(alpha:0.1)),
           ),
           child: Row(
             children: [
               Container(
                 width: 40, height: 40,
-                decoration: BoxDecoration(color: isDestructive ? theme.colorScheme.error.withOpacity(0.1) : theme.colorScheme.primaryContainer.withOpacity(0.3), borderRadius: BorderRadius.circular(12)),
+                decoration: BoxDecoration(color: isDestructive ? theme.colorScheme.error.withValues(alpha:0.1) : theme.colorScheme.primaryContainer.withValues(alpha:0.3), borderRadius: BorderRadius.circular(12)),
                 child: Icon(icon, color: color, size: 20),
               ),
               const SizedBox(width: 16),
@@ -894,7 +897,7 @@ class _SedesPageState extends State<SedesPage> with TickerProviderStateMixin {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(title, style: theme.textTheme.titleSmall?.copyWith(color: color, fontWeight: FontWeight.w600)),
-                    Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: isDestructive ? theme.colorScheme.error.withOpacity(0.7) : theme.colorScheme.onSurfaceVariant)),
+                    Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: isDestructive ? theme.colorScheme.error.withValues(alpha:0.7) : theme.colorScheme.onSurfaceVariant)),
                   ],
                 ),
               ),

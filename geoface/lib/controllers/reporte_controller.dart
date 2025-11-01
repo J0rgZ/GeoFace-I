@@ -25,7 +25,8 @@ import '../models/asistencia.dart';
 import '../models/empleado.dart';
 import '../models/sede.dart';
 import '../models/estadistica_asistencia.dart';
-import '../services/firebase_service.dart';
+import '../services/empleado_service.dart';
+import '../services/asistencia_service.dart';
 import '../utils/pdf_report_generator.dart';
 
 // Clase auxiliar para agrupar todos los datos de un reporte generado.
@@ -43,7 +44,8 @@ class ReporteDetallado {
 
 // Controlador para la lógica de negocio de la generación de reportes de asistencia.
 class ReporteController extends ChangeNotifier {
-  final FirebaseService _firebaseService = FirebaseService();
+  final EmpleadoService _empleadoService = EmpleadoService();
+  final AsistenciaService _asistenciaService = AsistenciaService();
 
   // Estado interno del controlador.
   ReporteDetallado? _reporte;
@@ -85,7 +87,7 @@ class ReporteController extends ChangeNotifier {
 
     try {
       // 1. Obtenemos la lista completa de empleados una sola vez para optimizar.
-      _todosLosEmpleados = await _firebaseService.getEmpleados(); 
+      _todosLosEmpleados = await _empleadoService.getEmpleados(); 
 
       // 2. Filtramos los empleados que aplican al reporte (activos y de la sede seleccionada).
       final empleadosActivos = _todosLosEmpleados.where((e) {
@@ -94,7 +96,7 @@ class ReporteController extends ChangeNotifier {
       }).toList();
 
       // 3. Obtenemos solo las asistencias del rango de fechas y sede.
-      final asistencias = await _firebaseService.getAsistenciasFiltradas(
+      final asistencias = await _asistenciaService.getAsistenciasFiltradas(
         fechaInicio: fechaInicio,
         fechaFin: fechaFin,
         sedeId: sedeId,
