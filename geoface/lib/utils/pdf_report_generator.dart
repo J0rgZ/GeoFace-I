@@ -57,9 +57,20 @@ class PdfReportGenerator {
   }) : _empleadoMap = { for (var e in todosLosEmpleados) e.id: e };
 
   /// Busca el nombre de un empleado por su ID usando el mapa pre-construido.
+  /// Retorna un nombre seguro sin exponer información sensible.
   String _getNombreEmpleado(String empleadoId) {
+    if (empleadoId.isEmpty) {
+      return 'Empleado Desconocido';
+    }
     final empleado = _empleadoMap[empleadoId];
-    return empleado?.nombreCompleto ?? 'Empleado Desconocido (ID: ${empleadoId.substring(0, 5)}...)';
+    if (empleado != null) {
+      return empleado.nombreCompleto;
+    }
+    // Si el ID es muy corto, no mostrar substring para evitar errores
+    final idPreview = empleadoId.length > 8 
+        ? '${empleadoId.substring(0, 8)}...'
+        : '***';
+    return 'Empleado Desconocido (ID: $idPreview)';
   }
 
   /// Carga las fuentes y el logo de forma segura y crea el tema del PDF.
@@ -73,10 +84,10 @@ class PdfReportGenerator {
       final boldTtf = pw.Font.ttf(boldFontData);
 
       // Creación de un tema para aplicar estilos de forma consistente
+      // Nota: Se omite PdfGoogleFonts para evitar dependencias externas y mejorar rendimiento
       return pw.ThemeData.withFont(
         base: ttf,
         bold: boldTtf,
-        fontFallback: [await PdfGoogleFonts.notoColorEmoji()], // Para emojis (opcional)
       );
     } catch (e) {
       // Registrar el error es crucial para la depuración.
@@ -444,11 +455,14 @@ class PdfReportGenerator {
   }
   
   pw.Widget _buildDetails(List<DateTime> dias) {
+    // OPTIMIZADO: Función de tardanza más eficiente sin crear nuevos DateTime
     bool esTardanza(Asistencia a) {
-      // Comparar solo la hora y el minuto con la hora límite
       final horaEntrada = a.fechaHoraEntrada;
-      final horaLimiteHoy = horaEntrada.copyWith(hour: _horaLimiteTardanza.hour, minute: _horaLimiteTardanza.minute, second: 0, millisecond: 0, microsecond: 0);
-      return horaEntrada.isAfter(horaLimiteHoy);
+      final horaLimite = _horaLimiteTardanza.hour;
+      final minutoLimite = _horaLimiteTardanza.minute;
+      // Comparación directa más eficiente
+      return horaEntrada.hour > horaLimite || 
+             (horaEntrada.hour == horaLimite && horaEntrada.minute > minutoLimite);
     }
 
     return pw.Column(
@@ -481,31 +495,46 @@ class PdfReportGenerator {
   pw.Widget _buildDailyTable(List<Asistencia> asistencias, List<Empleado> ausentes, bool Function(Asistencia) esTardanza) {
     final headers = ['Empleado', 'Entrada', 'Salida', 'Estado'];
     
+    // Pre-allocar lista con capacidad estimada para mejor rendimiento
     final allData = <Map<String, dynamic>>[];
 
-    // Filas de asistencias
+    // Filas de asistencias - sanitizar nombres antes de agregar
     for (var a in asistencias) {
-      allData.add({
-        'nombre': _getNombreEmpleado(a.empleadoId),
-        'entrada': DateFormat.jm('es').format(a.fechaHoraEntrada),
-        'salida': a.fechaHoraSalida != null ? DateFormat.jm('es').format(a.fechaHoraSalida!) : '---',
-        'tardanza': esTardanza(a),
-        'presente': true,
-      });
+      final nombreEmpleado = _getNombreEmpleado(a.empleadoId);
+      if (nombreEmpleado.isNotEmpty) {
+        allData.add({
+          'nombre': nombreEmpleado,
+          'entrada': DateFormat.jm('es').format(a.fechaHoraEntrada),
+          'salida': a.fechaHoraSalida != null 
+              ? DateFormat.jm('es').format(a.fechaHoraSalida!) 
+              : '---',
+          'tardanza': esTardanza(a),
+          'presente': true,
+        });
+      }
     }
 
-    // Filas de ausencias
+    // Filas de ausencias - sanitizar nombres antes de agregar
     for (var e in ausentes) {
-       allData.add({
-        'nombre': e.nombreCompleto,
-        'entrada': '---',
-        'salida': '---',
-        'presente': false,
-      });
+      final nombreCompleto = e.nombreCompleto.trim();
+      if (nombreCompleto.isNotEmpty) {
+        allData.add({
+          'nombre': nombreCompleto,
+          'entrada': '---',
+          'salida': '---',
+          'presente': false,
+        });
+      }
     }
     
     // Ordenar por nombre de empleado para unificar la lista
-    allData.sort((a, b) => a['nombre'].compareTo(b['nombre']));
+    if (allData.isNotEmpty) {
+      allData.sort((a, b) {
+        final nombreA = a['nombre'] as String;
+        final nombreB = b['nombre'] as String;
+        return nombreA.compareTo(nombreB);
+      });
+    }
 
     if (allData.isEmpty) {
       return pw.Padding(

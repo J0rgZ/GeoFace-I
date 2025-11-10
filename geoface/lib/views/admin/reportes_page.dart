@@ -234,20 +234,33 @@ class _ReportesPageState extends State<ReportesPage> {
   }
 
   Widget _buildReporteContent(ReporteController reporteController) {
+    // Validación de seguridad: verificar que el reporte existe
+    if (reporteController.reporte == null) {
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+    }
+    
     // Lógica de fechas
     final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
     final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
     final diasEnRango = endOfMonth.difference(startOfMonth).inDays;
-    final todosLosDiasDelReporte = List.generate(diasEnRango + 1, (index) => startOfMonth.add(Duration(days: index))).reversed.toList();
+    
+    // Optimización: Pre-calcular días una sola vez
+    final todosLosDiasDelReporte = List.generate(
+      diasEnRango + 1, 
+      (index) => startOfMonth.add(Duration(days: index)),
+      growable: false,
+    ).reversed.toList();
     
     // Filtrar días sin datos si el filtro está activado
+    // Optimización: Usar Set para búsqueda O(1) en lugar de O(n) para cada día
+    final diasConDatos = <DateTime>{
+      ...reporteController.reporte!.asistenciasPorDia.keys,
+      ...reporteController.reporte!.ausenciasPorDia.keys,
+    };
+    
     final diasParaMostrar = _mostrarDiasSinDatos
         ? todosLosDiasDelReporte
-        : todosLosDiasDelReporte.where((dia) {
-            final asistenciasDelDia = reporteController.reporte!.asistenciasPorDia[dia] ?? [];
-            final ausenciasDelDia = reporteController.reporte!.ausenciasPorDia[dia] ?? [];
-            return asistenciasDelDia.isNotEmpty || ausenciasDelDia.isNotEmpty;
-          }).toList();
+        : todosLosDiasDelReporte.where((dia) => diasConDatos.contains(dia)).toList();
     
     return SliverList.list(
       children: [
@@ -479,16 +492,13 @@ class _FiltrosCard extends StatefulWidget {
 
 class _FiltrosCardState extends State<_FiltrosCard> {
   String? _selectedSedeId;
-  final _formKey = GlobalKey<FormState>();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     
-    return Form(
-      key: _formKey,
-      child: Container(
+    return Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
@@ -532,8 +542,7 @@ class _FiltrosCardState extends State<_FiltrosCard> {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 }
 
@@ -869,14 +878,11 @@ class _DiaExpansionTile extends StatelessWidget {
   Widget _buildAsistenciaTile(BuildContext context, Asistencia asistencia) {
     final empleado = getEmpleadoById(asistencia.empleadoId);
     final horaEntrada = asistencia.fechaHoraEntrada;
-    final horaLimiteHoy = horaEntrada.copyWith(
-      hour: _horaLimiteTardanza.hour,
-      minute: _horaLimiteTardanza.minute,
-      second: 0,
-      millisecond: 0,
-      microsecond: 0,
-    );
-    final esTardanza = horaEntrada.isAfter(horaLimiteHoy);
+    // OPTIMIZADO: Comparación directa sin crear nuevo DateTime
+    final horaLimite = _horaLimiteTardanza.hour;
+    final minutoLimite = _horaLimiteTardanza.minute;
+    final esTardanza = horaEntrada.hour > horaLimite || 
+                       (horaEntrada.hour == horaLimite && horaEntrada.minute > minutoLimite);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final tieneSalida = asistencia.fechaHoraSalida != null;

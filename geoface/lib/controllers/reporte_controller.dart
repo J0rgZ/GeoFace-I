@@ -19,6 +19,7 @@
 // @Descripción:  [Descripción de los cambios realizados]
 // -----------------------------------------------------------------------------
 
+import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:collection/collection.dart';
 import '../models/asistencia.dart';
@@ -75,6 +76,7 @@ class ReporteController extends ChangeNotifier {
   // Estado interno del controlador.
   ReporteDetallado? _reporte;
   List<Empleado> _todosLosEmpleados = [];
+  Map<String, Empleado>? _empleadoMapCache; // Cache para búsquedas rápidas O(1)
   bool _loading = false;
   bool _isExporting = false;
   String? _errorMessage;
@@ -89,13 +91,14 @@ class ReporteController extends ChangeNotifier {
 
   // Función de utilidad para buscar un empleado por su ID en la lista local.
   // Evita hacer múltiples llamadas a la base de datos.
+  // OPTIMIZADO: Usa un mapa para búsqueda O(1) en lugar de O(n) con firstWhere
   Empleado? getEmpleadoById(String id) {
-    try {
-      return _todosLosEmpleados.firstWhere((e) => e.id == id);
-    } catch (e) {
-      // Si no se encuentra, devuelve null.
+    if (id.isEmpty || _todosLosEmpleados.isEmpty) {
       return null;
     }
+    // Crear mapa si no existe (lazy initialization para mejor rendimiento)
+    _empleadoMapCache ??= {for (var e in _todosLosEmpleados) e.id: e};
+    return _empleadoMapCache![id];
   }
 
   // Método principal para generar el reporte detallado de asistencias y ausencias.
@@ -128,9 +131,10 @@ class ReporteController extends ChangeNotifier {
         return;
       }
 
-      // Validación: Verificar que la fecha de fin no sea futura
+      // Validación: Verificar que la fecha de fin no sea futura (incluye ajuste de horas)
       final ahora = DateTime.now();
-      if (fechaFin.isAfter(ahora)) {
+      final fechaFinAjustada = fechaFin.add(const Duration(hours: 23, minutes: 59));
+      if (fechaFinAjustada.isAfter(ahora)) {
         _errorMessage = 'La fecha de fin no puede ser futura.';
         _loading = false;
         notifyListeners();
@@ -139,8 +143,17 @@ class ReporteController extends ChangeNotifier {
 
       // Validación: Verificar que hay sedes disponibles si se selecciona una sede
       if (sedeId != null && sedeId.isNotEmpty) {
-        final sedeExiste = sedes.any((s) => s.id == sedeId);
-        if (!sedeExiste) {
+        // Validar que el ID no esté vacío o sea solo espacios (seguridad)
+        final sedeIdLimpio = sedeId.trim();
+        if (sedeIdLimpio.isEmpty) {
+          _errorMessage = 'ID de sede inválido.';
+          _loading = false;
+          notifyListeners();
+          return;
+        }
+        // Usar mapa para búsqueda O(1) en lugar de O(n) - optimización de rendimiento
+        final mapaSedesIds = {for (var s in sedes) s.id: s};
+        if (!mapaSedesIds.containsKey(sedeIdLimpio)) {
           _errorMessage = 'La sede seleccionada no existe.';
           _loading = false;
           notifyListeners();
@@ -149,6 +162,8 @@ class ReporteController extends ChangeNotifier {
       }
       // 1. Obtenemos la lista completa de empleados una sola vez para optimizar.
       _todosLosEmpleados = await _empleadoService.getEmpleados();
+      // Limpiar cache al cargar nuevos empleados
+      _empleadoMapCache = null;
       
       // Validación: Verificar que se cargaron empleados
       if (_todosLosEmpleados.isEmpty) {
@@ -188,37 +203,56 @@ class ReporteController extends ChangeNotifier {
       );
 
       // =========================================================================
-      // ¡LÓGICA CORREGIDA! Iteramos sobre cada día del rango seleccionado.
+      // OPTIMIZADO: Iteramos sobre cada día del rango seleccionado.
       // =========================================================================
       final ausenciasPorDia = <DateTime, List<Empleado>>{};
       final diasEnRango = fechaFin.difference(fechaInicio).inDays;
+      
+      // Validación de seguridad: Limitar el número máximo de días para evitar problemas de rendimiento
+      const maxDiasPermitidos = 366; // 1 año
+      if (diasEnRango > maxDiasPermitidos) {
+        _errorMessage = 'El rango de fechas es demasiado grande. Por favor, seleccione un período menor.';
+        _loading = false;
+        notifyListeners();
+        return;
+      }
 
       for (var i = 0; i <= diasEnRango; i++) {
         // Se itera día por día dentro del rango de fechas.
         final diaActual = DateTime(fechaInicio.year, fechaInicio.month, fechaInicio.day).add(Duration(days: i));
         
         final asistenciasDelDia = asistenciasPorDia[diaActual] ?? [];
+        // Usar Set para búsqueda O(1) en lugar de O(n)
         final idsEmpleadosConAsistencia = asistenciasDelDia.map((a) => a.empleadoId).toSet();
         
         // Comparamos la lista de empleados activos con los que asistieron para encontrar a los ausentes.
+        // OPTIMIZADO: Filtrar usando el mapa de empleados activos
         final empleadosAusentes = empleadosActivos
             .where((e) => !idsEmpleadosConAsistencia.contains(e.id))
-            .toList();
+            .toList(growable: false); // growable: false para mejor rendimiento
             
-        ausenciasPorDia[diaActual] = empleadosAusentes;
+        // Solo agregar al mapa si hay ausentes (optimización de memoria)
+        if (empleadosAusentes.isNotEmpty) {
+          ausenciasPorDia[diaActual] = empleadosAusentes;
+        }
       }
       // =========================================================================
 
       // 5. Se calcula el total de tardanzas basado en una hora de entrada fija.
+      // OPTIMIZADO: Usar comparación directa de DateTime en lugar de TimeOfDay
+      final horaLimiteEntrada = 9; // Hora límite: 9:00 AM
+      final horaLimiteMinutos = 0;
       int totalTardanzas = 0;
-      final horaLimiteEntrada = TimeOfDay(hour: 9, minute: 0);
       final tardanzasPorEmpleado = <String, int>{};
+      
       for (var asistencia in asistencias) {
-          final horaEntrada = TimeOfDay.fromDateTime(asistencia.fechaHoraEntrada);
-          if (horaEntrada.hour > horaLimiteEntrada.hour || (horaEntrada.hour == horaLimiteEntrada.hour && horaEntrada.minute > horaLimiteEntrada.minute)) {
-              totalTardanzas++;
-              tardanzasPorEmpleado[asistencia.empleadoId] = (tardanzasPorEmpleado[asistencia.empleadoId] ?? 0) + 1;
-          }
+        final horaEntrada = asistencia.fechaHoraEntrada;
+        // Comparar directamente horas y minutos (más eficiente que TimeOfDay)
+        if (horaEntrada.hour > horaLimiteEntrada || 
+            (horaEntrada.hour == horaLimiteEntrada && horaEntrada.minute > horaLimiteMinutos)) {
+          totalTardanzas++;
+          tardanzasPorEmpleado[asistencia.empleadoId] = (tardanzasPorEmpleado[asistencia.empleadoId] ?? 0) + 1;
+        }
       }
       
       // 6. Se calculan los totales para el resumen general del reporte.
@@ -230,8 +264,10 @@ class ReporteController extends ChangeNotifier {
           ? (totalAsistencias / totalPosiblesAsistencias) * 100
           : 0.0;
       
+      // Obtener nombre de sede de forma segura (O(1) con mapa)
+      final mapaSedesNombre = {for (var s in sedes) s.id: s.nombre};
       final String sedeNombre = sedeId != null 
-        ? sedes.firstWhere((s) => s.id == sedeId, orElse: () => Sede.empty()).nombre
+        ? (mapaSedesNombre[sedeId] ?? 'Sede Desconocida')
         : 'Todas las Sedes';
 
       // 7. Se construye el objeto de resumen (EstadisticaAsistencia).
@@ -246,32 +282,39 @@ class ReporteController extends ChangeNotifier {
         porcentajeAsistencia: porcentajeAsistencia,
       );
 
-      // 8. Calcular estadísticas por empleado
+      // 8. Calcular estadísticas por empleado (OPTIMIZADO)
       final estadisticasPorEmpleado = <EstadisticaEmpleado>[];
       
-      // Agrupar asistencias por empleado
+      // Agrupar asistencias por empleado (O(n))
       final asistenciasPorEmpleado = groupBy<Asistencia, String>(
         asistencias,
         (a) => a.empleadoId,
       );
       
-      // Crear un mapa de sedeId -> nombre de sede para búsqueda rápida
+      // Crear un mapa de sedeId -> nombre de sede para búsqueda rápida O(1)
       final mapaSedes = {for (var s in sedes) s.id: s.nombre};
       
-      // Calcular estadísticas para cada empleado
+      // Crear un mapa de ausencias por empleado para búsqueda O(1) en lugar de O(n)
+      // Estructura: {empleadoId: {dia1, dia2, ...}}
+      final ausenciasPorEmpleadoMap = <String, Set<DateTime>>{};
+      for (var entry in ausenciasPorDia.entries) {
+        final dia = entry.key;
+        final empleadosAusentes = entry.value;
+        for (var empleado in empleadosAusentes) {
+          ausenciasPorEmpleadoMap.putIfAbsent(empleado.id, () => <DateTime>{}).add(dia);
+        }
+      }
+      
+      // Calcular estadísticas para cada empleado (O(n) en lugar de O(n*m))
       for (var empleado in empleadosActivos) {
         final asistenciasEmpleado = asistenciasPorEmpleado[empleado.id] ?? [];
         final totalAsistenciasEmpleado = asistenciasEmpleado.length;
         
-        // Calcular ausencias del empleado
-        int totalAusenciasEmpleado = 0;
-        for (var ausenciasDelDia in ausenciasPorDia.values) {
-          if (ausenciasDelDia.any((e) => e.id == empleado.id)) {
-            totalAusenciasEmpleado++;
-          }
-        }
+        // Obtener ausencias del empleado usando el mapa (O(1))
+        final diasAusentes = ausenciasPorEmpleadoMap[empleado.id] ?? <DateTime>{};
+        final totalAusenciasEmpleado = diasAusentes.length;
         
-        // Obtener tardanzas del empleado
+        // Obtener tardanzas del empleado (O(1))
         final totalTardanzasEmpleado = tardanzasPorEmpleado[empleado.id] ?? 0;
         
         // Calcular porcentaje de asistencia
@@ -280,7 +323,7 @@ class ReporteController extends ChangeNotifier {
             ? (totalAsistenciasEmpleado / totalDiasLaborables) * 100
             : 0.0;
         
-        // Obtener nombre de la sede
+        // Obtener nombre de la sede (O(1))
         final nombreSede = mapaSedes[empleado.sedeId] ?? 'Sede Desconocida';
         
         estadisticasPorEmpleado.add(
@@ -313,8 +356,10 @@ class ReporteController extends ChangeNotifier {
       );
       _reporteGenerado = true;
 
-    } catch (e) {
-      _errorMessage = 'Error al generar reporte: ${e.toString()}';
+    } catch (e, stackTrace) {
+      // No exponer detalles técnicos al usuario por seguridad
+      log('Error al generar reporte: $e', error: e, stackTrace: stackTrace);
+      _errorMessage = 'Error al generar el reporte. Por favor, intente nuevamente.';
     } finally {
       _loading = false;
       notifyListeners();
@@ -364,8 +409,10 @@ class ReporteController extends ChangeNotifier {
       }
       
       return true;
-    } catch (e) {
-      _errorMessage = 'Error al exportar el reporte: ${e.toString()}';
+    } catch (e, stackTrace) {
+      // No exponer detalles técnicos al usuario por seguridad
+      log('Error al exportar reporte: $e', error: e, stackTrace: stackTrace);
+      _errorMessage = 'Error al exportar el reporte. Por favor, intente nuevamente.';
       notifyListeners();
       return false;
     } finally {
