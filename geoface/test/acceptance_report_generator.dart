@@ -12,6 +12,9 @@ class FunctionalAcceptance {
   final String resultado;
   final String responsable;
   final String estado;
+  final String codigoReferencia;
+  final String archivosImplementacion;
+  final String pruebasUnitarias;
 
   FunctionalAcceptance({
     required this.requisitoId,
@@ -21,6 +24,9 @@ class FunctionalAcceptance {
     required this.resultado,
     required this.responsable,
     required this.estado,
+    required this.codigoReferencia,
+    required this.archivosImplementacion,
+    required this.pruebasUnitarias,
   });
 }
 
@@ -31,6 +37,8 @@ class NonFunctionalAcceptance {
   final String criterio;
   final String medicion;
   final String estado;
+  final String codigoReferencia;
+  final String evidenciasTecnicas;
 
   NonFunctionalAcceptance({
     required this.requisitoId,
@@ -39,6 +47,8 @@ class NonFunctionalAcceptance {
     required this.criterio,
     required this.medicion,
     required this.estado,
+    required this.codigoReferencia,
+    required this.evidenciasTecnicas,
   });
 }
 
@@ -268,7 +278,7 @@ class AcceptanceReportGenerator {
     final approved = item.estado.toUpperCase() == 'APROBADO';
 
     return pw.Container(
-      margin: const pw.EdgeInsets.only(bottom: 12),
+      margin: const pw.EdgeInsets.only(bottom: 14),
       padding: const pw.EdgeInsets.all(14),
       decoration: pw.BoxDecoration(
         color: approved ? PdfColors.green50 : PdfColors.orange50,
@@ -292,7 +302,7 @@ class AcceptanceReportGenerator {
                 ),
                 child: pw.Text(
                   item.requisitoId,
-                  style: pw.TextStyle(color: PdfColors.white, fontSize: 10),
+                  style: pw.TextStyle(color: PdfColors.white, fontSize: 10, fontWeight: pw.FontWeight.bold),
                 ),
               ),
               pw.SizedBox(width: 10),
@@ -308,20 +318,143 @@ class AcceptanceReportGenerator {
                         color: PdfColors.blueGrey900,
                       ),
                     ),
+                    pw.SizedBox(height: 8),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColors.white,
+                        borderRadius: pw.BorderRadius.circular(4),
+                        border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            'Escenario de Prueba:',
+                            style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey800),
+                          ),
+                          pw.SizedBox(height: 3),
+                          pw.Text(
+                            item.escenario,
+                            style: pw.TextStyle(fontSize: 9.5, color: PdfColors.blueGrey700),
+                          ),
+                        ],
+                      ),
+                    ),
                     pw.SizedBox(height: 6),
-                    pw.Text(
-                      'Escenario verificado: ${item.escenario}',
-                      style: pw.TextStyle(fontSize: 10.5),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColors.white,
+                        borderRadius: pw.BorderRadius.circular(4),
+                        border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            'Resultado Obtenido:',
+                            style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey800),
+                          ),
+                          pw.SizedBox(height: 3),
+                          pw.Text(
+                            item.resultado,
+                            style: pw.TextStyle(fontSize: 9.5, color: PdfColors.blueGrey700),
+                          ),
+                        ],
+                      ),
                     ),
-                    pw.SizedBox(height: 4),
-                    pw.Text(
-                      'Resultado esperado: ${item.resultado}',
-                      style: pw.TextStyle(fontSize: 10),
+                    pw.SizedBox(height: 6),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColors.blueGrey50,
+                        borderRadius: pw.BorderRadius.circular(4),
+                        border: pw.Border.all(color: PdfColors.blueGrey200, width: 0.5),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            '📁 Archivos de Implementación:',
+                            style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey900),
+                          ),
+                          pw.SizedBox(height: 4),
+                          pw.Text(
+                            item.archivosImplementacion,
+                            style: pw.TextStyle(fontSize: 9, color: PdfColors.blueGrey800),
+                          ),
+                        ],
+                      ),
                     ),
-                    pw.SizedBox(height: 4),
-                    pw.Text(
-                      'Evidencia: ${item.evidencia}',
-                      style: pw.TextStyle(fontSize: 10, color: PdfColors.blueGrey700),
+                    pw.SizedBox(height: 6),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColors.grey100,
+                        borderRadius: pw.BorderRadius.circular(4),
+                        border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            '💻 Evidencia de Código:',
+                            style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey900),
+                          ),
+                          pw.SizedBox(height: 4),
+                          pw.Text(
+                            item.codigoReferencia,
+                            style: pw.TextStyle(fontSize: 8.5, color: PdfColors.blueGrey800),
+                          ),
+                        ],
+                      ),
+                    ),
+                    pw.SizedBox(height: 6),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColors.green50,
+                        borderRadius: pw.BorderRadius.circular(4),
+                        border: pw.Border.all(color: PdfColors.green200, width: 0.5),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            '✅ Pruebas Unitarias:',
+                            style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: PdfColors.green900),
+                          ),
+                          pw.SizedBox(height: 4),
+                          pw.Text(
+                            item.pruebasUnitarias,
+                            style: pw.TextStyle(fontSize: 9, color: PdfColors.green800),
+                          ),
+                        ],
+                      ),
+                    ),
+                    pw.SizedBox(height: 6),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColors.amber50,
+                        borderRadius: pw.BorderRadius.circular(4),
+                        border: pw.Border.all(color: PdfColors.amber200, width: 0.5),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            '📸 Evidencias Visuales/Logs:',
+                            style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: PdfColors.amber900),
+                          ),
+                          pw.SizedBox(height: 4),
+                          pw.Text(
+                            item.evidencia,
+                            style: pw.TextStyle(fontSize: 9, color: PdfColors.amber800),
+                          ),
+                        ],
+                      ),
                     ),
                     pw.SizedBox(height: 8),
                     pw.Row(
@@ -329,14 +462,21 @@ class AcceptanceReportGenerator {
                       children: [
                         pw.Text(
                           'Responsable: ${item.responsable}',
-                          style: pw.TextStyle(fontSize: 10, color: PdfColors.blueGrey600),
+                          style: pw.TextStyle(fontSize: 9.5, color: PdfColors.blueGrey600, fontWeight: pw.FontWeight.bold),
                         ),
-                        pw.Text(
-                          'Estado: ${item.estado}',
-                          style: pw.TextStyle(
-                            fontSize: 10,
-                            fontWeight: pw.FontWeight.bold,
-                            color: approved ? PdfColors.green800 : PdfColors.orange800,
+                        pw.Container(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: pw.BoxDecoration(
+                            color: approved ? PdfColors.green700 : PdfColors.orange700,
+                            borderRadius: pw.BorderRadius.circular(12),
+                          ),
+                          child: pw.Text(
+                            item.estado.toUpperCase(),
+                            style: pw.TextStyle(
+                              fontSize: 9,
+                              fontWeight: pw.FontWeight.bold,
+                              color: PdfColors.white,
+                            ),
                           ),
                         ),
                       ],
@@ -364,64 +504,183 @@ class AcceptanceReportGenerator {
           ),
         ),
         pw.SizedBox(height: 12),
-        pw.Table(
-          border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.6),
-          columnWidths: {
-            0: const pw.FlexColumnWidth(1.2),
-            1: const pw.FlexColumnWidth(2.2),
-            2: const pw.FlexColumnWidth(3.5),
-            3: const pw.FlexColumnWidth(3.5),
-            4: const pw.FlexColumnWidth(1.2),
-          },
-          children: [
-            pw.TableRow(
-              decoration: const pw.BoxDecoration(color: PdfColors.blueGrey100),
-              children: [
-                _tableCell('Código', header: true),
-                _tableCell('Nombre', header: true),
-                _tableCell('Criterio de aceptación', header: true),
-                _tableCell('Medición/Evidencia', header: true),
-                _tableCell('Estado', header: true),
-              ],
-            ),
-            ...noFuncionales.map(
-              (item) => pw.TableRow(
-                decoration: pw.BoxDecoration(
-                  color: item.estado.toUpperCase() == 'APROBADO'
-                      ? PdfColors.green50
-                      : PdfColors.orange50,
-                ),
-                children: [
-                  _tableCell(item.requisitoId, bold: true),
-                  _tableCell(item.nombre),
-                  _tableCell('${item.descripcion}\n• ${item.criterio}'),
-                  _tableCell(item.medicion),
-                  _tableCell(item.estado,
-                      bold: true,
-                      color: item.estado.toUpperCase() == 'APROBADO'
-                          ? PdfColors.green800
-                          : PdfColors.orange800),
-                ],
-              ),
-            ),
-          ],
-        ),
+        ...noFuncionales.map((item) => _buildNonFunctionalCard(item)),
       ],
     );
   }
 
-  pw.Widget _tableCell(String text, {bool header = false, bool bold = false, PdfColor? color}) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.all(6),
-      child: pw.Text(
-        text,
-        style: pw.TextStyle(
-          fontSize: header ? 10.5 : 9.5,
-          fontWeight: header || bold ? pw.FontWeight.bold : pw.FontWeight.normal,
-          color: color ?? PdfColors.blueGrey800,
+  pw.Widget _buildNonFunctionalCard(NonFunctionalAcceptance item) {
+    final approved = item.estado.toUpperCase() == 'APROBADO';
+
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 14),
+      padding: const pw.EdgeInsets.all(14),
+      decoration: pw.BoxDecoration(
+        color: approved ? PdfColors.green50 : PdfColors.orange50,
+        borderRadius: pw.BorderRadius.circular(8),
+        border: pw.Border.all(
+          color: approved ? PdfColors.green300 : PdfColors.orange300,
+          width: 1,
         ),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Container(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: pw.BoxDecoration(
+                  color: approved ? PdfColors.green700 : PdfColors.orange700,
+                  borderRadius: pw.BorderRadius.circular(4),
+                ),
+                child: pw.Text(
+                  item.requisitoId,
+                  style: pw.TextStyle(color: PdfColors.white, fontSize: 10, fontWeight: pw.FontWeight.bold),
+                ),
+              ),
+              pw.SizedBox(width: 10),
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      item.nombre,
+                      style: pw.TextStyle(
+                        fontSize: 13,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.blueGrey900,
+                      ),
+                    ),
+                    pw.SizedBox(height: 8),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColors.white,
+                        borderRadius: pw.BorderRadius.circular(4),
+                        border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            'Descripción:',
+                            style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey800),
+                          ),
+                          pw.SizedBox(height: 3),
+                          pw.Text(
+                            item.descripcion,
+                            style: pw.TextStyle(fontSize: 9.5, color: PdfColors.blueGrey700),
+                          ),
+                        ],
+                      ),
+                    ),
+                    pw.SizedBox(height: 6),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColors.white,
+                        borderRadius: pw.BorderRadius.circular(4),
+                        border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            'Criterio de Aceptación:',
+                            style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey800),
+                          ),
+                          pw.SizedBox(height: 3),
+                          pw.Text(
+                            item.criterio,
+                            style: pw.TextStyle(fontSize: 9.5, color: PdfColors.blueGrey700),
+                          ),
+                        ],
+                      ),
+                    ),
+                    pw.SizedBox(height: 6),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColors.blueGrey50,
+                        borderRadius: pw.BorderRadius.circular(4),
+                        border: pw.Border.all(color: PdfColors.blueGrey200, width: 0.5),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            '💻 Evidencia de Código/Implementación:',
+                            style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey900),
+                          ),
+                          pw.SizedBox(height: 4),
+                          pw.Text(
+                            item.codigoReferencia,
+                            style: pw.TextStyle(fontSize: 8.5, color: PdfColors.blueGrey800),
+                          ),
+                        ],
+                      ),
+                    ),
+                    pw.SizedBox(height: 6),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColors.amber50,
+                        borderRadius: pw.BorderRadius.circular(4),
+                        border: pw.Border.all(color: PdfColors.amber200, width: 0.5),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            '📊 Medición y Evidencias Técnicas:',
+                            style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: PdfColors.amber900),
+                          ),
+                          pw.SizedBox(height: 4),
+                          pw.Text(
+                            item.medicion,
+                            style: pw.TextStyle(fontSize: 9, color: PdfColors.amber800),
+                          ),
+                          pw.SizedBox(height: 4),
+                          pw.Text(
+                            item.evidenciasTecnicas,
+                            style: pw.TextStyle(fontSize: 9, color: PdfColors.amber800),
+                          ),
+                        ],
+                      ),
+                    ),
+                    pw.SizedBox(height: 8),
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.end,
+                      children: [
+                        pw.Container(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: pw.BoxDecoration(
+                            color: approved ? PdfColors.green700 : PdfColors.orange700,
+                            borderRadius: pw.BorderRadius.circular(12),
+                          ),
+                          child: pw.Text(
+                            item.estado.toUpperCase(),
+                            style: pw.TextStyle(
+                              fontSize: 9,
+                              fontWeight: pw.FontWeight.bold,
+                              color: PdfColors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
+
 }
+
 

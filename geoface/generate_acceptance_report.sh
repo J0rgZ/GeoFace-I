@@ -22,3 +22,4 @@ echo "  REPORTE GENERADO CORRECTAMENTE"
 echo "========================================"
 ls test/reporte_aceptacion_*.pdf 2>/dev/null || echo "Aún no se generó ningún archivo"
 
+
