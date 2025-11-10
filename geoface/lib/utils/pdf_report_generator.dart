@@ -24,6 +24,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:collection/collection.dart';
 import '../controllers/reporte_controller.dart';
 import '../models/asistencia.dart';
 import '../models/empleado.dart';
@@ -44,7 +45,6 @@ class PdfReportGenerator {
   static const _warningColor = PdfColors.orange600;
   static const _errorColor = PdfColors.red600;
 
-  static const _logoAssetPath = 'assets/images/logo.png'; // <- ¡Asegúrate de que esta ruta sea correcta!
   static const _fontRegularPath = 'assets/fonts/Roboto-Regular.ttf';
   static const _fontBoldPath = 'assets/fonts/Roboto-Bold.ttf';
   
@@ -86,69 +86,71 @@ class PdfReportGenerator {
     }
   }
 
-  /// Carga el logo de la empresa de forma segura.
-  Future<pw.ImageProvider?> _loadLogo() async {
-    try {
-      final logoData = await rootBundle.load(_logoAssetPath);
-      return pw.MemoryImage(logoData.buffer.asUint8List());
-    } catch (e) {
-      log('Error al cargar el logo: $e. El logo no se mostrará.');
-      return null;
-    }
-  }
 
   /// Genera y muestra la pantalla para compartir/imprimir el PDF.
-  Future<void> generateAndSharePdf() async {
-    final theme = await _loadThemeData();
-    if (theme == null) {
-      // Aquí podrías mostrar un SnackBar o Toast al usuario informando del error.
-      log("No se pudo generar el PDF por un problema con las fuentes.");
-      return;
-    }
+  /// Retorna true si se generó exitosamente, false en caso de error.
+  Future<bool> generateAndSharePdf() async {
+    try {
+      // Validar que hay datos para el reporte
+      final diasConAsistencias = reporte.asistenciasPorDia.keys.toList();
+      final diasConAusencias = reporte.ausenciasPorDia.keys.toList();
+      
+      // Combinar todos los días únicos y ordenarlos
+      final todosLosDias = {...diasConAsistencias, ...diasConAusencias}.toList()..sort();
+      
+      final tieneDatos = todosLosDias.isNotEmpty;
+      
+      if (!tieneDatos) {
+        log("No hay datos para generar el reporte PDF.");
+        return false;
+      }
 
-    final logo = await _loadLogo();
-    final doc = pw.Document();
-    
-    // Ordenar los días para asegurar una secuencia cronológica en el reporte.
-    final diasOrdenados = reporte.asistenciasPorDia.keys.toList()..sort();
+      final theme = await _loadThemeData();
+      if (theme == null) {
+        log("No se pudo cargar las fuentes para el PDF.");
+        return false;
+      }
 
-    // Comprobación para manejar reportes sin datos.
-    if (diasOrdenados.isEmpty && reporte.ausenciasPorDia.isEmpty) {
-       doc.addPage(_buildEmptyReportPage(theme));
-    } else {
-      final fechaFinReporte = diasOrdenados.isNotEmpty ? diasOrdenados.last : reporte.resumen.fecha;
+      final doc = pw.Document();
+      final fechaFinReporte = todosLosDias.isNotEmpty ? todosLosDias.last : reporte.resumen.fecha;
+      final fechaInicioReporte = todosLosDias.isNotEmpty ? todosLosDias.first : reporte.resumen.fecha;
 
       doc.addPage(
         pw.MultiPage(
           theme: theme,
           pageFormat: PdfPageFormat.a4,
           orientation: pw.PageOrientation.portrait,
-          header: (context) => _buildHeader(context, logo),
+          margin: const pw.EdgeInsets.all(40),
+          header: (context) => _buildHeader(context),
           footer: (context) => _buildFooter(context),
           build: (context) => [
-            _buildTitle(fechaFinReporte),
+            _buildTitle(fechaInicioReporte, fechaFinReporte),
             pw.SizedBox(height: 20),
             _buildSummaryTable(),
             pw.SizedBox(height: 25),
-            _buildDetails(diasOrdenados),
+            _buildResumenPorEmpleado(),
+            pw.SizedBox(height: 25),
+            _buildDetails(todosLosDias),
           ],
         ),
       );
-    }
 
-    // Usar 'printing' para mostrar, compartir o imprimir el PDF.
-    // NOTA: Para que 'es' funcione correctamente, asegúrate de haber inicializado
-    // los locales en tu main.dart:
-    // await initializeDateFormatting('es_ES', null);
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => doc.save(),
-      name: 'reporte_asistencia_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.pdf',
-    );
+      // Usar 'printing' para mostrar, compartir o imprimir el PDF.
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => doc.save(),
+        name: 'reporte_asistencia_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.pdf',
+      );
+      
+      return true;
+    } catch (e) {
+      log('Error al generar el PDF: $e');
+      return false;
+    }
   }
   
   // --- Widgets de construcción del PDF ---
 
-  pw.Widget _buildHeader(pw.Context context, pw.ImageProvider? logo) {
+  pw.Widget _buildHeader(pw.Context context) {
     return pw.Container(
       decoration: const pw.BoxDecoration(
         border: pw.Border(bottom: pw.BorderSide(color: _lightGreyColor, width: 2)),
@@ -158,8 +160,18 @@ class PdfReportGenerator {
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Text('Reporte de Asistencia', style: pw.TextStyle(color: _darkGreyColor, fontSize: 12)),
-          if (logo != null) pw.Image(logo, height: 40),
+          pw.Text(
+            'GeoFace - Reporte de Asistencia',
+            style: pw.TextStyle(
+              color: _darkGreyColor,
+              fontSize: 14,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          pw.Text(
+            DateFormat('dd/MM/yyyy HH:mm', 'es').format(DateTime.now()),
+            style: pw.TextStyle(color: _darkGreyColor, fontSize: 10),
+          ),
         ],
       ),
     );
@@ -176,15 +188,49 @@ class PdfReportGenerator {
     );
   }
   
-  pw.Widget _buildTitle(DateTime fechaFin) {
+  pw.Widget _buildTitle(DateTime fechaInicio, DateTime fechaFin) {
     final resumen = reporte.resumen;
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text('Reporte Detallado de Asistencia', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: _primaryColor)),
-        pw.SizedBox(height: 8),
-        pw.Text('Sede: ${resumen.sedeNombre}', style: pw.TextStyle(fontSize: 16)),
-        pw.Text('Periodo: ${DateFormat.yMMMd('es').format(resumen.fecha)} al ${DateFormat.yMMMd('es').format(fechaFin)}', style: pw.TextStyle(fontSize: 16)),
+        pw.Text(
+          'Reporte Detallado de Asistencia',
+          style: pw.TextStyle(
+            fontSize: 24,
+            fontWeight: pw.FontWeight.bold,
+            color: _primaryColor,
+          ),
+        ),
+        pw.SizedBox(height: 12),
+        pw.Container(
+          padding: const pw.EdgeInsets.all(12),
+          decoration: pw.BoxDecoration(
+            color: _accentColor,
+            borderRadius: pw.BorderRadius.circular(8),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                'Sede: ${resumen.sedeNombre}',
+                style: pw.TextStyle(
+                  fontSize: 14,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Text(
+                'Período: ${DateFormat('dd/MM/yyyy', 'es').format(fechaInicio)} - ${DateFormat('dd/MM/yyyy', 'es').format(fechaFin)}',
+                style: const pw.TextStyle(fontSize: 12),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Text(
+                'Total de Empleados: ${resumen.totalEmpleados}',
+                style: const pw.TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+        ),
         pw.SizedBox(height: 15),
         pw.Divider(thickness: 1.5, color: _lightGreyColor),
       ],
@@ -218,6 +264,182 @@ class PdfReportGenerator {
         pw.SizedBox(height: 4),
         pw.Text(value, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 18, color: _primaryColor)),
       ]
+    );
+  }
+  
+  /// Construye la sección de resumen por empleado, agrupada por sede si hay múltiples sedes
+  pw.Widget _buildResumenPorEmpleado() {
+    if (reporte.estadisticasPorEmpleado.isEmpty) {
+      return pw.SizedBox.shrink();
+    }
+    
+    // Verificar si hay múltiples sedes
+    final sedesUnicas = reporte.estadisticasPorEmpleado.map((e) => e.sedeId).toSet();
+    final hayMultiplesSedes = sedesUnicas.length > 1;
+    
+    if (hayMultiplesSedes) {
+      // Agrupar por sede
+      final estadisticasPorSede = groupBy<EstadisticaEmpleado, String>(
+        reporte.estadisticasPorEmpleado,
+        (e) => e.sedeId,
+      );
+      
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'Resumen por Empleado',
+            style: pw.TextStyle(
+              fontSize: 18,
+              fontWeight: pw.FontWeight.bold,
+              color: _primaryColor,
+            ),
+          ),
+          pw.SizedBox(height: 15),
+          ...estadisticasPorSede.entries.map((entry) {
+            final estadisticas = entry.value;
+            final nombreSede = estadisticas.first.sedeNombre;
+            
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Container(
+                  width: double.infinity,
+                  padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                  decoration: pw.BoxDecoration(
+                    color: _primaryColor,
+                    borderRadius: const pw.BorderRadius.only(
+                      topLeft: pw.Radius.circular(8),
+                      topRight: pw.Radius.circular(8),
+                    ),
+                  ),
+                  child: pw.Text(
+                    'Sede: $nombreSede',
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.white,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                _buildTablaEmpleados(estadisticas),
+                pw.Container(
+                  height: 1,
+                  color: _lightGreyColor,
+                ),
+                pw.SizedBox(height: 15),
+              ],
+            );
+          }),
+        ],
+      );
+    } else {
+      // Solo una sede, mostrar directamente
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'Resumen por Empleado',
+            style: pw.TextStyle(
+              fontSize: 18,
+              fontWeight: pw.FontWeight.bold,
+              color: _primaryColor,
+            ),
+          ),
+          pw.SizedBox(height: 15),
+          _buildTablaEmpleados(reporte.estadisticasPorEmpleado),
+        ],
+      );
+    }
+  }
+  
+  /// Construye la tabla de estadísticas de empleados
+  pw.Widget _buildTablaEmpleados(List<EstadisticaEmpleado> estadisticas) {
+    final headers = ['Empleado', 'Asistencias', 'Ausencias', 'Tardanzas', '% Asistencia'];
+    
+    return pw.Table(
+      border: pw.TableBorder.all(color: _lightGreyColor),
+      columnWidths: {
+        0: const pw.FlexColumnWidth(3),
+        1: const pw.FlexColumnWidth(1.2),
+        2: const pw.FlexColumnWidth(1.2),
+        3: const pw.FlexColumnWidth(1.2),
+        4: const pw.FlexColumnWidth(1.2),
+      },
+      children: [
+        // Fila de cabecera
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: _accentColor),
+          children: headers.map((header) => pw.Padding(
+            padding: const pw.EdgeInsets.all(8),
+            child: pw.Text(
+              header,
+              style: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                fontSize: 10,
+              ),
+              textAlign: pw.TextAlign.center,
+            ),
+          )).toList(),
+        ),
+        
+        // Filas de datos
+        for (var i = 0; i < estadisticas.length; i++)
+          _buildFilaEmpleado(estadisticas[i], i % 2 == 0),
+      ],
+    );
+  }
+  
+  /// Construye una fila de la tabla de empleados
+  pw.TableRow _buildFilaEmpleado(EstadisticaEmpleado estadistica, bool isEven) {
+    final style = pw.TextStyle(fontSize: 9);
+    
+    return pw.TableRow(
+      decoration: pw.BoxDecoration(
+        color: isEven ? PdfColors.white : _accentColor,
+      ),
+      children: [
+        pw.Padding(
+          padding: const pw.EdgeInsets.all(6),
+          child: pw.Text(
+            estadistica.nombreEmpleado,
+            style: style,
+            maxLines: 2,
+          ),
+        ),
+        pw.Padding(
+          padding: const pw.EdgeInsets.all(6),
+          child: pw.Text(
+            estadistica.totalAsistencias.toString(),
+            style: style.copyWith(color: _successColor),
+            textAlign: pw.TextAlign.center,
+          ),
+        ),
+        pw.Padding(
+          padding: const pw.EdgeInsets.all(6),
+          child: pw.Text(
+            estadistica.totalAusencias.toString(),
+            style: style.copyWith(color: _errorColor),
+            textAlign: pw.TextAlign.center,
+          ),
+        ),
+        pw.Padding(
+          padding: const pw.EdgeInsets.all(6),
+          child: pw.Text(
+            estadistica.totalTardanzas.toString(),
+            style: style.copyWith(color: _warningColor),
+            textAlign: pw.TextAlign.center,
+          ),
+        ),
+        pw.Padding(
+          padding: const pw.EdgeInsets.all(6),
+          child: pw.Text(
+            '${estadistica.porcentajeAsistencia.toStringAsFixed(1)}%',
+            style: style,
+            textAlign: pw.TextAlign.center,
+          ),
+        ),
+      ],
     );
   }
   
@@ -359,24 +581,4 @@ class PdfReportGenerator {
     );
   }
   
-  /// Página que se muestra cuando no hay datos para el reporte.
-  pw.Page _buildEmptyReportPage(pw.ThemeData theme) {
-    return pw.Page(
-      theme: theme,
-      build: (context) {
-        return pw.Center(
-          child: pw.Column(
-            mainAxisAlignment: pw.MainAxisAlignment.center,
-            children: [
-              pw.Text('Reporte de Asistencia', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: _primaryColor)),
-              pw.SizedBox(height: 30),
-              pw.Text('No hay datos disponibles para el periodo seleccionado.', style: pw.TextStyle(fontSize: 16, color: _darkGreyColor)),
-              pw.SizedBox(height: 10),
-              pw.Text('Por favor, intente con otro rango de fechas o sede.', style: pw.TextStyle(fontSize: 14, color: PdfColors.grey)),
-            ],
-          ),
-        );
-      },
-    );
-  }
 }

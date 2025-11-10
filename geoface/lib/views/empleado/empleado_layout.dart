@@ -136,46 +136,25 @@ class _EmpleadoLayoutState extends State<EmpleadoLayout> {
         foregroundColor: colorScheme.onSurface,
         elevation: 0,
         actions: [
-          // Menú de opciones
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: colorScheme.onSurface),
-            onSelected: (value) {
-              switch (value) {
-                case 'cambiar_contrasena':
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const CambiarContrasenaEmpleadoPage(),
-                    ),
-                  );
-                  break;
-                case 'cerrar_sesion':
-                  _cerrarSesion();
-                  break;
-              }
+          // Botón de cambiar contraseña
+          IconButton(
+            icon: Icon(Icons.lock_reset, color: colorScheme.onSurface),
+            tooltip: 'Cambiar Contraseña',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const CambiarContrasenaEmpleadoPage(),
+                ),
+              );
             },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'cambiar_contrasena',
-                child: Row(
-                  children: [
-                    Icon(Icons.lock_reset),
-                    SizedBox(width: 8),
-                    Text('Cambiar Contraseña'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'cerrar_sesion',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout),
-                    SizedBox(width: 8),
-                    Text('Cerrar Sesión'),
-                  ],
-                ),
-              ),
-            ],
           ),
+          // Botón de cierre de sesión más visible
+          IconButton(
+            icon: Icon(Icons.logout, color: colorScheme.error),
+            tooltip: 'Cerrar Sesión',
+            onPressed: _cerrarSesion,
+          ),
+          const SizedBox(width: 8),
         ],
       ),
       body: const HistorialAsistenciasPage(),
@@ -186,11 +165,28 @@ class _EmpleadoLayoutState extends State<EmpleadoLayout> {
     if (!mounted) return;
     
     final navigator = Navigator.of(context);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
     final confirmacion = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Cerrar Sesión'),
-        content: const Text('¿Estás seguro de que deseas cerrar sesión?'),
+        icon: Icon(
+          Icons.logout_rounded,
+          size: 48,
+          color: colorScheme.error,
+        ),
+        title: const Text(
+          'Cerrar Sesión',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          '¿Estás seguro de que deseas cerrar sesión?',
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -198,6 +194,9 @@ class _EmpleadoLayoutState extends State<EmpleadoLayout> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.error,
+            ),
             child: const Text('Cerrar Sesión'),
           ),
         ],

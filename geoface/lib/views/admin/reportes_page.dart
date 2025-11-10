@@ -42,6 +42,7 @@ class ReportesPage extends StatefulWidget {
 
 class _ReportesPageState extends State<ReportesPage> {
   DateTime _selectedMonth = DateTime.now();
+  bool _mostrarDiasSinDatos = false; // Filtro para mostrar/ocultar días sin datos
 
   @override
   void initState() {
@@ -83,15 +84,61 @@ class _ReportesPageState extends State<ReportesPage> {
                   selectedMonth: _selectedMonth,
                   sedes: sedeController.sedes,
                   onSelectMonth: () => _selectMonth(context),
-                  onGenerarReporte: (sedeId) {
+                  onGenerarReporte: (sedeId) async {
                     final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
                     final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0).add(const Duration(hours: 23, minutes: 59));
-                    reporteController.generarReporteDetallado(
-                      fechaInicio: startOfMonth,
-                      fechaFin: endOfMonth,
-                      sedes: sedeController.sedes,
-                      sedeId: sedeId,
+                    
+                    // Validación visual antes de generar
+                    final confirmacion = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Row(
+                          children: [
+                            Icon(Icons.assessment_outlined, color: Colors.blue),
+                            SizedBox(width: 12),
+                            Text('Generar Reporte'),
+                          ],
+                        ),
+                        content: Text(
+                          '¿Desea generar el reporte de asistencia para\n${DateFormat.yMMMM('es').format(_selectedMonth)}?',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: const Text('Cancelar'),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.of(context).pop(true),
+                            child: const Text('Generar'),
+                          ),
+                        ],
+                      ),
                     );
+                    
+                    if (confirmacion == true && mounted) {
+                      await reporteController.generarReporteDetallado(
+                        fechaInicio: startOfMonth,
+                        fechaFin: endOfMonth,
+                        sedes: sedeController.sedes,
+                        sedeId: sedeId,
+                      );
+                      
+                      // Mostrar mensaje de error si existe
+                      if (reporteController.errorMessage != null && mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(reporteController.errorMessage!),
+                            backgroundColor: Colors.red,
+                            duration: const Duration(seconds: 4),
+                            action: SnackBarAction(
+                              label: 'Cerrar',
+                              textColor: Colors.white,
+                              onPressed: () {},
+                            ),
+                          ),
+                        );
+                      }
+                    }
                   },
                 ),
               ),
@@ -121,21 +168,67 @@ class _ReportesPageState extends State<ReportesPage> {
 
   Widget _buildLoadingSkeleton() {
     return SliverToBoxAdapter(
-      child: Shimmer.fromColors(
-        baseColor: Theme.of(context).colorScheme.surfaceContainer,
-        highlightColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(height: 180, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20))),
-            const SizedBox(height: 24),
-            Container(width: 150, height: 28, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8))),
-            const SizedBox(height: 16),
-            Container(height: 80, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16))),
-            const SizedBox(height: 12),
-            Container(height: 80, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16))),
-          ],
-        ),
+      child: Column(
+        children: [
+          Shimmer.fromColors(
+            baseColor: Theme.of(context).colorScheme.surfaceContainer,
+            highlightColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  width: 150,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Center(
+            child: Column(
+              children: [
+                CircularProgressIndicator(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Generando reporte...',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -147,30 +240,226 @@ class _ReportesPageState extends State<ReportesPage> {
     final diasEnRango = endOfMonth.difference(startOfMonth).inDays;
     final todosLosDiasDelReporte = List.generate(diasEnRango + 1, (index) => startOfMonth.add(Duration(days: index))).reversed.toList();
     
+    // Filtrar días sin datos si el filtro está activado
+    final diasParaMostrar = _mostrarDiasSinDatos
+        ? todosLosDiasDelReporte
+        : todosLosDiasDelReporte.where((dia) {
+            final asistenciasDelDia = reporteController.reporte!.asistenciasPorDia[dia] ?? [];
+            final ausenciasDelDia = reporteController.reporte!.ausenciasPorDia[dia] ?? [];
+            return asistenciasDelDia.isNotEmpty || ausenciasDelDia.isNotEmpty;
+          }).toList();
+    
     return SliverList.list(
       children: [
         _ResumenReporteCard(
           resumen: reporteController.reporte!.resumen,
           isExporting: reporteController.isExporting,
-          onExport: () => reporteController.exportarReporteAPDF(),
+          onExport: () => _exportarReporteConConfirmacion(reporteController),
         ),
         const SizedBox(height: 24),
+        // Barra de filtros y título
         Padding(
-          padding: const EdgeInsets.only(left: 8, bottom: 8),
-          child: Text('Detalle Diario', style: Theme.of(context).textTheme.titleLarge),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Detalle Diario',
+                      style: Theme.of(context).textTheme.titleLarge,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${diasParaMostrar.length} días',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(
+                    Icons.filter_list,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: FilterChip(
+                      label: Text(
+                        _mostrarDiasSinDatos ? 'Todos los días' : 'Solo con datos',
+                        style: const TextStyle(fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      selected: _mostrarDiasSinDatos,
+                      onSelected: (value) {
+                        setState(() {
+                          _mostrarDiasSinDatos = value;
+                        });
+                      },
+                      avatar: Icon(
+                        _mostrarDiasSinDatos ? Icons.check_circle : Icons.radio_button_unchecked,
+                        size: 16,
+                      ),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        ...todosLosDiasDelReporte.map((dia) {
-          final asistenciasDelDia = reporteController.reporte!.asistenciasPorDia[dia] ?? [];
-          final ausenciasDelDia = reporteController.reporte!.ausenciasPorDia[dia] ?? [];
-          return _DiaExpansionTile(
-            dia: dia,
-            asistencias: asistenciasDelDia,
-            ausentes: ausenciasDelDia,
-            getEmpleadoById: reporteController.getEmpleadoById,
-          );
-        }),
+        const SizedBox(height: 16),
+        if (diasParaMostrar.isEmpty)
+          Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.inbox_outlined,
+                  size: 64,
+                  color: Colors.grey[400],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No hay datos para mostrar',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'No se encontraron registros de asistencia para el período seleccionado.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.grey[600],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          )
+        else
+          ...diasParaMostrar.map((dia) {
+            final asistenciasDelDia = reporteController.reporte!.asistenciasPorDia[dia] ?? [];
+            final ausenciasDelDia = reporteController.reporte!.ausenciasPorDia[dia] ?? [];
+            return _DiaExpansionTile(
+              dia: dia,
+              asistencias: asistenciasDelDia,
+              ausentes: ausenciasDelDia,
+              getEmpleadoById: reporteController.getEmpleadoById,
+            );
+          }),
       ],
     );
+  }
+
+  Future<void> _exportarReporteConConfirmacion(ReporteController reporteController) async {
+    // Validación: Verificar que hay un reporte generado
+    if (reporteController.reporte == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay un reporte generado para exportar.'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    // Diálogo de confirmación
+    final confirmacion = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.picture_as_pdf, color: Colors.red, size: 48),
+        title: const Text('Exportar Reporte a PDF'),
+        content: const Text(
+          '¿Desea exportar el reporte actual a PDF?\n\nPodrá compartirlo o guardarlo desde la vista previa.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.picture_as_pdf),
+            label: const Text('Exportar'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmacion == true && mounted) {
+      final exito = await reporteController.exportarReporteAPDF();
+      
+      if (mounted) {
+        if (exito) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text('Reporte exportado exitosamente'),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.error, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      reporteController.errorMessage ?? 'Error al exportar el reporte',
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+              behavior: SnackBarBehavior.floating,
+              action: SnackBarAction(
+                label: 'Cerrar',
+                textColor: Colors.white,
+                onPressed: () {},
+              ),
+            ),
+          );
+        }
+      }
+    }
   }
 }
 
@@ -263,8 +552,26 @@ class _ResumenReporteCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.surfaceContainerHighest,
+            colorScheme.surfaceContainer,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colorScheme.outline.withValues(alpha: 0.2),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -273,33 +580,78 @@ class _ResumenReporteCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(
-                  'Resumen: ${resumen.sedeNombre}',
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Resumen del Reporte',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      resumen.sedeNombre,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              SizedBox(
-                height: 40,
-                child: OutlinedButton.icon(
-                  icon: isExporting
-                      ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5, color: colorScheme.primary))
-                      : const Icon(Icons.picture_as_pdf_outlined, size: 20),
-                  label: Text(isExporting ? 'Exportando...' : 'Exportar'),
-                  onPressed: isExporting ? null : onExport,
+              const SizedBox(width: 12),
+              FilledButton.icon(
+                icon: isExporting
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.picture_as_pdf, size: 20),
+                label: Text(isExporting ? 'Exportando...' : 'Exportar PDF'),
+                onPressed: isExporting ? null : onExport,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
               ),
             ],
           ),
-          const Divider(height: 24),
+          const Divider(height: 32),
           // Usamos Wrap para ser flexible en pantallas pequeñas
           Wrap(
             spacing: 16,
             runSpacing: 16,
             children: [
-              _ResumenStatItem(icon: Icons.check_circle_outline, color: colorScheme.primary, label: 'Asistencias', value: resumen.totalAsistencias.toString()),
-              _ResumenStatItem(icon: Icons.cancel_outlined, color: colorScheme.error, label: 'Ausencias', value: resumen.totalAusencias.toString()),
-              _ResumenStatItem(icon: Icons.watch_later_outlined, color: Colors.orange.shade700, label: 'Tardanzas', value: resumen.totalTardanzas.toString()),
-              _ResumenStatItem(icon: Icons.pie_chart_outline, color: colorScheme.tertiary, label: '% Asistencia', value: '${resumen.porcentajeAsistencia.toStringAsFixed(1)}%'),
+              _ResumenStatItem(
+                icon: Icons.check_circle_outline,
+                color: Colors.green,
+                label: 'Asistencias',
+                value: resumen.totalAsistencias.toString(),
+              ),
+              _ResumenStatItem(
+                icon: Icons.cancel_outlined,
+                color: colorScheme.error,
+                label: 'Ausencias',
+                value: resumen.totalAusencias.toString(),
+              ),
+              _ResumenStatItem(
+                icon: Icons.watch_later_outlined,
+                color: Colors.orange.shade700,
+                label: 'Tardanzas',
+                value: resumen.totalTardanzas.toString(),
+              ),
+              _ResumenStatItem(
+                icon: Icons.pie_chart_outline,
+                color: colorScheme.primary,
+                label: '% Asistencia',
+                value: '${resumen.porcentajeAsistencia.toStringAsFixed(1)}%',
+              ),
             ],
           ),
         ],
@@ -309,25 +661,64 @@ class _ResumenReporteCard extends StatelessWidget {
 }
 
 class _ResumenStatItem extends StatelessWidget {
-  final IconData icon; final Color color; final String label; final String value;
-  const _ResumenStatItem({required this.icon, required this.color, required this.label, required this.value});
+  final IconData icon; 
+  final Color color; 
+  final String label; 
+  final String value;
+  
+  const _ResumenStatItem({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min, // Importante para que Wrap funcione correctamente
-      children: [
-        Icon(icon, color: color, size: 28),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(value, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: color)),
-            Text(label, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-          ],
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withValues(alpha: 0.3),
+          width: 1,
         ),
-      ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+              Text(
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -338,40 +729,138 @@ class _DiaExpansionTile extends StatelessWidget {
   final List<Empleado> ausentes;
   final Empleado? Function(String) getEmpleadoById;
 
-  const _DiaExpansionTile({required this.dia, required this.asistencias, required this.ausentes, required this.getEmpleadoById});
+  const _DiaExpansionTile({
+    required this.dia,
+    required this.asistencias,
+    required this.ausentes,
+    required this.getEmpleadoById,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final noHayRegistros = asistencias.isEmpty && ausentes.isEmpty;
     final colorScheme = theme.colorScheme;
+    final esHoy = dia.year == DateTime.now().year && 
+                  dia.month == DateTime.now().month && 
+                  dia.day == DateTime.now().day;
     
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 0,
       color: colorScheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      clipBehavior: Clip.antiAlias, // Para que el ExpansionTile se ajuste bien
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: esHoy ? colorScheme.primary.withValues(alpha: 0.3) : Colors.transparent,
+          width: 2,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
-        leading: Icon(Icons.calendar_today, color: colorScheme.primary),
-        title: Text(DateFormat.yMMMMEEEEd('es').format(dia), style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-        subtitle: Text('${asistencias.length} Asistencias, ${ausentes.length} Ausencias'),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            Icons.calendar_today,
+            color: colorScheme.primary,
+            size: 20,
+          ),
+        ),
+        title: Text(
+          DateFormat.yMMMMEEEEd('es').format(dia),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Row(
+          children: [
+            if (asistencias.isNotEmpty) ...[
+              Icon(Icons.check_circle, size: 14, color: Colors.green),
+              const SizedBox(width: 4),
+              Text('${asistencias.length} Asistencias'),
+              if (ausentes.isNotEmpty) const SizedBox(width: 12),
+            ],
+            if (ausentes.isNotEmpty) ...[
+              Icon(Icons.cancel, size: 14, color: colorScheme.error),
+              const SizedBox(width: 4),
+              Text('${ausentes.length} Ausencias'),
+            ],
+            if (noHayRegistros)
+              Text(
+                'Sin registros',
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
+          ],
+        ),
         childrenPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Divider(height: 1),
+          Divider(
+            height: 1,
+            color: colorScheme.outline.withValues(alpha: 0.2),
+          ),
           if (noHayRegistros)
-            const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No hay registros para este día.')))
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.event_busy, size: 48, color: Colors.grey[400]),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No hay registros para este día',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
           else ...[
             if (asistencias.isNotEmpty) ...[
-              Padding(padding: const EdgeInsets.all(8.0), child: Text('Asistencias', style: theme.textTheme.titleSmall)),
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Asistencias (${asistencias.length})',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               ...asistencias.map((a) => _buildAsistenciaTile(context, a)),
             ],
             if (ausentes.isNotEmpty) ...[
-              Padding(padding: const EdgeInsets.all(8.0), child: Text('Ausencias', style: theme.textTheme.titleSmall)),
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Row(
+                  children: [
+                    Icon(Icons.cancel, color: colorScheme.error, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Ausencias (${ausentes.length})',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.error,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               ...ausentes.map((e) => _buildAusenciaTile(context, e)),
             ],
-          ]
+          ],
         ],
       ),
     );
@@ -380,38 +869,170 @@ class _DiaExpansionTile extends StatelessWidget {
   Widget _buildAsistenciaTile(BuildContext context, Asistencia asistencia) {
     final empleado = getEmpleadoById(asistencia.empleadoId);
     final horaEntrada = asistencia.fechaHoraEntrada;
-    final horaLimiteHoy = horaEntrada.copyWith(hour: _horaLimiteTardanza.hour, minute: _horaLimiteTardanza.minute);
+    final horaLimiteHoy = horaEntrada.copyWith(
+      hour: _horaLimiteTardanza.hour,
+      minute: _horaLimiteTardanza.minute,
+      second: 0,
+      millisecond: 0,
+      microsecond: 0,
+    );
     final esTardanza = horaEntrada.isAfter(horaLimiteHoy);
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final tieneSalida = asistencia.fechaHoraSalida != null;
     
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: theme.colorScheme.primaryContainer,
-        child: Icon(Icons.person_outline, color: theme.colorScheme.onPrimaryContainer),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: esTardanza 
+              ? Colors.orange.withValues(alpha: 0.3)
+              : Colors.green.withValues(alpha: 0.3),
+          width: 1,
+        ),
       ),
-      title: Text(empleado?.nombreCompleto ?? 'Empleado Desconocido'),
-      subtitle: Text('Entrada: ${DateFormat.jm('es').format(horaEntrada)}'),
-      trailing: esTardanza 
-          ? Chip(
-              label: const Text('Tarde'),
-              backgroundColor: Colors.orange.withAlpha(50),
-              side: BorderSide.none,
-              labelStyle: TextStyle(color: Colors.orange.shade800, fontSize: 12, fontWeight: FontWeight.bold),
-              visualDensity: VisualDensity.compact,
-            ) 
-          : null,
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: esTardanza 
+              ? Colors.orange.shade50
+              : Colors.green.shade50,
+          child: Icon(
+            Icons.person,
+            color: esTardanza 
+                ? Colors.orange.shade700
+                : Colors.green.shade700,
+            size: 20,
+          ),
+        ),
+        title: Text(
+          empleado?.nombreCompleto ?? 'Empleado Desconocido',
+          style: theme.textTheme.bodyLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(Icons.login, size: 14, color: Colors.green.shade700),
+                const SizedBox(width: 4),
+                Text('Entrada: ${DateFormat.jm('es').format(horaEntrada)}'),
+              ],
+            ),
+            if (tieneSalida) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(Icons.logout, size: 14, color: Colors.red.shade700),
+                  const SizedBox(width: 4),
+                  Text('Salida: ${DateFormat.jm('es').format(asistencia.fechaHoraSalida!)}'),
+                ],
+              ),
+            ],
+          ],
+        ),
+        trailing: esTardanza 
+            ? Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.orange.shade300,
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.watch_later, size: 14, color: Colors.orange.shade800),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Tarde',
+                      style: TextStyle(
+                        color: Colors.orange.shade800,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ) 
+            : Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.check_circle,
+                  size: 18,
+                  color: Colors.green.shade700,
+                ),
+              ),
+      ),
     );
   }
   
   Widget _buildAusenciaTile(BuildContext context, Empleado empleado) {
     final theme = Theme.of(context);
-    return ListTile(
-       leading: CircleAvatar(
-         backgroundColor: theme.colorScheme.errorContainer,
-         child: Icon(Icons.person_off_outlined, color: theme.colorScheme.onErrorContainer),
-       ),
-       title: Text(empleado.nombreCompleto),
-       subtitle: Text('Ausente', style: TextStyle(color: theme.colorScheme.error)),
+    final colorScheme = theme.colorScheme;
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.error.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: colorScheme.errorContainer,
+          child: Icon(
+            Icons.person_off,
+            color: colorScheme.onErrorContainer,
+            size: 20,
+          ),
+        ),
+        title: Text(
+          empleado.nombreCompleto,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Row(
+          children: [
+            Icon(Icons.cancel, size: 14, color: colorScheme.error),
+            const SizedBox(width: 4),
+            Text(
+              'Ausente',
+              style: TextStyle(
+                color: colorScheme.error,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        trailing: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: colorScheme.errorContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            Icons.close,
+            size: 18,
+            color: colorScheme.onErrorContainer,
+          ),
+        ),
+      ),
     );
   }
 }

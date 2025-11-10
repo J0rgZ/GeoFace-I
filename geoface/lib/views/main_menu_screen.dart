@@ -1078,8 +1078,6 @@ class _MainMenuScreenState extends State<MainMenuScreen>
                   ),
                 ),
                 SizedBox(height: config.padding),
-                _buildTechnicalInfo(config),
-                SizedBox(height: config.padding),
                 _buildCopyright(config),
               ],
             ),
@@ -1143,7 +1141,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
                 ),
               ),
               Text(
-                'Versión 2.3.1',
+                'Versión 1.0.0',
                 style: TextStyle(
                   fontSize: config.statusSize,
                   color: Colors.grey[600],
@@ -1153,55 +1151,6 @@ class _MainMenuScreenState extends State<MainMenuScreen>
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildTechnicalInfo(ResponsiveConfig config) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: config.padding, vertical: config.margin),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildInfoRow(config, Icons.build, 'Build', '20250531-TimeSync-V2'),
-          _buildInfoRow(config, Icons.schedule, 'Fuente de Tiempo', _timeService.timeSource),
-          _buildInfoRow(config, Icons.cloud, 'Estado de Conexión', _timeService.isOnline ? 'Conectado' : 'Sin conexión'),
-          _buildInfoRow(config, Icons.location_on, 'Zona Horaria', 'America/Lima (UTC-5)'),
-          _buildInfoRow(config, Icons.phone_android, 'Plataforma', 'Flutter Mobile'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(ResponsiveConfig config, IconData icon, String label, String value) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(
-        icon,
-        size: config.iconSize * 0.8,
-        color: _primaryColor,
-      ),
-      title: Text(
-        label,
-        style: TextStyle(
-          fontSize: config.statusSize + 1,
-          fontWeight: FontWeight.w600,
-          color: Colors.grey[800],
-        ),
-      ),
-      subtitle: Text(
-        value,
-        style: TextStyle(
-          fontSize: config.statusSize,
-          color: Colors.grey[600],
-        ),
-        overflow: TextOverflow.ellipsis,
-      ),
-      dense: true,
     );
   }
 

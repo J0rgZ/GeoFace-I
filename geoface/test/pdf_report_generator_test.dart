@@ -65,6 +65,7 @@ void main() {
         resumen: resumen,
         asistenciasPorDia: asistenciasPorDia,
         ausenciasPorDia: ausenciasPorDia,
+        estadisticasPorEmpleado: [],
       );
 
       // Assert
@@ -152,6 +153,7 @@ void main() {
         resumen: resumen,
         asistenciasPorDia: {},
         ausenciasPorDia: {},
+        estadisticasPorEmpleado: [],
       );
 
       // Assert
