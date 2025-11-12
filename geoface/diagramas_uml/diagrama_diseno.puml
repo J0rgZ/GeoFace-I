@@ -1,0 +1,185 @@
+@startuml Diagrama_Clases_Diseno
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FFFFFF
+skinparam class {
+    BackgroundColor #F5F5F5
+    BorderColor #6A1B9A
+    ArrowColor #333333
+    FontColor #000000
+    FontSize 9
+}
+skinparam arrow {
+    Color #333333
+    Thickness 2
+}
+
+title Diagrama de Clases - Diseño\nArquitectura Técnica GeoFace
+
+package "Models" {
+    class Empleado
+    class Sede
+    class Asistencia
+    class Usuario
+    class Biometrico
+    class ApiConfig
+}
+
+package "Controllers" {
+    class AuthController {
+        -FirebaseAuth _auth
+        -FirebaseFirestore _firestore
+        -AuthStatus _status
+        -Usuario? _currentUser
+        +AuthStatus status
+        +Usuario? currentUser
+        +bool isAdmin
+        +bool isEmpleado
+        +Future signIn()
+        +Future signOut()
+        +void notifyListeners()
+    }
+    
+    class EmpleadoController {
+        -EmpleadoService _empleadoService
+        -List~Empleado~ _empleados
+        +List~Empleado~ empleados
+        +Future getEmpleados()
+        +Future addEmpleado()
+        +Future updateEmpleado()
+        +void notifyListeners()
+    }
+    
+    class SedeController {
+        -SedeService _sedeService
+        -List~Sede~ _sedes
+        +List~Sede~ sedes
+        +Future getSedes()
+        +Future addSede()
+        +void notifyListeners()
+    }
+    
+    class AsistenciaController {
+        -AsistenciaService _asistenciaService
+        -SedeService _sedeService
+        -LocationService _locationService
+        +Future registrarEntrada()
+        +Future registrarSalida()
+        +void notifyListeners()
+    }
+    
+    class ReporteController {
+        -EmpleadoService _empleadoService
+        -AsistenciaService _asistenciaService
+        +Future generarReporte()
+        +Future exportarPDF()
+        +void notifyListeners()
+    }
+    
+    class BiometricoController
+    class AdministradorController
+    class UserController
+    class ApiConfigController
+    class ThemeProvider
+}
+
+package "Services" {
+    class EmpleadoService {
+        -FirebaseFirestore _firestore
+        +Future~List~Empleado~~ getEmpleados()
+        +Future~Empleado?~ getEmpleadoById()
+        +Future addEmpleado()
+    }
+    
+    class SedeService {
+        -FirebaseFirestore _firestore
+        +Future~List~Sede~~ getSedes()
+        +Future~Sede?~ getSedeById()
+        +Future addSede()
+    }
+    
+    class AsistenciaService {
+        -FirebaseFirestore _firestore
+        +Future~List~Asistencia~~ getAsistenciasByEmpleado()
+        +Future registrarEntrada()
+        +Future registrarSalida()
+    }
+    
+    class AuthService
+    class AdministradorService
+    class BiometricoService
+    class ApiConfigService
+    class LocationService
+    class TimeService
+    class UsuarioService
+}
+
+package "Utils" {
+    class PdfReportGenerator {
+        +Future generarReportePDF()
+        +Future generarReporteAceptacion()
+    }
+    
+    class LocationHelper {
+        +static double calcularDistancia()
+        +static bool estaDentroDelRadio()
+    }
+    
+    class DateUtils {
+        +static String formatearFecha()
+        +static String formatearHora()
+    }
+    
+    class Validators {
+        +static String? validarEmail()
+        +static String? validarDNI()
+    }
+}
+
+' Relaciones Controllers -> Services
+EmpleadoController --> EmpleadoService
+SedeController --> SedeService
+AsistenciaController --> AsistenciaService
+AsistenciaController --> SedeService
+AsistenciaController --> LocationService
+ReporteController --> EmpleadoService
+ReporteController --> AsistenciaService
+BiometricoController --> BiometricoService
+AdministradorController --> AdministradorService
+UserController --> UsuarioService
+ApiConfigController --> ApiConfigService
+AuthController --> AuthService
+
+' Relaciones Controllers -> Models
+AuthController --> Usuario
+EmpleadoController --> Empleado
+SedeController --> Sede
+AsistenciaController --> Asistencia
+ReporteController --> EstadisticaAsistencia
+BiometricoController --> Biometrico
+AdministradorController --> Usuario
+ApiConfigController --> ApiConfig
+
+' Relaciones Services -> Models
+EmpleadoService --> Empleado
+SedeService --> Sede
+AsistenciaService --> Asistencia
+AsistenciaService --> TimeService
+AdministradorService --> Usuario
+BiometricoService --> Biometrico
+ApiConfigService --> ApiConfig
+UsuarioService --> Usuario
+
+' Relaciones Services -> Utils
+ReporteController --> PdfReportGenerator
+AsistenciaController --> LocationHelper
+AsistenciaController --> TimeService
+
+' Relaciones Models -> Models
+Empleado --> Sede
+Asistencia --> Empleado
+Asistencia --> Sede
+Biometrico --> Empleado
+Usuario --> Empleado
+
+@enduml

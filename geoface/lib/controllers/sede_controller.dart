@@ -4,7 +4,7 @@
 // @Descripción:  Este archivo contiene la lógica de negocio para la gestión de
 //               las sedes de la empresa. Se encarga de las operaciones CRUD
 //               (Crear, Leer, Actualizar, Eliminar) interactuando con el
-//               `FirebaseService` y gestiona el estado de la UI (carga y errores)
+//               `SedeService` y gestiona el estado de la UI (carga y errores)
 //               relacionado con estas operaciones.
 //
 // @NombreControlador: SedeController

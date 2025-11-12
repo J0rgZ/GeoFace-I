@@ -1,0 +1,134 @@
+@startuml Diagrama_Clases_Analisis
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FFFFFF
+skinparam class {
+    BackgroundColor #F5F5F5
+    BorderColor #6A1B9A
+    ArrowColor #333333
+    FontColor #000000
+    FontSize 10
+}
+skinparam arrow {
+    Color #333333
+    Thickness 2
+}
+
+title Diagrama de Clases - Análisis\nSistema GeoFace
+
+class Empleado {
+    +String id
+    +String nombre
+    +String apellidos
+    +String correo
+    +String cargo
+    +String sedeId
+    +String dni
+    +String celular
+    +bool hayDatosBiometricos
+    +bool activo
+    +bool tieneUsuario
+    +DateTime fechaCreacion
+    +DateTime? fechaModificacion
+    +String nombreCompleto
+    +Empleado copyWith()
+    +Empleado fromJson()
+    +Map toJson()
+}
+
+class Sede {
+    +String id
+    +String nombre
+    +String direccion
+    +double latitud
+    +double longitud
+    +int radioPermitido
+    +bool activa
+    +DateTime fechaCreacion
+    +DateTime? fechaModificacion
+    +Sede copyWith()
+    +Sede fromJson()
+    +Map toJson()
+    +Sede empty()
+}
+
+class Asistencia {
+    +String id
+    +String empleadoId
+    +String sedeId
+    +DateTime fechaHoraEntrada
+    +DateTime? fechaHoraSalida
+    +double latitudEntrada
+    +double longitudEntrada
+    +double? latitudSalida
+    +double? longitudSalida
+    +String? capturaEntrada
+    +String? capturaSalida
+    +bool registroCompleto
+    +Duration tiempoTrabajado
+    +Asistencia copyWith()
+    +Asistencia fromJson()
+    +Map toJson()
+}
+
+class Usuario {
+    +String id
+    +String nombreUsuario
+    +String correo
+    +String tipoUsuario
+    +String? empleadoId
+    +bool activo
+    +DateTime fechaCreacion
+    +DateTime? fechaUltimoAcceso
+    +bool debeCambiarContrasena
+    +bool isAdmin
+    +bool isEmpleado
+    +Usuario fromJson()
+    +Map toJson()
+}
+
+class Biometrico {
+    +String id
+    +String empleadoId
+    +String datoFacial
+    +DateTime fechaRegistro
+    +DateTime? fechaActualizacion
+    +Biometrico copyWith()
+    +Biometrico fromJson()
+    +Map toJson()
+}
+
+class EstadisticaAsistencia {
+    +String sedeId
+    +String sedeNombre
+    +String? empleadoId
+    +DateTime fecha
+    +int totalEmpleados
+    +int totalAsistencias
+    +int totalAusencias
+    +int totalTardanzas
+    +double porcentajeAsistencia
+    +EstadisticaAsistencia copyWith()
+    +EstadisticaAsistencia fromJson()
+    +Map toJson()
+}
+
+class ApiConfig {
+    +String identificationApiUrl
+    +String syncApiUrl
+    +String baseUrl
+    +ApiConfig fromMap()
+    +Map toMap()
+    +ApiConfig empty
+}
+
+' Relaciones
+Empleado "1" --> "*" Asistencia : registra
+Empleado "1" --> "0..1" Biometrico : tiene
+Empleado "1" --> "0..1" Usuario : tiene
+Empleado "*" --> "1" Sede : pertenece
+Asistencia "*" --> "1" Sede : se_registra_en
+EstadisticaAsistencia "*" --> "1" Sede : calcula_para
+EstadisticaAsistencia "*" --> "0..1" Empleado : calcula_para
+
+@enduml
