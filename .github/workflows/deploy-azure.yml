@@ -38,11 +38,16 @@ jobs:
         
         # Crear archivo Firebase desde secret (si está configurado)
         if [ -n "${{ secrets.FIREBASE_JSON }}" ]; then
-          echo '${{ secrets.FIREBASE_JSON }}' > deployment/geoface-firebase-adminsdk.json
+          echo '${{ secrets.FIREBASE_JSON }}' > deployment/app/geoface-c53eb-firebase-adminsdk-fbsvc-88c24f9a22.json
           echo "✅ Archivo Firebase creado desde secret"
         else
           # Intentar copiar desde el repo si existe
-          cp geoface-*-firebase-adminsdk-*.json deployment/ 2>/dev/null || echo "⚠️ Archivo Firebase no encontrado (configúralo en Azure o como secret)"
+          if [ -f "app/geoface-c53eb-firebase-adminsdk-fbsvc-88c24f9a22.json" ]; then
+            cp app/geoface-c53eb-firebase-adminsdk-fbsvc-88c24f9a22.json deployment/app/
+            echo "✅ Archivo Firebase copiado desde repo"
+          else
+            echo "⚠️ Archivo Firebase no encontrado (configúralo en Azure o como secret FIREBASE_JSON)"
+          fi
         fi
         
         cd deployment
@@ -54,6 +59,5 @@ jobs:
       with:
         app-name: ${{ env.AZURE_WEBAPP_NAME }}
         package: ./deployment
-        startup-command: 'bash startup.sh'
         publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
 
