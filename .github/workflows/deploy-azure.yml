@@ -68,12 +68,23 @@ jobs:
           echo "✅ Archivo Firebase verificado en app/: $(ls -lh "${FIREBASE_FILE_APP}" | awk '{print $5}')"
         fi
         
+        # Crear archivo .python_version para Azure (opcional pero recomendado)
+        echo "3.11" > deployment/.python_version 2>/dev/null || true
+        
         cd deployment
         echo "✅ Paquete de despliegue creado"
+        echo ""
+        echo "📁 Estructura del deployment:"
         ls -la
         echo ""
         echo "📁 Contenido de app/:"
         ls -la app/ || echo "Carpeta app/ no existe"
+        echo ""
+        echo "📁 Verificando archivos críticos:"
+        [ -f "requirements.txt" ] && echo "✅ requirements.txt" || echo "❌ requirements.txt NO encontrado"
+        [ -f "startup.sh" ] && echo "✅ startup.sh" || echo "❌ startup.sh NO encontrado"
+        [ -f "app/main.py" ] && echo "✅ app/main.py" || echo "❌ app/main.py NO encontrado"
+        [ -f "geoface-c53eb-firebase-adminsdk-fbsvc-88c24f9a22.json" ] && echo "✅ Firebase JSON en raíz" || echo "⚠️ Firebase JSON NO en raíz"
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
