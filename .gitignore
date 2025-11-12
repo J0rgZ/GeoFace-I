@@ -1,0 +1,34 @@
+# Archivos de Firebase (secretos - NO subir al repositorio)
+**/*firebase*adminsdk*.json
+app/*firebase*.json
+**/geoface-*-firebase-adminsdk-*.json
+geoface-*-firebase-adminsdk-*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+app/logs/
+logs/
+
+# Uploads
+app/uploads/
+uploads/
+
+# Archivos temporales
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+

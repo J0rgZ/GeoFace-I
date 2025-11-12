@@ -24,6 +24,8 @@ jobs:
         python-version: ${{ env.PYTHON_VERSION }}
 
     - name: Create deployment package
+      env:
+        FIREBASE_JSON: ${{ secrets.FIREBASE_JSON }}
       run: |
         # Crear estructura de directorios necesaria
         mkdir -p deployment/app
@@ -34,25 +36,44 @@ jobs:
         cp -r app/* deployment/app/ 2>/dev/null || echo "⚠️ Carpeta app/ no encontrada"
         cp requirements.txt deployment/ 2>/dev/null || echo "⚠️ requirements.txt no encontrado"
         cp startup.sh deployment/ 2>/dev/null || echo "⚠️ startup.sh no encontrado"
+        chmod +x deployment/startup.sh 2>/dev/null || echo "⚠️ No se pudo dar permisos a startup.sh"
         cp .deployment deployment/ 2>/dev/null || echo "[config]\nSCM_DO_BUILD_DURING_DEPLOYMENT=true" > deployment/.deployment
         
         # Crear archivo Firebase desde secret (si está configurado)
-        if [ -n "${{ secrets.FIREBASE_JSON }}" ]; then
-          echo '${{ secrets.FIREBASE_JSON }}' > deployment/app/geoface-c53eb-firebase-adminsdk-fbsvc-88c24f9a22.json
-          echo "✅ Archivo Firebase creado desde secret"
+        # Crear en la raíz del deployment (donde el código lo busca)
+        FIREBASE_FILE_ROOT="deployment/geoface-c53eb-firebase-adminsdk-fbsvc-88c24f9a22.json"
+        # También en app/ por si acaso
+        FIREBASE_FILE_APP="deployment/app/geoface-c53eb-firebase-adminsdk-fbsvc-88c24f9a22.json"
+        
+        if [ -n "${FIREBASE_JSON}" ] && [ "${FIREBASE_JSON}" != "" ]; then
+          printf '%s\n' "${FIREBASE_JSON}" > "${FIREBASE_FILE_ROOT}"
+          printf '%s\n' "${FIREBASE_JSON}" > "${FIREBASE_FILE_APP}"
+          echo "✅ Archivo Firebase creado desde secret (en raíz y app/)"
         else
           # Intentar copiar desde el repo si existe
           if [ -f "app/geoface-c53eb-firebase-adminsdk-fbsvc-88c24f9a22.json" ]; then
-            cp app/geoface-c53eb-firebase-adminsdk-fbsvc-88c24f9a22.json deployment/app/
-            echo "✅ Archivo Firebase copiado desde repo"
+            cp app/geoface-c53eb-firebase-adminsdk-fbsvc-88c24f9a22.json "${FIREBASE_FILE_ROOT}"
+            cp app/geoface-c53eb-firebase-adminsdk-fbsvc-88c24f9a22.json "${FIREBASE_FILE_APP}"
+            echo "✅ Archivo Firebase copiado desde repo (en raíz y app/)"
           else
             echo "⚠️ Archivo Firebase no encontrado (configúralo en Azure o como secret FIREBASE_JSON)"
           fi
         fi
         
+        # Verificar que el archivo existe
+        if [ -f "${FIREBASE_FILE_ROOT}" ]; then
+          echo "✅ Archivo Firebase verificado en raíz: $(ls -lh "${FIREBASE_FILE_ROOT}" | awk '{print $5}')"
+        fi
+        if [ -f "${FIREBASE_FILE_APP}" ]; then
+          echo "✅ Archivo Firebase verificado en app/: $(ls -lh "${FIREBASE_FILE_APP}" | awk '{print $5}')"
+        fi
+        
         cd deployment
         echo "✅ Paquete de despliegue creado"
         ls -la
+        echo ""
+        echo "📁 Contenido de app/:"
+        ls -la app/ || echo "Carpeta app/ no existe"
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
