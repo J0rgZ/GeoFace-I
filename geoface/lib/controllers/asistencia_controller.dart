@@ -25,7 +25,11 @@ import '../services/asistencia_service.dart';
 import '../services/sede_service.dart';
 import '../services/location_service.dart';
 import '../services/time_service.dart';
+import '../services/empleado_service.dart';
+import '../services/notificacion_service.dart';
+import '../services/notificacion_local_service.dart';
 import '../models/asistencia.dart';
+import '../models/notificacion.dart';
 import '../utils/location_helper.dart';
 
 // Define los posibles estados de la jornada laboral de un empleado en un día.
@@ -42,6 +46,9 @@ class AsistenciaController extends ChangeNotifier {
   final AsistenciaService _asistenciaService = AsistenciaService();
   final SedeService _sedeService = SedeService();
   final LocationService _locationService = LocationService();
+  final EmpleadoService _empleadoService = EmpleadoService();
+  final NotificacionService _notificacionService = NotificacionService();
+  final NotificacionLocalService _notificacionLocalService = NotificacionLocalService();
   final Uuid _uuid = Uuid();
   
   // --- ESTADO INTERNO DEL CONTROLADOR ---
@@ -138,6 +145,9 @@ class AsistenciaController extends ChangeNotifier {
       await _asistenciaService.registrarEntrada(nuevaAsistencia);
       _asistenciaActiva = nuevaAsistencia;
       
+      // Crear notificación de entrada
+      _crearNotificacionEntrada(nuevaAsistencia, sede);
+      
       return true;
 
     } catch (e) {
@@ -198,6 +208,9 @@ class AsistenciaController extends ChangeNotifier {
         longitudSalida: position.longitude,
         capturaSalida: capturaSalida,
       );
+      
+      // Crear notificación de salida
+      _crearNotificacionSalida(asistenciaParaCerrar, networkTime);
       
       return true;
 
@@ -264,5 +277,90 @@ class AsistenciaController extends ChangeNotifier {
   // Útil para acciones como "deslizar para refrescar" en la UI.
   Future<void> refreshAsistenciaStatus(String empleadoId) async {
     await checkEmpleadoAsistenciaStatus(empleadoId);
+  }
+
+  // Crea una notificación de entrada cuando un empleado marca asistencia
+  Future<void> _crearNotificacionEntrada(Asistencia asistencia, dynamic sede) async {
+    try {
+      // Obtener información del empleado
+      final empleado = await _empleadoService.getEmpleadoById(asistencia.empleadoId);
+      if (empleado == null) {
+        debugPrint('No se pudo crear notificación: empleado no encontrado');
+        return;
+      }
+
+      // Crear la notificación
+      final notificacion = Notificacion(
+        id: _uuid.v4(),
+        tipo: TipoNotificacion.entrada,
+        titulo: 'Entrada registrada',
+        mensaje: '${empleado.nombreCompleto} marcó entrada en ${sede.nombre}',
+        empleadoId: empleado.id,
+        empleadoNombre: empleado.nombreCompleto,
+        sedeId: sede.id,
+        sedeNombre: sede.nombre,
+        fecha: asistencia.fechaHoraEntrada,
+        leida: false,
+      );
+
+      // Guardar en Firestore
+      await _notificacionService.crearNotificacion(notificacion);
+
+      // Mostrar notificación local en el dispositivo
+      await _notificacionLocalService.mostrarNotificacion(
+        id: asistencia.fechaHoraEntrada.millisecondsSinceEpoch % 2147483647, // ID único basado en timestamp
+        titulo: notificacion.titulo,
+        cuerpo: notificacion.mensaje,
+      );
+    } catch (e) {
+      debugPrint('Error al crear notificación de entrada: $e');
+      // No lanzamos la excepción para no interrumpir el flujo de registro de asistencia
+    }
+  }
+
+  // Crea una notificación de salida cuando un empleado marca salida
+  Future<void> _crearNotificacionSalida(Asistencia asistencia, DateTime fechaSalida) async {
+    try {
+      // Obtener información del empleado
+      final empleado = await _empleadoService.getEmpleadoById(asistencia.empleadoId);
+      if (empleado == null) {
+        debugPrint('No se pudo crear notificación: empleado no encontrado');
+        return;
+      }
+
+      // Obtener información de la sede
+      final sede = await _sedeService.getSedeById(asistencia.sedeId);
+      if (sede == null) {
+        debugPrint('No se pudo crear notificación: sede no encontrada');
+        return;
+      }
+
+      // Crear la notificación
+      final notificacion = Notificacion(
+        id: _uuid.v4(),
+        tipo: TipoNotificacion.salida,
+        titulo: 'Salida registrada',
+        mensaje: '${empleado.nombreCompleto} marcó salida en ${sede.nombre}',
+        empleadoId: empleado.id,
+        empleadoNombre: empleado.nombreCompleto,
+        sedeId: sede.id,
+        sedeNombre: sede.nombre,
+        fecha: fechaSalida,
+        leida: false,
+      );
+
+      // Guardar en Firestore
+      await _notificacionService.crearNotificacion(notificacion);
+
+      // Mostrar notificación local en el dispositivo
+      await _notificacionLocalService.mostrarNotificacion(
+        id: fechaSalida.millisecondsSinceEpoch % 2147483647, // ID único basado en timestamp
+        titulo: notificacion.titulo,
+        cuerpo: notificacion.mensaje,
+      );
+    } catch (e) {
+      debugPrint('Error al crear notificación de salida: $e');
+      // No lanzamos la excepción para no interrumpir el flujo de registro de asistencia
+    }
   }
 }

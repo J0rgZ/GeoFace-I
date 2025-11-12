@@ -99,7 +99,10 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _cameraController?.dispose();
+    // Liberar la cámara de forma segura
+    _releaseCamera().catchError((e) {
+      debugPrint('Error al liberar cámara en dispose: $e');
+    });
     _dniController.dispose();
     super.dispose();
   }
@@ -405,26 +408,111 @@ class _MarcarAsistenciaPageState extends State<MarcarAsistenciaPage>
   
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
-    if (state == AppLifecycleState.inactive) {
-      _cameraController?.dispose();
+    if (_cameraController == null) return;
+    
+    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+      // Liberar la cámara cuando la app se pausa o se vuelve inactiva
+      _releaseCamera();
     } else if (state == AppLifecycleState.resumed) {
-      if (_flowState == MarcacionFlowState.verificacionFacial) {
+      if (_flowState == MarcacionFlowState.verificacionFacial && !_isCameraInitialized) {
+        // Re-inicializar solo si estamos en el flujo de verificación facial
         _initializeCamera();
       }
     }
   }
 
+  Future<void> _releaseCamera() async {
+    if (_cameraController != null) {
+      try {
+        if (_cameraController!.value.isInitialized) {
+          await _cameraController!.dispose().timeout(
+            const Duration(seconds: 3),
+            onTimeout: () {
+              debugPrint('⚠️ Timeout al liberar cámara en marcar asistencia');
+            },
+          );
+        }
+      } catch (e) {
+        debugPrint('⚠️ Error al liberar cámara: $e');
+      } finally {
+        _cameraController = null;
+        if (mounted) {
+          setState(() => _isCameraInitialized = false);
+        }
+      }
+    }
+  }
+
   Future<void> _initializeCamera() async {
-    final cameras = await availableCameras();
-    if (cameras.isEmpty) throw Exception("No hay cámaras disponibles.");
-    final frontCamera = cameras.firstWhere(
-      (camera) => camera.lensDirection == CameraLensDirection.front,
-      orElse: () => cameras.first,
-    );
-    _cameraController = CameraController(frontCamera, ResolutionPreset.medium, enableAudio: false);
-    await _cameraController!.initialize();
-    if (mounted) setState(() => _isCameraInitialized = true);
+    // Liberar cualquier cámara previa antes de inicializar
+    await _releaseCamera();
+    
+    // Esperar un momento para que el sistema libere completamente la cámara
+    await Future.delayed(const Duration(milliseconds: 300));
+    
+    int intentos = 0;
+    const maxIntentos = 3;
+    
+    while (intentos < maxIntentos && mounted) {
+      try {
+        final cameras = await availableCameras();
+        if (cameras.isEmpty) {
+          throw Exception("No hay cámaras disponibles.");
+        }
+        
+        final frontCamera = cameras.firstWhere(
+          (camera) => camera.lensDirection == CameraLensDirection.front,
+          orElse: () => cameras.first,
+        );
+        
+        _cameraController = CameraController(
+          frontCamera,
+          ResolutionPreset.medium,
+          enableAudio: false,
+        );
+        
+        // Agregar timeout para evitar bloqueos
+        await _cameraController!.initialize().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Timeout al inicializar la cámara. La cámara puede estar ocupada.');
+          },
+        );
+        
+        if (mounted) {
+          setState(() => _isCameraInitialized = true);
+          debugPrint('✅ Cámara inicializada en marcar asistencia');
+        }
+        break; // Salir del bucle si se inicializó correctamente
+        
+      } catch (e) {
+        intentos++;
+        debugPrint('⚠️ Intento $intentos/$maxIntentos falló en marcar asistencia: $e');
+        
+        // Limpiar el controlador si falló
+        if (_cameraController != null) {
+          try {
+            await _cameraController!.dispose();
+          } catch (_) {}
+          _cameraController = null;
+        }
+        
+        if (intentos >= maxIntentos) {
+          if (mounted) {
+            _showCustomInfoDialog(
+              title: "Error de Cámara",
+              content: "No se pudo inicializar la cámara después de $maxIntentos intentos. "
+                  "Asegúrate de que ninguna otra aplicación esté usando la cámara.",
+              lottieAsset: 'assets/animations/error.json',
+            );
+            setState(() => _isCameraInitialized = false);
+          }
+        } else {
+          // Esperar antes de reintentar (backoff exponencial)
+          await Future.delayed(Duration(milliseconds: 500 * intentos));
+        }
+      }
+    }
   }
   
   Future<void> _getCurrentLocation() async {

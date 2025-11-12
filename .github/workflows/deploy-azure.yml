@@ -1,0 +1,67 @@
+name: Deploy to Azure App Service
+
+on:
+  push:
+    branches:
+      - main  # Cambia a tu rama principal si es diferente
+  workflow_dispatch:  # Permite ejecución manual
+
+env:
+  AZURE_WEBAPP_NAME: geoface-api  # Cambia por el nombre de tu App Service
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Create deployment package
+      run: |
+        # Crear estructura de directorios necesaria
+        mkdir -p deployment/app
+        mkdir -p deployment/app/uploads
+        mkdir -p deployment/app/logs
+        
+        # Copiar archivos necesarios
+        cp -r app/* deployment/app/ 2>/dev/null || echo "⚠️ Carpeta app/ no encontrada"
+        cp requirements.txt deployment/ 2>/dev/null || echo "⚠️ requirements.txt no encontrado"
+        cp startup.sh deployment/ 2>/dev/null || echo "⚠️ startup.sh no encontrado"
+        cp .deployment deployment/ 2>/dev/null || echo "[config]\nSCM_DO_BUILD_DURING_DEPLOYMENT=true" > deployment/.deployment
+        
+        # Crear archivo Firebase desde secret (si está configurado)
+        if [ -n "${{ secrets.FIREBASE_JSON }}" ]; then
+          echo '${{ secrets.FIREBASE_JSON }}' > deployment/geoface-firebase-adminsdk.json
+          echo "✅ Archivo Firebase creado desde secret"
+        else
+          # Intentar copiar desde el repo si existe
+          cp geoface-*-firebase-adminsdk-*.json deployment/ 2>/dev/null || echo "⚠️ Archivo Firebase no encontrado (configúralo en Azure o como secret)"
+        fi
+        
+        cd deployment
+        echo "✅ Paquete de despliegue creado"
+        ls -la
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        package: ./deployment
+        startup-command: 'bash startup.sh'
+
+    - name: Azure logout
+      run: |
+        az logout
+

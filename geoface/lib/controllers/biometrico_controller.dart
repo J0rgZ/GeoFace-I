@@ -55,44 +55,108 @@ class BiometricoController extends ChangeNotifier {
   Future<void> initCamera() async {
     if (_isCameraInitialized) return; // Evita reinicializaciones innecesarias.
     
-    _errorMessage = null;
-    try {
-      final cameras = await availableCameras();
-      if (cameras.isEmpty) {
-        throw Exception('No se encontraron cámaras disponibles.');
+    // Si ya hay un controlador, liberarlo primero
+    if (cameraController != null) {
+      try {
+        await stopCamera();
+        // Esperar un momento para que el sistema libere completamente la cámara
+        await Future.delayed(const Duration(milliseconds: 300));
+      } catch (e) {
+        debugPrint('Error al liberar cámara previa: $e');
       }
-      
-      // Se prioriza la cámara frontal, que es la estándar para reconocimiento facial.
-      final frontCamera = cameras.firstWhere(
-        (c) => c.lensDirection == CameraLensDirection.front,
-        orElse: () => cameras.first,
-      );
-      
-      cameraController = CameraController(
-        frontCamera,
-        ResolutionPreset.high, // Alta resolución para mejor calidad de reconocimiento.
-        enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.jpeg,
-      );
-      
-      await cameraController!.initialize();
-      _isCameraInitialized = true;
-    } catch (e) {
-      _errorMessage = 'Error al inicializar la cámara: ${e.toString()}';
-      _isCameraInitialized = false;
-    } finally {
-      notifyListeners();
+    }
+    
+    _errorMessage = null;
+    int intentos = 0;
+    const maxIntentos = 3;
+    
+    while (intentos < maxIntentos) {
+      try {
+        final cameras = await availableCameras();
+        if (cameras.isEmpty) {
+          throw Exception('No se encontraron cámaras disponibles.');
+        }
+        
+        // Se prioriza la cámara frontal, que es la estándar para reconocimiento facial.
+        final frontCamera = cameras.firstWhere(
+          (c) => c.lensDirection == CameraLensDirection.front,
+          orElse: () => cameras.first,
+        );
+        
+        cameraController = CameraController(
+          frontCamera,
+          ResolutionPreset.high, // Alta resolución para mejor calidad de reconocimiento.
+          enableAudio: false,
+          imageFormatGroup: ImageFormatGroup.jpeg,
+        );
+        
+        // Agregar timeout para evitar bloqueos indefinidos
+        await cameraController!.initialize().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Timeout al inicializar la cámara. La cámara puede estar ocupada por otra aplicación.');
+          },
+        );
+        
+        _isCameraInitialized = true;
+        debugPrint('✅ Cámara inicializada correctamente');
+        break; // Salir del bucle si se inicializó correctamente
+        
+      } catch (e) {
+        intentos++;
+        debugPrint('⚠️ Intento $intentos/$maxIntentos falló: $e');
+        
+        // Limpiar el controlador si falló
+        if (cameraController != null) {
+          try {
+            await cameraController!.dispose();
+          } catch (_) {}
+          cameraController = null;
+        }
+        
+        if (intentos >= maxIntentos) {
+          _errorMessage = 'Error al inicializar la cámara después de $maxIntentos intentos. '
+              'Asegúrate de que ninguna otra aplicación esté usando la cámara. '
+              'Error: ${e.toString()}';
+          _isCameraInitialized = false;
+        } else {
+          // Esperar antes de reintentar (backoff exponencial)
+          await Future.delayed(Duration(milliseconds: 500 * intentos));
+        }
+      } finally {
+        notifyListeners();
+      }
     }
   }
   
   // Libera los recursos de la cámara cuando ya no se necesita.
   // Es crucial para evitar fugas de memoria y problemas de rendimiento.
   Future<void> stopCamera() async {
-    if (cameraController != null && cameraController!.value.isInitialized) {
-      await cameraController!.dispose();
-      cameraController = null;
-      _isCameraInitialized = false;
-      notifyListeners();
+    if (cameraController != null) {
+      try {
+        // Verificar si está inicializada antes de intentar dispose
+        if (cameraController!.value.isInitialized) {
+          await cameraController!.dispose().timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              debugPrint('⚠️ Timeout al liberar cámara, forzando limpieza');
+            },
+          );
+        } else {
+          // Si no está inicializada, solo limpiar la referencia
+          cameraController = null;
+        }
+      } catch (e) {
+        debugPrint('⚠️ Error al liberar cámara: $e');
+        // Forzar limpieza incluso si hay error
+        cameraController = null;
+      } finally {
+        _isCameraInitialized = false;
+        notifyListeners();
+        // Pequeña pausa para asegurar que el sistema libere completamente la cámara
+        await Future.delayed(const Duration(milliseconds: 200));
+        debugPrint('✅ Recursos de cámara liberados');
+      }
     }
   }
   
@@ -104,11 +168,27 @@ class BiometricoController extends ChangeNotifier {
       return null;
     }
     
+    // Verificar que la cámara sigue inicializada antes de capturar
+    if (!cameraController!.value.isInitialized) {
+      _errorMessage = 'La cámara se desconectó. Por favor, intenta de nuevo.';
+      _isCameraInitialized = false;
+      notifyListeners();
+      return null;
+    }
+    
     try {
-      final XFile imageXFile = await cameraController!.takePicture();
+      // Agregar timeout para evitar bloqueos
+      final XFile imageXFile = await cameraController!.takePicture().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Timeout al capturar la foto. La cámara puede estar ocupada.');
+        },
+      );
       return File(imageXFile.path);
     } catch (e) {
       _errorMessage = 'Error al capturar la foto: ${e.toString()}';
+      // Si hay error, marcar la cámara como no inicializada
+      _isCameraInitialized = false;
       notifyListeners();
       return null;
     }
@@ -254,7 +334,24 @@ class BiometricoController extends ChangeNotifier {
   // Se asegura de liberar la cámara al destruir el controlador para evitar fugas de memoria.
   @override
   void dispose() {
-    stopCamera();
+    // Usar un método asíncrono pero no esperar para evitar bloquear dispose
+    stopCamera().catchError((e) {
+      debugPrint('Error en dispose de cámara: $e');
+    });
     super.dispose();
+  }
+  
+  // Método para forzar la liberación inmediata de recursos (útil en casos de emergencia)
+  Future<void> forceReleaseCamera() async {
+    _isCameraInitialized = false;
+    if (cameraController != null) {
+      try {
+        await cameraController!.dispose();
+      } catch (e) {
+        debugPrint('Error al forzar liberación: $e');
+      }
+      cameraController = null;
+    }
+    notifyListeners();
   }
 }

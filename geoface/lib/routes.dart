@@ -37,6 +37,7 @@ import 'views/empleado/cambiar_contrasena_empleado_page.dart';
 import 'views/empleado/historial_asistencias_page.dart';
 import 'views/admin/admin_layout.dart';
 import 'views/admin/gestion_usuarios_empleados_page.dart';
+import 'views/admin/notificaciones_page.dart';
 import 'models/empleado.dart';
 
 
@@ -57,6 +58,7 @@ class AppRoutes {
   static const String cambiarContrasenaEmpleado = '/empleado/cambiar-contrasena';
   static const String historialAsistencias = '/empleado/historial';
   static const String loginEmpleado = '/login-empleado';
+  static const String notificaciones = '/admin/notificaciones';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     // Widget de error genérico para rutas con argumentos faltantes
@@ -230,6 +232,23 @@ class AppRoutes {
 
       case historialAsistencias:
         return MaterialPageRoute(builder: (_) => const HistorialAsistenciasPage());
+
+      case notificaciones:
+        // PROTECCIÓN: Solo admins pueden acceder
+        return MaterialPageRoute(
+          builder: (context) {
+            final authController = Provider.of<AuthController>(context, listen: false);
+            if (!authController.isAdmin) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                Navigator.of(context).pushReplacementNamed(AppRoutes.mainMenu);
+              });
+              return Scaffold(
+                body: Center(child: Text('Acceso No Autorizado')),
+              );
+            }
+            return const NotificacionesPage();
+          },
+        );
 
       default:
         return MaterialPageRoute(

@@ -33,6 +33,7 @@ import '../admin/reportes_page.dart';
 import '../admin/administradores_page.dart';
 import 'gestion_usuarios_empleados_page.dart';
 import '../admin/cambiar_contrasena_page.dart';
+import '../admin/notificaciones_page.dart';
 
 /// AdminLayout: El contenedor principal para la interfaz de administrador.
 ///
@@ -465,6 +466,7 @@ class _SettingsMenu extends StatelessWidget {
                   _buildProfileHeader(theme),
                   const Divider(height: 24, indent: 16, endIndent: 16),
                   _buildMenuSection(context, "Mi Cuenta", [
+                    _buildOptionTile(Icons.notifications_rounded, "Notificaciones", () => onNavigate(const NotificacionesPage()), theme),
                     _buildOptionTile(Icons.password_rounded, "Cambiar Contraseña", () => onNavigate(const CambiarContrasenaPage()), theme),
                   ]),
                   _buildMenuSection(context, "Administración", [
