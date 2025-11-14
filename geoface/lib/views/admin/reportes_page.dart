@@ -116,6 +116,8 @@ class _ReportesPageState extends State<ReportesPage> {
                     );
                     
                     if (confirmacion == true && mounted) {
+                      // ignore: use_build_context_synchronously
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
                       await reporteController.generarReporteDetallado(
                         fechaInicio: startOfMonth,
                         fechaFin: endOfMonth,
@@ -124,8 +126,9 @@ class _ReportesPageState extends State<ReportesPage> {
                       );
                       
                       // Mostrar mensaje de error si existe
-                      if (reporteController.errorMessage != null && mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                      if (!mounted) return;
+                      if (reporteController.errorMessage != null) {
+                        scaffoldMessenger.showSnackBar(
                           SnackBar(
                             content: Text(reporteController.errorMessage!),
                             backgroundColor: Colors.red,

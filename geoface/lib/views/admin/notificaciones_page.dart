@@ -303,7 +303,7 @@ class _NotificacionesPageState extends State<NotificacionesPage> {
       margin: const EdgeInsets.only(bottom: 8, left: 16, right: 16),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: color.withOpacity(0.2),
+          backgroundColor: color.withValues(alpha: 0.2),
           child: Icon(icon, color: color),
         ),
         title: Text(

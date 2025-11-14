@@ -6,6 +6,7 @@
 // -----------------------------------------------------------------------------
 
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:intl/intl.dart';
@@ -48,7 +49,7 @@ class TestReportGenerator {
 
     final file = File(outputPath);
     await file.writeAsBytes(await doc.save());
-    print('✅ Reporte PDF generado exitosamente en: $outputPath');
+    debugPrint('✅ Reporte PDF generado exitosamente en: $outputPath');
   }
 
   pw.Widget _buildHeader() {

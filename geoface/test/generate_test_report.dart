@@ -5,10 +5,11 @@
 
 // ignore: unused_import
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'test_report_generator.dart';
 
 void main() async {
-  print('🚀 Iniciando ejecución de pruebas unitarias...\n');
+  debugPrint('🚀 Iniciando ejecución de pruebas unitarias...\n');
 
   // Datos de los requisitos y sus pruebas
   final testResults = [
@@ -230,11 +231,11 @@ void main() async {
     0, (sum, r) => sum + r.testCount);
   final failedTests = totalTests - passedTests;
 
-  print('📊 Resumen de resultados:');
-  print('   Total de pruebas: $totalTests');
-  print('   Pruebas exitosas: $passedTests');
-  print('   Pruebas fallidas: $failedTests');
-  print('   Tasa de éxito: ${(passedTests / totalTests * 100).toStringAsFixed(1)}%\n');
+  debugPrint('📊 Resumen de resultados:');
+  debugPrint('   Total de pruebas: $totalTests');
+  debugPrint('   Pruebas exitosas: $passedTests');
+  debugPrint('   Pruebas fallidas: $failedTests');
+  debugPrint('   Tasa de éxito: ${(passedTests / totalTests * 100).toStringAsFixed(1)}%\n');
 
   // Generar el PDF
   final generator = TestReportGenerator(
@@ -247,8 +248,8 @@ void main() async {
 
   final outputPath = 'test/reporte_pruebas_unitarias_${DateTime.now().toString().split(' ')[0]}.pdf';
   
-  print('📄 Generando reporte PDF...');
+  debugPrint('📄 Generando reporte PDF...');
   await generator.generatePDF(outputPath);
-  print('\n✅ Proceso completado exitosamente!');
+  debugPrint('\n✅ Proceso completado exitosamente!');
 }
 

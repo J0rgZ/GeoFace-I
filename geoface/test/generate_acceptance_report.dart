@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
 import 'acceptance_report_generator.dart';
@@ -283,12 +284,12 @@ void main() async {
   final nombreArchivo =
       'test/reporte_aceptacion_${DateFormat('yyyyMMdd_HHmm').format(fechaEjecucion)}.pdf';
 
-  print('📋 Generando reporte de aceptación...');
+  debugPrint('📋 Generando reporte de aceptación...');
   await generator.generatePDF(nombreArchivo);
 
-  print('✅ Reporte generado: $nombreArchivo');
-  print('   Requisitos funcionales cubiertos: ${funcionales.length}');
-  print('   Requisitos no funcionales cubiertos: ${noFuncionales.length}');
+  debugPrint('✅ Reporte generado: $nombreArchivo');
+  debugPrint('   Requisitos funcionales cubiertos: ${funcionales.length}');
+  debugPrint('   Requisitos no funcionales cubiertos: ${noFuncionales.length}');
 }
 
 

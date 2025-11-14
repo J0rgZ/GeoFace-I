@@ -79,7 +79,7 @@ void main() {
       final tiempoTotalTrabajado = asistencias
           .where((a) => a.registroCompleto)
           .fold<Duration>(
-              Duration.zero, (sum, a) => sum + a.tiempoTrabajado);
+              Duration.zero, (total, a) => total + a.tiempoTrabajado);
 
       // Assert
       expect(totalAsistencias, 1);
