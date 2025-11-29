@@ -22,12 +22,18 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../services/sede_service.dart';
+import '../services/auditoria_service.dart';
+import '../services/device_info_service.dart';
 import '../models/sede.dart';
+import '../models/auditoria.dart';
 
 class SedeController extends ChangeNotifier {
   
   final SedeService _sedeService = SedeService();
+  final AuditoriaService _auditoriaService = AuditoriaService();
+  final DeviceInfoService _deviceInfoService = DeviceInfoService();
   final Uuid _uuid = Uuid();
+  
 
   // Estado interno del controlador.
   List<Sede> _sedes = [];
@@ -66,7 +72,9 @@ class SedeController extends ChangeNotifier {
     required String direccion, 
     required double latitud, 
     required double longitud, 
-    required int radioPermitido
+    required int radioPermitido,
+    String? usuarioId,
+    String? usuarioNombre,
   }) async {
     _loading = true;
     _errorMessage = null;
@@ -87,6 +95,18 @@ class SedeController extends ChangeNotifier {
       
       await _sedeService.addSede(sede);
       
+      // Registrar auditoría si se proporciona información del usuario
+      if (usuarioId != null && usuarioNombre != null) {
+        await _registrarAuditoriaSede(
+          usuarioId,
+          usuarioNombre,
+          TipoAccion.crearSede,
+          sede.id,
+          sede.nombre,
+          'Sede creada: ${sede.nombre}',
+        );
+      }
+      
       // Se refresca la lista local para que la UI muestre la nueva sede inmediatamente.
       await getSedes();
       return true;
@@ -106,7 +126,9 @@ class SedeController extends ChangeNotifier {
     required double latitud, 
     required double longitud, 
     required int radioPermitido,
-    required bool activa
+    required bool activa,
+    String? usuarioId,
+    String? usuarioNombre,
   }) async {
     _loading = true;
     _errorMessage = null;
@@ -133,6 +155,18 @@ class SedeController extends ChangeNotifier {
       
       await _sedeService.updateSede(sedeActualizada);
       
+      // Registrar auditoría si se proporciona información del usuario
+      if (usuarioId != null && usuarioNombre != null) {
+        await _registrarAuditoriaSede(
+          usuarioId,
+          usuarioNombre,
+          TipoAccion.editarSede,
+          sedeActualizada.id,
+          sedeActualizada.nombre,
+          'Sede editada: ${sedeActualizada.nombre}',
+        );
+      }
+      
       // Refrescamos la lista para reflejar los cambios en la UI.
       await getSedes();
       return true;
@@ -145,13 +179,29 @@ class SedeController extends ChangeNotifier {
   }
 
   // Elimina una sede de la base de datos usando su ID.
-  Future<bool> deleteSede(String id) async {
+  Future<bool> deleteSede(String id, {String? usuarioId, String? usuarioNombre}) async {
     _loading = true;
     _errorMessage = null;
     notifyListeners();
     
     try {
+      // Obtener información de la sede antes de eliminarla
+      final sede = await _sedeService.getSedeById(id);
+      final nombreSede = sede?.nombre ?? 'Sede desconocida';
+      
       await _sedeService.deleteSede(id);
+      
+      // Registrar auditoría si se proporciona información del usuario
+      if (usuarioId != null && usuarioNombre != null) {
+        await _registrarAuditoriaSede(
+          usuarioId,
+          usuarioNombre,
+          TipoAccion.eliminarSede,
+          id,
+          nombreSede,
+          'Sede eliminada: $nombreSede',
+        );
+      }
       
       // Refrescamos la lista para que el elemento eliminado desaparezca de la UI.
       await getSedes();
@@ -161,6 +211,35 @@ class SedeController extends ChangeNotifier {
       _loading = false;
       notifyListeners();
       return false;
+    }
+  }
+  
+  // Método auxiliar para registrar auditoría de sedes
+  Future<void> _registrarAuditoriaSede(
+    String usuarioId,
+    String usuarioNombre,
+    TipoAccion tipoAccion,
+    String sedeId,
+    String sedeNombre,
+    String descripcion,
+  ) async {
+    try {
+      final dispositivoInfo = await _deviceInfoService.obtenerInformacionDispositivo();
+      
+      await _auditoriaService.registrarAuditoria(
+        usuarioId: usuarioId,
+        usuarioNombre: usuarioNombre,
+        tipoAccion: tipoAccion,
+        tipoEntidad: TipoEntidad.sede,
+        entidadId: sedeId,
+        entidadNombre: sedeNombre,
+        descripcion: descripcion,
+        dispositivoId: dispositivoInfo.id,
+        dispositivoMarca: dispositivoInfo.marca,
+        dispositivoModelo: dispositivoInfo.modelo,
+      );
+    } catch (e) {
+      // No fallar si no se puede registrar auditoría
     }
   }
 }

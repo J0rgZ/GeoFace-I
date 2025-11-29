@@ -26,6 +26,7 @@ import 'package:geoface/views/admin/empleado_form_page.dart';
 import 'package:geoface/views/admin/registro_biometrico_page.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/empleado_controller.dart';
+import '../../controllers/auth_controller.dart';
 import '../../models/empleado.dart';
 
 /// EmpleadosPage: Versión mejorada con mejor UX y animaciones
@@ -170,7 +171,14 @@ class _EmpleadosPageState extends State<EmpleadosPage> with TickerProviderStateM
 
   Future<void> _deleteEmpleado(Empleado empleado) async {
     final controller = Provider.of<EmpleadoController>(context, listen: false);
-    final success = await controller.deleteEmpleado(empleado.id);
+    final authController = Provider.of<AuthController>(context, listen: false);
+    final currentUser = authController.currentUser;
+    
+    final success = await controller.deleteEmpleado(
+      empleado.id,
+      usuarioId: currentUser?.id,
+      usuarioNombre: currentUser?.nombreUsuario,
+    );
     if (success) {
       _showFeedback('${empleado.nombreCompleto} ha sido eliminado.');
     } else {

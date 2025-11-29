@@ -50,4 +50,5 @@ class AppConfig {
   static const String sedesCollection = 'sedes';
   static const String asistenciasCollection = 'asistencias';
   static const String notificacionesCollection = 'notificaciones';
+  static const String auditoriaCollection = 'auditoria';
 }

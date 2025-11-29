@@ -20,6 +20,8 @@ import 'controllers/empleado_controller.dart';
 import 'controllers/sede_controller.dart';
 import 'controllers/reporte_controller.dart';
 import 'controllers/notificacion_controller.dart';
+import 'controllers/auditoria_controller.dart';
+import 'controllers/reportes_guardados_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,6 +50,8 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ApiConfigController()),
         ChangeNotifierProvider(create: (_) => BiometricoController()),
         ChangeNotifierProvider(create: (_) => NotificacionController()),
+        ChangeNotifierProvider(create: (_) => AuditoriaController()),
+        ChangeNotifierProvider(create: (_) => ReportesGuardadosController()),
       ],
       child: const MyApp(),
     ),

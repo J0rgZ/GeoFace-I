@@ -25,6 +25,7 @@ import 'package:provider/provider.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../../controllers/sede_controller.dart';
 import '../../controllers/empleado_controller.dart';
+import '../../controllers/auth_controller.dart';
 import '../../models/sede.dart';
 import 'sede_form_page.dart';
 
@@ -207,6 +208,9 @@ class _SedesPageState extends State<SedesPage> with TickerProviderStateMixin {
     // Crea una copia de la sede con el estado 'activa' invertido.
     final sedeActualizada = sede.copyWith(activa: !sede.activa);
     
+    final authController = Provider.of<AuthController>(context, listen: false);
+    final currentUser = authController.currentUser;
+    
     final success = await controller.updateSede(
       id: sedeActualizada.id,
       nombre: sedeActualizada.nombre,
@@ -215,6 +219,8 @@ class _SedesPageState extends State<SedesPage> with TickerProviderStateMixin {
       longitud: sedeActualizada.longitud,
       radioPermitido: sedeActualizada.radioPermitido,
       activa: sedeActualizada.activa,
+      usuarioId: currentUser?.id,
+      usuarioNombre: currentUser?.nombreUsuario,
     );
     
     if (success) {
@@ -242,7 +248,14 @@ class _SedesPageState extends State<SedesPage> with TickerProviderStateMixin {
     // Si no hay empleados, procede con la eliminación.
     if (!mounted) return;
     final sedeController = Provider.of<SedeController>(context, listen: false);
-    final success = await sedeController.deleteSede(sede.id);
+    final authController = Provider.of<AuthController>(context, listen: false);
+    final currentUser = authController.currentUser;
+    
+    final success = await sedeController.deleteSede(
+      sede.id,
+      usuarioId: currentUser?.id,
+      usuarioNombre: currentUser?.nombreUsuario,
+    );
     if (!mounted) return;
     if (success) {
       _showFeedback('${sede.nombre} ha sido eliminada.');

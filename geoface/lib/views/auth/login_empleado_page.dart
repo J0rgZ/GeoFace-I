@@ -21,6 +21,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../routes.dart';
 import '../../services/usuario_service.dart';
+import '../../services/auditoria_service.dart';
+import '../../services/device_info_service.dart';
+import '../../models/auditoria.dart';
 
 class LoginEmpleadoPage extends StatefulWidget {
   const LoginEmpleadoPage({super.key});
@@ -74,6 +77,26 @@ class _LoginEmpleadoPageState extends State<LoginEmpleadoPage> {
       if (!usuario.activo) {
         await FirebaseAuth.instance.signOut();
         throw Exception('Tu cuenta ha sido desactivada. Contacta al administrador.');
+      }
+
+      // Registrar auditoría de login de empleado
+      try {
+        final auditoriaService = AuditoriaService();
+        final deviceInfoService = DeviceInfoService();
+        final dispositivoInfo = await deviceInfoService.obtenerInformacionDispositivo();
+        
+        await auditoriaService.registrarAuditoria(
+          usuarioId: usuario.id,
+          usuarioNombre: usuario.nombreUsuario,
+          tipoAccion: TipoAccion.login,
+          tipoEntidad: TipoEntidad.sesion,
+          descripcion: 'Inicio de sesión de empleado: ${usuario.nombreUsuario}',
+          dispositivoId: dispositivoInfo.id,
+          dispositivoMarca: dispositivoInfo.marca,
+          dispositivoModelo: dispositivoInfo.modelo,
+        );
+      } catch (e) {
+        // No fallar si no se puede registrar auditoría
       }
 
       // El AuthController se actualizará automáticamente con el listener de Firebase Auth

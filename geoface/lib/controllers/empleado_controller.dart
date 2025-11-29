@@ -22,14 +22,22 @@ import 'package:uuid/uuid.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/empleado_service.dart';
+import '../services/auditoria_service.dart';
+import '../services/device_info_service.dart';
 import '../models/empleado.dart';
+import '../models/auditoria.dart';
 
 
 class EmpleadoController extends ChangeNotifier {
   final EmpleadoService _empleadoService = EmpleadoService();
+  final AuditoriaService _auditoriaService = AuditoriaService();
+  final DeviceInfoService _deviceInfoService = DeviceInfoService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final Uuid _uuid = Uuid();
+  
+  // Obtener AuthController desde el contexto cuando sea necesario
+  // Se accede mediante Provider en los métodos que lo necesiten
   
   // Estado interno del controlador.
   List<Empleado> _empleados = [];
@@ -146,6 +154,8 @@ class EmpleadoController extends ChangeNotifier {
     required String correo,
     required String cargo,
     required String sedeId,
+    String? usuarioId,
+    String? usuarioNombre,
   }) async {
     _setState(loading: true);
     try {
@@ -168,6 +178,19 @@ class EmpleadoController extends ChangeNotifier {
       
       await _empleadoService.addEmpleado(empleado);
       await getEmpleados(); // Refresca la lista local.
+      
+      // Registrar auditoría si se proporciona información del usuario
+      if (usuarioId != null && usuarioNombre != null) {
+        await _registrarAuditoriaEmpleado(
+          usuarioId,
+          usuarioNombre,
+          TipoAccion.crearEmpleado,
+          empleado.id,
+          empleado.nombreCompleto,
+          'Empleado creado: ${empleado.nombreCompleto}',
+        );
+      }
+      
       _setState(loading: false);
       return true;
     } catch (e) {
@@ -186,6 +209,8 @@ class EmpleadoController extends ChangeNotifier {
     required String cargo,
     required String sedeId,
     required bool activo,
+    String? usuarioId,
+    String? usuarioNombre,
   }) async {
     _setState(loading: true);
     try {
@@ -212,6 +237,19 @@ class EmpleadoController extends ChangeNotifier {
       
       await _empleadoService.updateEmpleado(empleadoActualizado);
       await getEmpleados();
+      
+      // Registrar auditoría si se proporciona información del usuario
+      if (usuarioId != null && usuarioNombre != null) {
+        await _registrarAuditoriaEmpleado(
+          usuarioId,
+          usuarioNombre,
+          TipoAccion.editarEmpleado,
+          empleadoActualizado.id,
+          empleadoActualizado.nombreCompleto,
+          'Empleado editado: ${empleadoActualizado.nombreCompleto}',
+        );
+      }
+      
       _setState(loading: false);
       return true;
     } catch (e) {
@@ -220,16 +258,62 @@ class EmpleadoController extends ChangeNotifier {
     }
   }
 
-  Future<bool> deleteEmpleado(String id) async {
+  Future<bool> deleteEmpleado(String id, {String? usuarioId, String? usuarioNombre}) async {
     _setState(loading: true);
     try {
+      // Obtener información del empleado antes de eliminarlo
+      final empleado = await _empleadoService.getEmpleadoById(id);
+      final nombreEmpleado = empleado?.nombreCompleto ?? 'Empleado desconocido';
+      
       await _empleadoService.deleteEmpleado(id);
       await getEmpleados();
+      
+      // Registrar auditoría si se proporciona información del usuario
+      if (usuarioId != null && usuarioNombre != null) {
+        await _registrarAuditoriaEmpleado(
+          usuarioId,
+          usuarioNombre,
+          TipoAccion.eliminarEmpleado,
+          id,
+          nombreEmpleado,
+          'Empleado eliminado: $nombreEmpleado',
+        );
+      }
+      
       _setState(loading: false);
       return true;
     } catch (e) {
       _setState(loading: false, error: 'Error al eliminar empleado: ${e.toString()}');
       return false;
+    }
+  }
+  
+  // Método auxiliar para registrar auditoría de empleados
+  Future<void> _registrarAuditoriaEmpleado(
+    String usuarioId,
+    String usuarioNombre,
+    TipoAccion tipoAccion,
+    String empleadoId,
+    String empleadoNombre,
+    String descripcion,
+  ) async {
+    try {
+      final dispositivoInfo = await _deviceInfoService.obtenerInformacionDispositivo();
+      
+      await _auditoriaService.registrarAuditoria(
+        usuarioId: usuarioId,
+        usuarioNombre: usuarioNombre,
+        tipoAccion: tipoAccion,
+        tipoEntidad: TipoEntidad.empleado,
+        entidadId: empleadoId,
+        entidadNombre: empleadoNombre,
+        descripcion: descripcion,
+        dispositivoId: dispositivoInfo.id,
+        dispositivoMarca: dispositivoInfo.marca,
+        dispositivoModelo: dispositivoInfo.modelo,
+      );
+    } catch (e) {
+      // No fallar si no se puede registrar auditoría
     }
   }
 

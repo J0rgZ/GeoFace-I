@@ -28,7 +28,11 @@ import '../models/sede.dart';
 import '../models/estadistica_asistencia.dart';
 import '../services/empleado_service.dart';
 import '../services/asistencia_service.dart';
+import '../services/auditoria_service.dart';
+import '../services/device_info_service.dart';
+import '../models/auditoria.dart';
 import '../utils/pdf_report_generator.dart';
+import 'package:intl/intl.dart';
 
 // Clase para estadísticas por empleado
 class EstadisticaEmpleado {
@@ -72,6 +76,8 @@ class ReporteDetallado {
 class ReporteController extends ChangeNotifier {
   final EmpleadoService _empleadoService = EmpleadoService();
   final AsistenciaService _asistenciaService = AsistenciaService();
+  final AuditoriaService _auditoriaService = AuditoriaService();
+  final DeviceInfoService _deviceInfoService = DeviceInfoService();
 
   // Estado interno del controlador.
   ReporteDetallado? _reporte;
@@ -107,6 +113,8 @@ class ReporteController extends ChangeNotifier {
     required DateTime fechaFin,
     required List<Sede> sedes,
     String? sedeId,
+    String? usuarioId,
+    String? usuarioNombre,
   }) async {
     _loading = true;
     _reporteGenerado = false;
@@ -356,6 +364,38 @@ class ReporteController extends ChangeNotifier {
       );
       _reporteGenerado = true;
 
+      // 10. Registrar auditoría de generación de reporte
+      if (usuarioId != null && usuarioNombre != null) {
+        try {
+          final dispositivoInfo = await _deviceInfoService.obtenerInformacionDispositivo();
+          await _auditoriaService.registrarAuditoria(
+            usuarioId: usuarioId,
+            usuarioNombre: usuarioNombre,
+            tipoAccion: TipoAccion.generarReporte,
+            tipoEntidad: TipoEntidad.reporte,
+            entidadId: null,
+            entidadNombre: 'Reporte ${resumen.sedeNombre}',
+            descripcion: 'Reporte generado: ${resumen.sedeNombre} - Período: ${DateFormat('dd/MM/yyyy').format(fechaInicio)} a ${DateFormat('dd/MM/yyyy').format(fechaFin)}',
+            datosAdicionales: {
+              'sedeId': sedeId ?? 'todas',
+              'sedeNombre': resumen.sedeNombre,
+              'fechaInicio': fechaInicio.toIso8601String(),
+              'fechaFin': fechaFin.toIso8601String(),
+              'totalAsistencias': resumen.totalAsistencias,
+              'totalAusencias': resumen.totalAusencias,
+              'totalTardanzas': resumen.totalTardanzas,
+              'porcentajeAsistencia': resumen.porcentajeAsistencia,
+            },
+            dispositivoId: dispositivoInfo.id,
+            dispositivoMarca: dispositivoInfo.marca,
+            dispositivoModelo: dispositivoInfo.modelo,
+          );
+        } catch (e) {
+          log('Error al registrar auditoría de generación: $e');
+          // No fallar si no se puede registrar auditoría
+        }
+      }
+
     } catch (e, stackTrace) {
       // No exponer detalles técnicos al usuario por seguridad
       log('Error al generar reporte: $e', error: e, stackTrace: stackTrace);
@@ -368,7 +408,14 @@ class ReporteController extends ChangeNotifier {
 
   // Delega la creación y la acción de compartir el PDF a una clase especializada.
   // Retorna true si se exportó exitosamente, false en caso de error.
-  Future<bool> exportarReporteAPDF() async {
+  // 
+  // Parámetros:
+  // - usuarioId: ID del usuario que exporta el reporte
+  // - usuarioNombre: Nombre del usuario que exporta el reporte
+  Future<bool> exportarReporteAPDF({
+    required String usuarioId,
+    required String usuarioNombre,
+  }) async {
     // Validación: Verificar que hay un reporte generado
     if (_reporte == null) {
       _errorMessage = 'No hay un reporte generado para exportar.';
@@ -396,16 +443,50 @@ class ReporteController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Obtener información del dispositivo
+      final dispositivoInfo = await _deviceInfoService.obtenerInformacionDispositivo();
+
       final pdfGenerator = PdfReportGenerator(
         reporte: _reporte!,
         todosLosEmpleados: _todosLosEmpleados,
       );
-      final exito = await pdfGenerator.generateAndSharePdf();
+      final exito = await pdfGenerator.generateAndSharePdf(
+        guardarLocal: true,
+        usuarioId: usuarioId,
+        usuarioNombre: usuarioNombre,
+      );
       
       if (!exito) {
         _errorMessage = 'Error al generar el PDF. Por favor, intente nuevamente.';
         notifyListeners();
         return false;
+      }
+
+      // Registrar auditoría de exportación de reporte
+      try {
+        await _auditoriaService.registrarAuditoria(
+          usuarioId: usuarioId,
+          usuarioNombre: usuarioNombre,
+          tipoAccion: TipoAccion.exportarReporte,
+          tipoEntidad: TipoEntidad.reporte,
+          entidadId: null,
+          entidadNombre: 'Reporte ${_reporte!.resumen.sedeNombre}',
+          descripcion: 'Reporte exportado: ${_reporte!.resumen.sedeNombre} - ${_reporte!.resumen.totalAsistencias} asistencias',
+          datosAdicionales: {
+            'sedeId': _reporte!.resumen.sedeId,
+            'sedeNombre': _reporte!.resumen.sedeNombre,
+            'totalAsistencias': _reporte!.resumen.totalAsistencias,
+            'totalAusencias': _reporte!.resumen.totalAusencias,
+            'totalTardanzas': _reporte!.resumen.totalTardanzas,
+            'porcentajeAsistencia': _reporte!.resumen.porcentajeAsistencia,
+          },
+          dispositivoId: dispositivoInfo.id,
+          dispositivoMarca: dispositivoInfo.marca,
+          dispositivoModelo: dispositivoInfo.modelo,
+        );
+      } catch (e) {
+        log('Error al registrar auditoría de exportación: $e');
+        // No fallar si no se puede registrar auditoría
       }
       
       return true;

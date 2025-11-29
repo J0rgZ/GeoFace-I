@@ -1,0 +1,106 @@
+{
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "editor.rulers": [
+    80
+  ],
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "files.associations": {
+    "*.dart": "dart"
+  },
+  "files.exclude": {
+    "**/.dart_tool": true,
+    "**/.idea": true,
+    "**/.packages": true,
+    "**/build": true,
+    "**/.flutter-plugins": true,
+    "**/.flutter-plugins-dependencies": true
+  },
+  "search.exclude": {
+    "**/build": true,
+    "**/.dart_tool": true,
+    "**/.idea": true,
+    "**/coverage": true,
+    "**/node_modules": true
+  },
+  "[dart]": {
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
+    "editor.rulers": [
+      80
+    ],
+    "editor.selectionHighlight": false,
+    "editor.suggest.snippetsPreventQuickSuggestions": false,
+    "editor.suggestSelection": "first",
+    "editor.tabCompletion": "onlySnippets",
+    "editor.wordBasedSuggestions": "off",
+    "editor.defaultFormatter": "Dart-Code.dart-code"
+  },
+  "dart.previewFlutterUiGuides": true,
+  "dart.previewFlutterUiGuidesCustomTracking": true,
+  "dart.debugExternalPackageLibraries": false,
+  "dart.debugSdkLibraries": false,
+  "dart.lineLength": 80,
+  "dart.analysisExcludedFolders": [
+    "build",
+    ".dart_tool",
+    "coverage"
+  ],
+  "dart.enableSdkFormatter": true,
+  "dart.flutterSdkPath": "",
+  "dart.previewLsp": true,
+  "cursor.chat.showContextFiles": true,
+  "cursor.aiRules.enabled": true,
+  "cursor.aiRules.file": ".cursorrules",
+  "cursor.aiModelConfig": {
+    "contextFiles": [
+      ".cursorrules",
+      "mcp_config.json",
+      "pubspec.yaml",
+      "README.md"
+    ]
+  },
+  "files.watcherExclude": {
+    "**/build/**": true,
+    "**/.dart_tool/**": true,
+    "**/node_modules/**": true,
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true
+  },
+  "dart.completeFunctionCalls": true,
+  "dart.showTodos": true,
+  "dart.updateImportsOnRename": true,
+  "dart.openTestView": [
+    "testRunStart"
+  ],
+  "dart.warnWhenEditingFilesOutsideWorkspace": true,
+  "dart.warnWhenEditingFilesInPubCache": true,
+  "git.ignoreLimitWarning": true,
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "pubspec.yaml": "pubspec.lock, .flutter-plugins, .flutter-plugins-dependencies, .packages",
+    "*.dart": "${capture}.g.dart, ${capture}.freezed.dart",
+    "analysis_options.yaml": ".analysis_options.yaml"
+  },
+  "flutter.automaticRestart": false,
+  "flutter.hotReloadOnSave": "manual",
+  "flutter.triggerHotReloadOnSave": true,
+  "cSpell.words": [
+    "asistencia",
+    "biometrico",
+    "empleado",
+    "geoface",
+    "geocoding",
+    "geolocator",
+    "firestore",
+    "sqflite",
+    "mlkit",
+    "auditoria",
+    "reportes",
+    "sede"
+  ]
+}

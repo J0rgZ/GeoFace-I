@@ -19,15 +19,19 @@
 // -----------------------------------------------------------------------------
 
 import 'dart:developer';
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 import 'package:collection/collection.dart';
 import '../controllers/reporte_controller.dart';
 import '../models/asistencia.dart';
 import '../models/empleado.dart';
+import '../services/reporte_local_service.dart';
 
 class PdfReportGenerator {
   final ReporteDetallado reporte;
@@ -98,9 +102,8 @@ class PdfReportGenerator {
   }
 
 
-  /// Genera y muestra la pantalla para compartir/imprimir el PDF.
-  /// Retorna true si se generó exitosamente, false en caso de error.
-  Future<bool> generateAndSharePdf() async {
+  /// Genera el PDF y retorna los bytes del archivo
+  Future<List<int>?> generatePdfBytes() async {
     try {
       // Validar que hay datos para el reporte
       final diasConAsistencias = reporte.asistenciasPorDia.keys.toList();
@@ -113,13 +116,13 @@ class PdfReportGenerator {
       
       if (!tieneDatos) {
         log("No hay datos para generar el reporte PDF.");
-        return false;
+        return null;
       }
 
       final theme = await _loadThemeData();
       if (theme == null) {
         log("No se pudo cargar las fuentes para el PDF.");
-        return false;
+        return null;
       }
 
       final doc = pw.Document();
@@ -146,15 +149,104 @@ class PdfReportGenerator {
         ),
       );
 
-      // Usar 'printing' para mostrar, compartir o imprimir el PDF.
-      await Printing.layoutPdf(
-        onLayout: (PdfPageFormat format) async => doc.save(),
-        name: 'reporte_asistencia_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.pdf',
+      return await doc.save();
+    } catch (e) {
+      log('Error al generar el PDF: $e');
+      return null;
+    }
+  }
+
+  /// Genera y comparte el PDF usando ShareSheet nativo.
+  /// Retorna true si se generó exitosamente, false en caso de error.
+  /// 
+  /// Parámetros opcionales:
+  /// - guardarLocal: Si es true, guarda el reporte en almacenamiento local
+  /// - usuarioId: ID del usuario que genera el reporte (para guardar localmente)
+  /// - usuarioNombre: Nombre del usuario (para guardar localmente)
+  Future<bool> generateAndSharePdf({
+    bool guardarLocal = true,
+    String? usuarioId,
+    String? usuarioNombre,
+  }) async {
+    File? archivoTemporal;
+    try {
+      // Generar bytes del PDF
+      final pdfBytes = await generatePdfBytes();
+      if (pdfBytes == null) {
+        return false;
+      }
+
+      // Crear archivo temporal
+      final tempDir = await getTemporaryDirectory();
+      final nombreArchivo = 'reporte_asistencia_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.pdf';
+      archivoTemporal = File(path.join(tempDir.path, nombreArchivo));
+      await archivoTemporal.writeAsBytes(pdfBytes);
+
+      // Guardar localmente si se solicita
+      if (guardarLocal && usuarioId != null && usuarioNombre != null) {
+        try {
+          final reporteLocalService = ReporteLocalService();
+          await reporteLocalService.initialize();
+          
+          final fechaFinReporte = reporte.asistenciasPorDia.keys.isNotEmpty 
+              ? reporte.asistenciasPorDia.keys.last 
+              : reporte.resumen.fecha;
+          final fechaInicioReporte = reporte.asistenciasPorDia.keys.isNotEmpty 
+              ? reporte.asistenciasPorDia.keys.first 
+              : reporte.resumen.fecha;
+
+          await reporteLocalService.guardarReporte(
+            nombreArchivo: nombreArchivo,
+            bytesArchivo: pdfBytes,
+            usuarioId: usuarioId,
+            usuarioNombre: usuarioNombre,
+            fechaInicio: fechaInicioReporte,
+            fechaFin: fechaFinReporte,
+            sedeId: reporte.resumen.sedeId != 'todas' ? reporte.resumen.sedeId : null,
+            sedeNombre: reporte.resumen.sedeNombre,
+            totalAsistencias: reporte.resumen.totalAsistencias,
+            totalAusencias: reporte.resumen.totalAusencias,
+            totalTardanzas: reporte.resumen.totalTardanzas,
+            porcentajeAsistencia: reporte.resumen.porcentajeAsistencia,
+            totalEmpleados: reporte.resumen.totalEmpleados,
+          );
+        } catch (e) {
+          log('Error al guardar reporte localmente: $e');
+          // No fallar si no se puede guardar localmente
+        }
+      }
+
+      // Compartir usando ShareSheet nativo
+      final xFile = XFile(archivoTemporal.path);
+      await Share.shareXFiles(
+        [xFile],
+        subject: 'Reporte de Asistencia - ${DateFormat('dd/MM/yyyy').format(DateTime.now())}',
+        text: 'Reporte de asistencia generado el ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
       );
+
+      // Limpiar archivo temporal después de compartir
+      // Esperar un poco para asegurar que el share sheet haya procesado el archivo
+      await Future.delayed(const Duration(seconds: 2));
+      if (await archivoTemporal.exists()) {
+        try {
+          await archivoTemporal.delete();
+        } catch (e) {
+          log('Error al eliminar archivo temporal: $e');
+          // No es crítico si no se puede eliminar inmediatamente
+        }
+      }
       
       return true;
     } catch (e) {
-      log('Error al generar el PDF: $e');
+      log('Error al generar y compartir el PDF: $e');
+      // Intentar limpiar archivo temporal en caso de error
+      if (archivoTemporal != null && await archivoTemporal.exists()) {
+        try {
+          await archivoTemporal.delete();
+        } catch (deleteError) {
+          log('Error al eliminar archivo temporal después de error: $deleteError');
+        }
+      }
       return false;
     }
   }

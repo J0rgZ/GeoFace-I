@@ -22,6 +22,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/usuario.dart';
+import '../services/auditoria_service.dart';
+import '../services/device_info_service.dart';
+import '../models/auditoria.dart';
 
 // Define los posibles estados de autenticación para un manejo claro en la UI.
 enum AuthStatus { initial, authenticated, unauthenticated, loading }
@@ -29,6 +32,8 @@ enum AuthStatus { initial, authenticated, unauthenticated, loading }
 class AuthController with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final AuditoriaService _auditoriaService = AuditoriaService();
+  final DeviceInfoService _deviceInfoService = DeviceInfoService();
 
   // Estado interno del controlador.
   AuthStatus _status = AuthStatus.initial;
@@ -52,12 +57,51 @@ class AuthController with ChangeNotifier {
   // Este método es el oyente principal que reacciona a inicios de sesión,
   // cierres de sesión o cambios en el token del usuario.
   Future<void> _onAuthStateChanged(User? firebaseUser) async {
+    final usuarioAnterior = _currentUser;
+    
     if (firebaseUser == null) {
+      // Logout - registrar auditoría antes de limpiar
+      if (usuarioAnterior != null) {
+        try {
+          final dispositivoInfo = await _deviceInfoService.obtenerInformacionDispositivo();
+          await _auditoriaService.registrarAuditoria(
+            usuarioId: usuarioAnterior.id,
+            usuarioNombre: usuarioAnterior.nombreUsuario,
+            tipoAccion: TipoAccion.logout,
+            tipoEntidad: TipoEntidad.sesion,
+            descripcion: 'Cierre de sesión',
+            dispositivoId: dispositivoInfo.id,
+            dispositivoMarca: dispositivoInfo.marca,
+            dispositivoModelo: dispositivoInfo.modelo,
+          );
+        } catch (e) {
+          // No fallar si no se puede registrar auditoría
+        }
+      }
       _currentUser = null;
       _status = AuthStatus.unauthenticated;
     } else {
       // Si Firebase confirma un usuario, buscamos sus datos en nuestra base de datos.
       await _fetchUserData(firebaseUser.uid);
+      
+      // Login - registrar auditoría después de cargar datos del usuario
+      if (_currentUser != null && usuarioAnterior == null) {
+        try {
+          final dispositivoInfo = await _deviceInfoService.obtenerInformacionDispositivo();
+          await _auditoriaService.registrarAuditoria(
+            usuarioId: _currentUser!.id,
+            usuarioNombre: _currentUser!.nombreUsuario,
+            tipoAccion: TipoAccion.login,
+            tipoEntidad: TipoEntidad.sesion,
+            descripcion: 'Inicio de sesión',
+            dispositivoId: dispositivoInfo.id,
+            dispositivoMarca: dispositivoInfo.marca,
+            dispositivoModelo: dispositivoInfo.modelo,
+          );
+        } catch (e) {
+          // No fallar si no se puede registrar auditoría
+        }
+      }
     }
     notifyListeners();
   }
@@ -113,6 +157,9 @@ class AuthController with ChangeNotifier {
       
       await _auth.signInWithEmailAndPassword(email: finalEmail, password: password);
       
+      // Registrar auditoría de login (después de que _onAuthStateChanged cargue el usuario)
+      // Se registrará en _onAuthStateChanged cuando se cargue el usuario
+      
       // Si el login es exitoso, el listener _onAuthStateChanged se activará automáticamente
       // y se encargará de actualizar el estado de la aplicación.
       return true;
@@ -155,6 +202,25 @@ class AuthController with ChangeNotifier {
       );
       await user.reauthenticateWithCredential(credential);
       await user.updatePassword(newPassword);
+      
+      // Registrar auditoría de cambio de contraseña
+      if (_currentUser != null) {
+        try {
+          final dispositivoInfo = await _deviceInfoService.obtenerInformacionDispositivo();
+          await _auditoriaService.registrarAuditoria(
+            usuarioId: _currentUser!.id,
+            usuarioNombre: _currentUser!.nombreUsuario,
+            tipoAccion: TipoAccion.cambiarContrasena,
+            tipoEntidad: TipoEntidad.configuracion,
+            descripcion: 'Cambio de contraseña',
+            dispositivoId: dispositivoInfo.id,
+            dispositivoMarca: dispositivoInfo.marca,
+            dispositivoModelo: dispositivoInfo.modelo,
+          );
+        } catch (e) {
+          // No fallar si no se puede registrar auditoría
+        }
+      }
       
       _status = AuthStatus.authenticated; // Vuelve al estado autenticado.
       notifyListeners();

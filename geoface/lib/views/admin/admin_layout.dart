@@ -34,6 +34,8 @@ import '../admin/administradores_page.dart';
 import 'gestion_usuarios_empleados_page.dart';
 import '../admin/cambiar_contrasena_page.dart';
 import '../admin/notificaciones_page.dart';
+import '../admin/auditoria_page.dart';
+import '../admin/reportes_guardados_page.dart';
 
 /// AdminLayout: El contenedor principal para la interfaz de administrador.
 ///
@@ -473,6 +475,8 @@ class _SettingsMenu extends StatelessWidget {
                     _buildOptionTile(Icons.admin_panel_settings_rounded, "Administradores", () => onNavigate(const AdministradoresPage()), theme),
                     _buildOptionTile(Icons.assignment_ind_rounded, "Gestionar Usuario", () => onNavigate(const GestionUsuariosEmpleadosPage()), theme),
                     _buildOptionTile(Icons.api_rounded, "API Reconocimiento", () => onNavigate(const ApiConfigPage()), theme),
+                    _buildOptionTile(Icons.verified_user_rounded, "Auditoría", () => onNavigate(const AuditoriaPage()), theme),
+                    _buildOptionTile(Icons.folder_shared_rounded, "Reportes Guardados", () => onNavigate(const ReportesGuardadosPage()), theme),
                   ]),
                   _buildMenuSection(context, "Aplicación", [
                     _buildOptionTile(isDarkMode ? Icons.light_mode_rounded : Icons.dark_mode_rounded, isDarkMode ? 'Modo Claro' : 'Modo Oscuro', onToggleTheme, theme),

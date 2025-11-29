@@ -25,6 +25,7 @@ import 'package:geoface/models/empleado.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/empleado_controller.dart';
 import '../../controllers/sede_controller.dart';
+import '../../controllers/auth_controller.dart';
 
 class EmpleadoFormPage extends StatefulWidget {
   final Empleado? empleado;
@@ -102,6 +103,9 @@ class _EmpleadoFormPageState extends State<EmpleadoFormPage> {
     setState(() => _isLoading = true);
 
     try {
+      final authController = Provider.of<AuthController>(context, listen: false);
+      final currentUser = authController.currentUser;
+      
       final success = await _empleadoController.addEmpleado(
         nombre: _nombreController.text.trim(),
         apellidos: _apellidosController.text.trim(),
@@ -110,6 +114,8 @@ class _EmpleadoFormPageState extends State<EmpleadoFormPage> {
         correo: _correoController.text.trim(),
         cargo: _cargoController.text.trim(),
         sedeId: _sedeSeleccionada!,
+        usuarioId: currentUser?.id,
+        usuarioNombre: currentUser?.nombreUsuario,
       );
 
       if (mounted) {

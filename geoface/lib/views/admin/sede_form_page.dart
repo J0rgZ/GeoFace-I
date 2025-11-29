@@ -26,6 +26,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:lottie/lottie.dart' hide Marker;
 import 'package:provider/provider.dart';
 import '../../controllers/sede_controller.dart';
+import '../../controllers/auth_controller.dart';
 import '../../models/sede.dart';
 import '../../utils/validators.dart';
 import 'sede_mapa_seleccion_page.dart';
@@ -145,6 +146,9 @@ class _SedeFormPageState extends State<SedeFormPage> {
 
       final sedeController =
           Provider.of<SedeController>(context, listen: false);
+      final authController = Provider.of<AuthController>(context, listen: false);
+      final currentUser = authController.currentUser;
+      
       bool success;
 
       if (_isEditing) {
@@ -156,6 +160,8 @@ class _SedeFormPageState extends State<SedeFormPage> {
           longitud: _ubicacion!.longitude,
           radioPermitido: _radioPermitido.toInt(),
           activa: _activa,
+          usuarioId: currentUser?.id,
+          usuarioNombre: currentUser?.nombreUsuario,
         );
       } else {
         success = await sedeController.addSede(
@@ -164,6 +170,8 @@ class _SedeFormPageState extends State<SedeFormPage> {
           latitud: _ubicacion!.latitude,
           longitud: _ubicacion!.longitude,
           radioPermitido: _radioPermitido.toInt(),
+          usuarioId: currentUser?.id,
+          usuarioNombre: currentUser?.nombreUsuario,
         );
       }
 

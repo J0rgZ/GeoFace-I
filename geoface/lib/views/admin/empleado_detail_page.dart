@@ -24,6 +24,7 @@ import 'package:geoface/views/admin/registro_biometrico_page.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/empleado_controller.dart';
 import '../../controllers/sede_controller.dart';
+import '../../controllers/auth_controller.dart';
 import '../../models/empleado.dart';
 
 class EmpleadoDetailPage extends StatefulWidget {
@@ -119,6 +120,9 @@ class _EmpleadoDetailPageState extends State<EmpleadoDetailPage> {
     setState(() => _isLoading = true);
 
     try {
+      final authController = Provider.of<AuthController>(context, listen: false);
+      final currentUser = authController.currentUser;
+      
       final success = await _empleadoController.updateEmpleado(
         id: widget.empleadoId,
         nombre: _nombreController.text.trim(),
@@ -129,6 +133,8 @@ class _EmpleadoDetailPageState extends State<EmpleadoDetailPage> {
         cargo: _cargoController.text.trim(),
         sedeId: _sedeSeleccionada!,
         activo: _empleado!.activo,
+        usuarioId: currentUser?.id,
+        usuarioNombre: currentUser?.nombreUsuario,
       );
 
       if (mounted) {

@@ -26,6 +26,7 @@ import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart'; // Para el efecto de carga
 import '../../controllers/reporte_controller.dart';
 import '../../controllers/sede_controller.dart';
+import '../../controllers/auth_controller.dart';
 import '../../models/asistencia.dart';
 import '../../models/empleado.dart';
 import '../../models/sede.dart';
@@ -118,11 +119,16 @@ class _ReportesPageState extends State<ReportesPage> {
                     if (confirmacion == true && mounted) {
                       // ignore: use_build_context_synchronously
                       final scaffoldMessenger = ScaffoldMessenger.of(context);
+                      final authController = Provider.of<AuthController>(context, listen: false);
+                      final currentUser = authController.currentUser;
+                      
                       await reporteController.generarReporteDetallado(
                         fechaInicio: startOfMonth,
                         fechaFin: endOfMonth,
                         sedes: sedeController.sedes,
                         sedeId: sedeId,
+                        usuarioId: currentUser?.id ?? '',
+                        usuarioNombre: currentUser?.nombreUsuario ?? 'Usuario',
                       );
                       
                       // Mostrar mensaje de error si existe
@@ -429,7 +435,23 @@ class _ReportesPageState extends State<ReportesPage> {
     );
 
     if (confirmacion == true && mounted) {
-      final exito = await reporteController.exportarReporteAPDF();
+      final authController = Provider.of<AuthController>(context, listen: false);
+      final currentUser = authController.currentUser;
+      
+      if (currentUser == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo obtener la información del usuario.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+      
+      final exito = await reporteController.exportarReporteAPDF(
+        usuarioId: currentUser.id,
+        usuarioNombre: currentUser.nombreUsuario,
+      );
       
       if (mounted) {
         if (exito) {
